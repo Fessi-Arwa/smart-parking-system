@@ -1,3 +1,4 @@
+from .base import ModelMixin
 from .compte import Compte
 from .parking import Parking
 from .place import Place
