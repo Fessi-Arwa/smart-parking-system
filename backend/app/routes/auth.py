@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from ..models.compte import Compte
+from ..models.compte import RoleCompte
 from .. import db
 from flask_jwt_extended import create_access_token
 
@@ -13,7 +14,7 @@ def register():
         nom=data["nom"],
         email=data["email"],
         mot_passe=data["mot_passe"],
-        role="conducteur"
+        role=RoleCompte.conducteur
     )
 
     db.session.add(user)
