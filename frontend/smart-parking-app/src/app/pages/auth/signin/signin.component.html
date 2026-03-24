@@ -1,6 +1,7 @@
 <div class="auth-container">
-  <div class="hidden-content">
-    <div class="left-content" #leftContent>
+  <!-- Contenu qui sera révélé -->
+  <div class="content-wrapper">
+    <div class="left-content">
       <div class="app-name">
         <h1>
           PARKINI
@@ -10,7 +11,7 @@
       </div>
     </div>
     
-    <div class="right-content" #rightContent>
+    <div class="right-content">
       <div class="login-form">
         <div class="form-header">
           <h2>Bienvenue</h2>
@@ -50,8 +51,11 @@
     </div>
   </div>
 
-  <div class="reveal-layer" #revealLayer></div>
-  <div class="car-zipper" #carZipper>
+  <!-- Voile blanc -->
+  <div class="reveal-layer" id="revealLayer"></div>
+  
+  <!-- Voiture -->
+  <div class="car-zipper" id="carZipper">
     <svg class="car-svg" width="180" height="90" viewBox="0 0 180 90" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="20" y="35" width="130" height="35" rx="8" fill="#2c3e50"/>
       <rect x="45" y="15" width="80" height="25" rx="6" fill="#34495e"/>
@@ -68,5 +72,4 @@
       <rect x="95" y="48" width="15" height="3" rx="1" fill="#95a5a6"/>
     </svg>
   </div>
-  <div class="trail" #trail></div>
 </div>
