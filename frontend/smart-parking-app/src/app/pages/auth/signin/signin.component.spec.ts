@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { RouterTestingModule } from '@angular/router/testing';
-import { IonicModule } from '@ionic/angular';
 import { of } from 'rxjs';
 import { SigninComponent } from './signin.component';
 import { AuthService } from '../../../services/auth';
@@ -14,7 +13,7 @@ describe('SigninComponent', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [SigninComponent],
-      imports: [IonicModule.forRoot(), ReactiveFormsModule, RouterTestingModule],
+      imports: [ReactiveFormsModule, RouterTestingModule],
       providers: [
         {
           provide: AuthService,
