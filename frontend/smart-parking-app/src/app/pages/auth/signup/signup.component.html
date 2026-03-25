@@ -1,116 +1,88 @@
 <div class="auth-container">
   <div class="hidden-content">
-    <div class="left-content" #leftContent>
-      <div class="app-name">
-        <h1>
-          PARKINI
-          <span>SMART PARKING</span>
-        </h1>
-        <div class="app-tagline">● STATIONNEMENT INTELLIGENT ●</div>
-      </div>
-    </div>
-    
-    <div class="right-content" #rightContent>
+    <div class="right-content" [class.revealed]="isFormVisible">
       <div class="login-form">
         <div class="form-header">
-          <h2>Créer un compte</h2>
+          <h2>Creer un compte</h2>
           <p>Inscrivez-vous en quelques secondes</p>
         </div>
-        
+
         <form [formGroup]="signupForm" (ngSubmit)="onSubmit()">
           <div class="input-group">
-            <label>NOM D'UTILISATEUR</label>
-            <input 
-              type="text" 
-              formControlName="username"
-              placeholder="Jean Dupont">
+            <label>Nom complet</label>
+            <input type="text" formControlName="username" placeholder="Jean Dupont" />
             <div class="error-message" *ngIf="signupForm.get('username')?.touched && signupForm.get('username')?.invalid">
               <span *ngIf="signupForm.get('username')?.errors?.['required']">Nom d'utilisateur requis</span>
-              <span *ngIf="signupForm.get('username')?.errors?.['minlength']">Minimum 3 caractères</span>
+              <span *ngIf="signupForm.get('username')?.errors?.['minlength']">Minimum 3 caracteres</span>
             </div>
           </div>
-          
+
           <div class="input-group">
-            <label>EMAIL</label>
-            <input 
-              type="email" 
-              formControlName="email"
-              placeholder="exemple@parkini.com">
+            <label>Numero de telephone</label>
+            <input type="text" formControlName="phone" placeholder="+216 6 12 34 56 78" />
+            <div class="error-message" *ngIf="signupForm.get('phone')?.touched && signupForm.get('phone')?.invalid">
+              <span *ngIf="signupForm.get('phone')?.errors?.['pattern']">Format de numero invalide</span>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Email</label>
+            <input type="email" formControlName="email" placeholder="exemple@parkini.com" />
             <div class="error-message" *ngIf="signupForm.get('email')?.touched && signupForm.get('email')?.invalid">
               <span *ngIf="signupForm.get('email')?.errors?.['required']">Email requis</span>
               <span *ngIf="signupForm.get('email')?.errors?.['email']">Email valide requis</span>
             </div>
           </div>
-          
+
           <div class="input-group">
-            <label>MOT DE PASSE</label>
-            <input 
-              type="password" 
-              formControlName="password"
-              placeholder="••••••••">
-            <div class="error-message" *ngIf="signupForm.get('password')?.touched && signupForm.get('password')?.invalid">
-              <span *ngIf="signupForm.get('password')?.errors?.['required']">Mot de passe requis</span>
-              <span *ngIf="signupForm.get('password')?.errors?.['minlength']">Minimum 6 caractères</span>
+            <label>Choisissez votre role</label>
+            <div class="role-selector">
+              <button
+                type="button"
+                class="role-button"
+                [class.active]="signupForm.get('role')?.value === 'conducteur'"
+                (click)="selectRole('conducteur')">
+                Conducteur
+              </button>
+              <button
+                type="button"
+                class="role-button"
+                [class.active]="signupForm.get('role')?.value === 'owner'"
+                (click)="selectRole('owner')">
+                Parking Owner
+              </button>
             </div>
           </div>
-          
+
           <div class="input-group">
-            <label>CONFIRMER</label>
-            <input 
-              type="password" 
-              formControlName="confirmPassword"
-              placeholder="••••••••">
+            <label>Mot de passe</label>
+            <input type="password" formControlName="password" placeholder="........" />
+            <div class="error-message" *ngIf="signupForm.get('password')?.touched && signupForm.get('password')?.invalid">
+              <span *ngIf="signupForm.get('password')?.errors?.['required']">Mot de passe requis</span>
+              <span *ngIf="signupForm.get('password')?.errors?.['minlength']">Minimum 6 caracteres</span>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Confirmer mot de passe</label>
+            <input type="password" formControlName="confirmPassword" placeholder="........" />
             <div class="error-message" *ngIf="signupForm.get('confirmPassword')?.touched && signupForm.errors?.['mismatch']">
               Les mots de passe ne correspondent pas
             </div>
           </div>
-          
-          <button 
-            type="submit" 
-            class="btn-login"
-            [disabled]="signupForm.invalid || isLoading">
+
+          <button type="submit" class="btn-login" [disabled]="signupForm.invalid || isLoading">
             <span *ngIf="!isLoading">S'inscrire</span>
             <span *ngIf="isLoading">Inscription...</span>
           </button>
         </form>
-        
+
         <div class="signup-link">
-          <p>Déjà un compte ? <a (click)="goToSignin()">Se connecter</a></p>
+          <p>Deja un compte ? <a (click)="goToSignin()">Se connecter</a></p>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="reveal-layer" #revealLayer></div>
-  <div class="car-zipper" #carZipper>
-    <svg class="car-svg" width="180" height="90" viewBox="0 0 180 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="luxuryBodySignup" x1="24" y1="24" x2="152" y2="68" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#0b1220"/>
-          <stop offset="0.5" stop-color="#1f2937"/>
-          <stop offset="1" stop-color="#05070d"/>
-        </linearGradient>
-        <linearGradient id="luxuryGlassSignup" x1="56" y1="26" x2="122" y2="41" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#e2e8f0"/>
-          <stop offset="1" stop-color="#94a3b8"/>
-        </linearGradient>
-      </defs>
-      <path d="M18 61C19 55 24 49 31 47L45 43C53 30 68 22 86 22H108C124 22 136 29 145 40L153 42C160 44 165 50 166 57L167 61H18Z" fill="url(#luxuryBodySignup)"/>
-      <path d="M38 45C46 31 61 25 79 25H106C119 25 129 30 137 40L139 45H38Z" fill="#111827"/>
-      <path d="M58 28H81C73 28 66 33 61 41H44C48 34 53 30 58 28Z" fill="url(#luxuryGlassSignup)"/>
-      <path d="M85 28H105C116 28 125 33 132 41H85V28Z" fill="#cbd5e1"/>
-      <path d="M27 53H37" stroke="#f8fafc" stroke-width="2.4" stroke-linecap="round"/>
-      <path d="M143 53H156" stroke="#ef4444" stroke-width="2.4" stroke-linecap="round"/>
-      <path d="M54 60H132" stroke="#475569" stroke-width="2.5" stroke-linecap="round"/>
-      <path d="M68 46H95" stroke="#f8fafc" stroke-width="1.8" stroke-linecap="round" opacity="0.85"/>
-      <circle cx="54" cy="62" r="14" fill="#020617"/>
-      <circle cx="54" cy="62" r="8.5" fill="#64748b"/>
-      <circle cx="54" cy="62" r="4.5" fill="#e5e7eb"/>
-      <circle cx="130" cy="62" r="14" fill="#020617"/>
-      <circle cx="130" cy="62" r="8.5" fill="#64748b"/>
-      <circle cx="130" cy="62" r="4.5" fill="#e5e7eb"/>
-      <path d="M149 42L156 44C160 45 162 48 163 51H150L149 42Z" fill="#0f172a"/>
-    </svg>
-  </div>
-  <div class="trail" #trail></div>
+  <app-car-animation [run]="animateCar" [durationMs]="4200"></app-car-animation>
 </div>

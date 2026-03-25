@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { CanActivate, ActivatedRouteSnapshot, Router } from '@angular/router';
-import { AuthService } from '../services/auth';
+import { AuthService } from '../services/auth.service';
 
 @Injectable({
   providedIn: 'root'
@@ -16,18 +16,17 @@ export class RoleGuard implements CanActivate {
     const user = this.authService.getCurrentUser();
 
     if (!user) {
-      this.router.navigate(['/auth/signin']);
+      this.router.navigate(['/pages/auth/signin/form']);
       return false;
     }
 
     if (user.role !== expectedRole) {
-      // Rediriger vers la page appropriée selon le rôle
-      if (user.role === 'driver') {
-        this.router.navigate(['/driver/home']);
+      if (user.role === 'conducteur') {
+        this.router.navigate(['/dashboard']);
       } else if (user.role === 'owner') {
         this.router.navigate(['/owner/dashboard']);
       } else {
-        this.router.navigate(['/auth/signin']);
+        this.router.navigate(['/pages/auth/signin/form']);
       }
       return false;
     }

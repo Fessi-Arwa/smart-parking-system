@@ -1,8 +1,8 @@
-import { Component, OnInit, Renderer2, ElementRef, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
+import { AfterViewInit, Component, OnInit } from '@angular/core';
 import { AbstractControl, FormBuilder, FormGroup, ValidationErrors, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { AuthService } from '../../../services/auth';
+import { AuthService } from '../../../services/auth.service';
 import { ToastService } from '../../../services/toast.service';
 
 @Component({
@@ -11,29 +11,26 @@ import { ToastService } from '../../../services/toast.service';
   styleUrls: ['./signup.component.scss'],
   standalone: false,
 })
-export class SignupComponent implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild('revealLayer') revealLayer!: ElementRef;
-  @ViewChild('carZipper') carZipper!: ElementRef;
-  @ViewChild('leftContent') leftContent!: ElementRef;
-  @ViewChild('rightContent') rightContent!: ElementRef;
-
+export class SignupComponent implements OnInit, AfterViewInit {
   signupForm: FormGroup;
   isLoading = false;
-  private animationFrame: number | null = null;
+  isFormVisible = false;
+  animateCar = false;
 
   constructor(
     private fb: FormBuilder,
     private authService: AuthService,
     private router: Router,
-    private toastService: ToastService,
-    private renderer: Renderer2
+    private toastService: ToastService
   ) {
     this.signupForm = this.fb.group(
       {
         username: ['', [Validators.required, Validators.minLength(3)]],
+        phone: ['', [Validators.pattern(/^\+?[0-9\s-]{8,20}$/)]],
         email: ['', [Validators.required, Validators.email]],
         password: ['', [Validators.required, Validators.minLength(6)]],
         confirmPassword: ['', [Validators.required]],
+        role: ['conducteur', [Validators.required]],
       },
       { validators: this.passwordMatchValidator }
     );
@@ -49,61 +46,13 @@ export class SignupComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  ngAfterViewInit() {
+  ngAfterViewInit(): void {
     setTimeout(() => {
-      this.startAnimation();
-    }, 500);
-  }
-
-  private startAnimation() {
-    this.renderer.setStyle(this.carZipper.nativeElement, 'transform', `translateX(${window.innerWidth}px) translateY(-50%)`);
-    this.renderer.setStyle(this.carZipper.nativeElement, 'top', '50%');
-    this.renderer.setStyle(this.carZipper.nativeElement, 'opacity', '1');
-
-    const startTime = performance.now();
-    const duration = 4000;
-    const startX = window.innerWidth;
-    const endX = -200;
-
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      let progress = Math.min(elapsed / duration, 1);
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      const currentX = startX + (endX - startX) * easeProgress;
-
-      this.renderer.setStyle(this.carZipper.nativeElement, 'transform', `translateX(${currentX}px) translateY(-50%)`);
-
-      const windowWidth = window.innerWidth;
-      const carRightEdge = currentX + 140;
-      let revealPercent = (carRightEdge / windowWidth) * 100;
-      revealPercent = Math.min(Math.max(revealPercent, 0), 100);
-
-      this.renderer.setStyle(
-        this.revealLayer.nativeElement,
-        'clipPath',
-        `inset(0 ${100 - revealPercent}% 0 0)`
-      );
-
-      if (revealPercent > 60) {
-        this.renderer.addClass(this.leftContent.nativeElement, 'revealed');
-        this.renderer.addClass(this.rightContent.nativeElement, 'revealed');
-      }
-
-      if (progress < 1) {
-        this.animationFrame = requestAnimationFrame(animate);
-      } else {
-        if (this.animationFrame) {
-          cancelAnimationFrame(this.animationFrame);
-          this.animationFrame = null;
-        }
-        this.renderer.setStyle(this.revealLayer.nativeElement, 'clipPath', 'inset(0 100% 0 0)');
-        this.renderer.setStyle(this.carZipper.nativeElement, 'opacity', '0');
-        this.renderer.addClass(this.leftContent.nativeElement, 'revealed');
-        this.renderer.addClass(this.rightContent.nativeElement, 'revealed');
-      }
-    };
-
-    this.animationFrame = requestAnimationFrame(animate);
+      this.animateCar = true;
+    }, 100);
+    setTimeout(() => {
+      this.isFormVisible = true;
+    }, 1350);
   }
 
   async onSubmit(): Promise<void> {
@@ -114,24 +63,25 @@ export class SignupComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.isLoading = true;
     try {
-      const { username, email, password } = this.signupForm.value;
-      await firstValueFrom(this.authService.signup(username, email, password));
-      this.toastService.show('Inscription réussie ! Bienvenue sur PARKINI 🚗', 'success');
-      await this.router.navigate(['/owner/dashboard']);
+      const { username, phone, email, password, role } = this.signupForm.value;
+      await firstValueFrom(this.authService.signup(username, email, password, phone, role));
+      this.toastService.show("Inscription reussie ! Bienvenue sur PARKINI", 'success');
+      await this.router.navigate([
+        role === 'owner' ? '/pages/auth/onboarding/owner' : '/pages/auth/onboarding/driver',
+      ]);
     } catch (error: any) {
-      this.toastService.show(error.error?.error || "Erreur d'inscription", 'error');
+      this.toastService.show(error.error?.msg || error.error?.error || "Erreur d'inscription", 'error');
     } finally {
       this.isLoading = false;
     }
   }
 
-  goToSignin(): void {
-    this.router.navigate(['/auth/signin']);
+  selectRole(role: 'conducteur' | 'owner'): void {
+    this.signupForm.get('role')?.setValue(role);
+    this.signupForm.get('role')?.markAsTouched();
   }
 
-  ngOnDestroy() {
-    if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame);
-    }
+  goToSignin(): void {
+    this.router.navigate(['/pages/auth/signin/form']);
   }
 }

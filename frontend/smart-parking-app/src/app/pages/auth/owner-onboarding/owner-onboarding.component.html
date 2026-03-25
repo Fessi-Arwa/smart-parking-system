@@ -1,0 +1,39 @@
+<div class="onboarding-shell">
+  <div class="onboarding-card" [class.revealed]="isFormVisible">
+    <div class="header">
+      <span class="eyebrow">Parking Owner</span>
+      <h1>Ajoutez votre premier parking</h1>
+      <p>Renseignez les informations essentielles pour publier votre espace de stationnement.</p>
+    </div>
+
+    <form [formGroup]="parkingForm" (ngSubmit)="onSubmit()">
+      <div class="input-group">
+        <label>Nom du parking</label>
+        <input type="text" formControlName="nom" placeholder="Parking Centre Ville" />
+      </div>
+
+      <div class="input-group">
+        <label>Adresse détaillée</label>
+        <input type="text" formControlName="adresse" placeholder="12 rue de la Gare, 2ème étage, près du centre commercial" />
+      </div>
+
+      <div class="input-group">
+        <label>Capacité</label>
+        <input type="number" formControlName="capacite" placeholder="20" />
+      </div>
+
+      <div class="input-group">
+        <label>Tarif horaire</label>
+        <input type="number" formControlName="prix_heure" placeholder="5" />
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="primary-btn" [disabled]="parkingForm.invalid || isLoading">
+          {{ isLoading ? 'Enregistrement...' : 'Continuer' }}
+        </button>
+        <button type="button" class="secondary-btn" (click)="skip()">Passer pour le moment</button>
+      </div>
+    </form>
+  </div>
+  <app-car-animation [run]="animateCar" [durationMs]="4200"></app-car-animation>
+</div>

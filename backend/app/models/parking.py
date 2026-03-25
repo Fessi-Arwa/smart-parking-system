@@ -19,15 +19,14 @@ class Parking(ModelMixin, db.Model):
         "owner_id",
         "nom",
         "adresse",
-        "ville",
-        "latitude",
-        "longitude",
+        "capacite",
         "prix_heure",
         "statut",
         "created_at",
     )
     __table_args__ = (
         CheckConstraint("prix_heure >= 0", name="ck_parking_prix_heure_positive"),
+        CheckConstraint("capacite >= 0", name="ck_parking_capacite_positive"),
         Index("idx_parking_owner_id", "owner_id"),
     )
 
@@ -39,9 +38,7 @@ class Parking(ModelMixin, db.Model):
     )
     nom = db.Column(db.String(150), nullable=False)
     adresse = db.Column(db.Text, nullable=False)
-    ville = db.Column(db.String(100), nullable=False)
-    latitude = db.Column(db.Float, nullable=False)
-    longitude = db.Column(db.Float, nullable=False)
+    capacite = db.Column(db.Integer, nullable=False)
     prix_heure = db.Column(db.Numeric(10, 2), nullable=False)
     statut = db.Column(
         db.Enum(StatutParking, name="statut_parking"),

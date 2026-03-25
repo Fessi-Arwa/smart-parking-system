@@ -13,7 +13,6 @@ migrate = Migrate()
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-
     db.init_app(app)
     migrate.init_app(app, db, compare_type=True)
     jwt.init_app(app)
@@ -32,6 +31,7 @@ def create_app():
     from .routes.place import place_bp
     from .routes.reservation import reservation_bp
     from .routes.paiement import paiement_bp
+    from .routes.vehicule import vehicule_bp
 
     app.register_blueprint(abonnement_bp, url_prefix="/api/abonnements")
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
@@ -42,5 +42,6 @@ def create_app():
     app.register_blueprint(place_bp, url_prefix="/api/places")
     app.register_blueprint(reservation_bp, url_prefix="/api/reservations")
     app.register_blueprint(paiement_bp, url_prefix="/api/paiements")
+    app.register_blueprint(vehicule_bp, url_prefix="/api/vehicules")
 
     return app

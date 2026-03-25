@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { AuthService } from '../../../services/auth';
+import { AuthService } from '../../../services/auth.service';
 
 type DriverTab = 'home' | 'historique' | 'profil';
 type PaymentMode = 'en_ligne' | 'sur_place';
@@ -245,8 +245,9 @@ export class DashboardPage implements OnInit {
     if (currentUser) {
       this.driverProfile = {
         ...this.driverProfile,
-        nom: currentUser.username || this.driverProfile.nom,
+        nom: currentUser.nom || this.driverProfile.nom,
         email: currentUser.email || this.driverProfile.email,
+        telephone: currentUser.telephone || this.driverProfile.telephone,
       };
     }
 

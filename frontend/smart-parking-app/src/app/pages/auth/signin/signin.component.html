@@ -1,88 +1,39 @@
 <div class="auth-container">
-  <!-- Contenu qui sera révélé -->
   <div class="content-wrapper">
-    <div class="left-content">
-      <div class="app-name">
-        <h1>
-          PARKINI
-          <span>SMART PARKING</span>
-        </h1>
-        <div class="app-tagline">● STATIONNEMENT INTELLIGENT ●</div>
-      </div>
-    </div>
-    
-    <div class="right-content">
+    <div class="right-content" [class.revealed]="isFormVisible">
       <div class="login-form">
         <div class="form-header">
           <h2>Bienvenue</h2>
-          <p>Connectez-vous à votre espace</p>
+          <p>Connectez-vous a votre espace</p>
         </div>
-        
+
         <form [formGroup]="signinForm" (ngSubmit)="onSubmit()">
           <div class="input-group">
             <label>EMAIL</label>
-            <input 
-              type="email" 
-              formControlName="email"
-              placeholder="exemple@parkini.com">
+            <input type="email" formControlName="email" placeholder="exemple@parkini.com" />
           </div>
-          
+
           <div class="input-group">
             <label>MOT DE PASSE</label>
-            <input 
-              type="password" 
-              formControlName="password"
-              placeholder="••••••••">
+            <input type="password" formControlName="password" placeholder="........" />
           </div>
-          
-          <button 
-            type="submit" 
-            class="btn-login"
-            [disabled]="signinForm.invalid || isLoading">
+
+          <div class="forgot-link">
+            <a (click)="goToForgotPassword()">Mot de passe oublie ?</a>
+          </div>
+
+          <button type="submit" class="btn-login" [disabled]="signinForm.invalid || isLoading">
             <span *ngIf="!isLoading">Se connecter</span>
             <span *ngIf="isLoading">Connexion...</span>
           </button>
         </form>
-        
+
         <div class="signup-link">
-          <p>Pas encore de compte ? <a (click)="goToSignup()">Créer un compte</a></p>
+          <p>Pas encore de compte ? <a (click)="goToSignup()">Creer un compte</a></p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Voile blanc -->
-  <div class="reveal-layer" id="revealLayer"></div>
-  
-  <!-- Voiture -->
-  <div class="car-zipper" id="carZipper">
-    <svg class="car-svg" width="180" height="90" viewBox="0 0 180 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="luxuryBodySignin" x1="24" y1="24" x2="152" y2="68" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#0b1220"/>
-          <stop offset="0.5" stop-color="#1f2937"/>
-          <stop offset="1" stop-color="#05070d"/>
-        </linearGradient>
-        <linearGradient id="luxuryGlassSignin" x1="56" y1="26" x2="122" y2="41" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#e2e8f0"/>
-          <stop offset="1" stop-color="#94a3b8"/>
-        </linearGradient>
-      </defs>
-      <path d="M18 61C19 55 24 49 31 47L45 43C53 30 68 22 86 22H108C124 22 136 29 145 40L153 42C160 44 165 50 166 57L167 61H18Z" fill="url(#luxuryBodySignin)"/>
-      <path d="M38 45C46 31 61 25 79 25H106C119 25 129 30 137 40L139 45H38Z" fill="#111827"/>
-      <path d="M58 28H81C73 28 66 33 61 41H44C48 34 53 30 58 28Z" fill="url(#luxuryGlassSignin)"/>
-      <path d="M85 28H105C116 28 125 33 132 41H85V28Z" fill="#cbd5e1"/>
-      <path d="M27 53H37" stroke="#f8fafc" stroke-width="2.4" stroke-linecap="round"/>
-      <path d="M143 53H156" stroke="#ef4444" stroke-width="2.4" stroke-linecap="round"/>
-      <path d="M54 60H132" stroke="#475569" stroke-width="2.5" stroke-linecap="round"/>
-      <path d="M68 46H95" stroke="#f8fafc" stroke-width="1.8" stroke-linecap="round" opacity="0.85"/>
-      <circle cx="54" cy="62" r="14" fill="#020617"/>
-      <circle cx="54" cy="62" r="8.5" fill="#64748b"/>
-      <circle cx="54" cy="62" r="4.5" fill="#e5e7eb"/>
-      <circle cx="130" cy="62" r="14" fill="#020617"/>
-      <circle cx="130" cy="62" r="8.5" fill="#64748b"/>
-      <circle cx="130" cy="62" r="4.5" fill="#e5e7eb"/>
-      <path d="M149 42L156 44C160 45 162 48 163 51H150L149 42Z" fill="#0f172a"/>
-    </svg>
-  </div>
+  <app-car-animation [run]="animateCar" [durationMs]="4200"></app-car-animation>
 </div>
