@@ -19,7 +19,7 @@ export class AuthService {
   private apiUrl = 'http://localhost:5000/api/auth';
   private tokenKey = 'access_token';
   private userSubject = new BehaviorSubject<User | null>(null);
-  
+
   public user$ = this.userSubject.asObservable();
 
   constructor(

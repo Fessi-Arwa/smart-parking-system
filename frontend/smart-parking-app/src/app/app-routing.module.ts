@@ -1,20 +1,22 @@
 import { NgModule } from '@angular/core';
 import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
-import { AuthGuard } from './guards/auth-guard';
 
 const routes: Routes = [
   {
     path: 'pages/auth',
-    loadChildren: () => import('./pages/auth.module').then(m => m.AuthModule)
+    loadChildren: () => import('./pages/auth.module').then((m) => m.AuthModule)
   },
-{
-  path: 'dashboard',
-  loadChildren: () => import('./pages/dashboard/dashboard.module').then(m => m.DashboardPageModule)
-},
-
+  {
+    path: 'dashboard',
+    loadChildren: () => import('./pages/dashboard/dashboard.module').then((m) => m.DashboardPageModule)
+  },
+  {
+    path: 'owner',
+    loadChildren: () => import('./pages/owner/owner.module').then((m) => m.OwnerModule)
+  },
   {
     path: '',
-    redirectTo: 'pages/auth/signin',
+    redirectTo: 'owner/dashboard',
     pathMatch: 'full'
   }
 ];
@@ -25,4 +27,4 @@ const routes: Routes = [
   ],
   exports: [RouterModule]
 })
-export class AppRoutingModule { }
+export class AppRoutingModule {}

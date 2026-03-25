@@ -1,0 +1,745 @@
+.profile-container {
+  --background: #f5f7fb;
+}
+
+.profile-content {
+  padding: 20px 16px;
+  padding-bottom: 90px;
+  transition: filter 0.3s ease;
+  
+  &.blur-background {
+    filter: blur(4px);
+    pointer-events: none;
+  }
+}
+
+/* ========== HEADER PROFIL ========== */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: white;
+  padding: 24px;
+  border-radius: 28px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.avatar-wrapper {
+  position: relative;
+  
+  .profile-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #3b82f6;
+  }
+}
+
+.profile-info {
+  flex: 1;
+  
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+  }
+  
+  .role {
+    font-size: 13px;
+    color: #3b82f6;
+    margin: 0;
+  }
+}
+
+/* ========== CARTES ========== */
+.info-card, .parking-card {
+  background: white;
+  border-radius: 28px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+  }
+  
+  .header-icon {
+    font-size: 22px;
+    color: #3b82f6;
+  }
+  
+  h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0;
+  }
+  
+  .edit-icon-btn {
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border-radius: 30px;
+    color: #3b82f6;
+    transition: all 0.2s;
+    cursor: pointer;
+    
+    ion-icon {
+      font-size: 20px;
+    }
+    
+    &:hover {
+      background: #eff6ff;
+      transform: scale(1.05);
+    }
+  }
+}
+
+.add-btn {
+  background: #3b82f6;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 30px;
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  
+  ion-icon {
+    font-size: 16px;
+  }
+}
+
+/* ========== INFORMATIONS PERSONNELLES ========== */
+.info-list {
+  .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid #f0f2f5;
+    
+    &:last-child {
+      border-bottom: none;
+    }
+    
+    .info-label {
+      color: #64748b;
+      font-size: 14px;
+    }
+    
+    .info-value {
+      color: #0f172a;
+      font-weight: 500;
+      font-size: 14px;
+    }
+  }
+}
+
+/* ========== LISTE DES PARKINGS ========== */
+.parking-list {
+  .parking-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid #f0f2f5;
+    cursor: pointer;
+    
+    &:last-child {
+      border-bottom: none;
+    }
+    
+    .parking-icon {
+      width: 48px;
+      height: 48px;
+      background: #eff6ff;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      
+      ion-icon {
+        font-size: 24px;
+        color: #3b82f6;
+      }
+    }
+    
+    .parking-details {
+      flex: 1;
+      
+      h4 {
+        font-size: 16px;
+        font-weight: 600;
+        color: #0f172a;
+        margin: 0 0 4px 0;
+      }
+      
+      p {
+        font-size: 13px;
+        color: #64748b;
+        margin: 0 0 8px 0;
+      }
+      
+      .parking-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        
+        .status {
+          font-size: 11px;
+          padding: 4px 10px;
+          border-radius: 20px;
+          font-weight: 500;
+          
+          &.active {
+            background: #e6f7e6;
+            color: #22c55e;
+          }
+          
+          &.maintenance {
+            background: #fff3e0;
+            color: #f97316;
+          }
+        }
+        
+        .spaces {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 12px;
+          color: #64748b;
+          
+          ion-icon {
+            font-size: 12px;
+          }
+        }
+      }
+    }
+    
+    .chevron {
+      color: #cbd5e1;
+      font-size: 18px;
+    }
+  }
+}
+
+/* ========== DÉTAIL PARKING ========== */
+.parking-detail {
+  .detail-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: none;
+      color: #3b82f6;
+      font-size: 14px;
+      padding: 0;
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 12px;
+      
+      .icon-btn {
+        background: none;
+        border: none;
+        font-size: 20px;
+        color: #64748b;
+        
+        &.danger {
+          color: #ef4444;
+        }
+      }
+    }
+  }
+  
+  .detail-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    
+    .detail-icon {
+      width: 56px;
+      height: 56px;
+      background: #eff6ff;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      
+      ion-icon {
+        font-size: 28px;
+        color: #3b82f6;
+      }
+    }
+    
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #0f172a;
+      margin: 0 0 6px 0;
+    }
+    
+    .status-badge {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      
+      &.active {
+        background: #e6f7e6;
+        color: #22c55e;
+      }
+      
+      &.maintenance {
+        background: #fff3e0;
+        color: #f97316;
+      }
+    }
+  }
+  
+  .detail-info {
+    .info-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f2f5;
+      
+      ion-icon {
+        font-size: 18px;
+        color: #3b82f6;
+        width: 24px;
+      }
+      
+      span {
+        color: #334155;
+        font-size: 14px;
+      }
+    }
+  }
+}
+
+/* ========== BOTTOM SHEET MODAL ========== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+}
+
+.bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 28px 28px 0 0;
+  z-index: 1001;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+  max-height: 85vh;
+  overflow-y: auto;
+  
+  &.show {
+    transform: translateY(0);
+  }
+  
+  .sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: #e2e8f0;
+    border-radius: 2px;
+    margin: 12px auto;
+  }
+  
+  .sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 20px 16px;
+    border-bottom: 1px solid #f0f2f5;
+    
+    h3 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #0f172a;
+      margin: 0;
+    }
+    
+    .close-btn {
+      background: #f1f5f9;
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      
+      ion-icon {
+        font-size: 20px;
+        color: #64748b;
+      }
+    }
+  }
+  
+  .sheet-body {
+    padding: 20px;
+    
+    .input-group {
+      margin-bottom: 20px;
+      
+      label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        color: #475569;
+        margin-bottom: 8px;
+      }
+      
+      input, select, textarea {
+        width: 100%;
+        padding: 14px 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        font-size: 15px;
+        background: #ffffff;
+        color: #0f172a;
+        transition: all 0.2s;
+        
+        &::placeholder {
+          color: #94a3b8;
+        }
+        
+        &:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+      }
+      
+      select {
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 16px center;
+        background-size: 16px;
+      }
+    }
+    
+    .input-row {
+      display: flex;
+      gap: 12px;
+      
+      .input-group.half {
+        flex: 1;
+      }
+    }
+    
+    .status-options {
+      display: flex;
+      gap: 12px;
+      
+      .status-option {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #475569;
+        transition: all 0.2s;
+        
+        &.active {
+          background: #eff6ff;
+          border-color: #3b82f6;
+          color: #3b82f6;
+        }
+        
+        ion-icon {
+          font-size: 18px;
+        }
+      }
+    }
+  }
+  
+  .sheet-footer {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px 30px;
+    border-top: 1px solid #f0f2f5;
+  }
+}
+
+/* ========== CONFIRMATION SHEET ========== */
+.confirm-sheet {
+  text-align: center;
+  
+  .confirm-body {
+    text-align: center;
+    padding: 20px 20px 0;
+    
+    .confirm-icon {
+      width: 64px;
+      height: 64px;
+      background: #fee2e2;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      
+      ion-icon {
+        font-size: 32px;
+        color: #ef4444;
+      }
+    }
+    
+    h4 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #0f172a;
+      margin: 0 0 8px 0;
+    }
+    
+    p {
+      color: #64748b;
+      font-size: 14px;
+      margin: 0;
+      
+      strong {
+        color: #0f172a;
+      }
+    }
+  }
+  
+  .confirm-footer {
+    border-top: none;
+    padding-top: 0;
+  }
+}
+
+/* ========== BOUTONS ========== */
+.btn-primary {
+  background: #3b82f6;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 30px;
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+  flex: 1;
+  transition: all 0.2s;
+  cursor: pointer;
+  
+  &:hover {
+    background: #2563eb;
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 30px;
+  color: #475569;
+  font-weight: 600;
+  font-size: 15px;
+  flex: 1;
+  transition: all 0.2s;
+  cursor: pointer;
+  
+  &:hover {
+    background: #e2e8f0;
+  }
+}
+
+.btn-danger {
+  background: #ef4444;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 30px;
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+  flex: 1;
+  transition: all 0.2s;
+  cursor: pointer;
+  
+  &:hover {
+    background: #dc2626;
+  }
+}
+
+.btn-outline {
+  background: none;
+  border: 1px solid #3b82f6;
+  padding: 10px 20px;
+  border-radius: 30px;
+  color: #3b82f6;
+  font-weight: 500;
+  margin-top: 12px;
+  transition: all 0.2s;
+  cursor: pointer;
+  
+  &:hover {
+    background: #eff6ff;
+  }
+}
+
+/* ========== ÉTAT VIDE ========== */
+.empty-parking {
+  text-align: center;
+  padding: 40px 20px;
+  
+  ion-icon {
+    font-size: 48px;
+    color: #cbd5e1;
+  }
+  
+  p {
+    color: #64748b;
+    margin: 12px 0;
+  }
+}
+
+/* ========== ANIMATIONS ========== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.profile-container {
+  --background: var(--bg-primary, #f5f7fb);
+  
+  .profile-content {
+    animation: fadeInUp 0.5s ease-out;
+  }
+}
+
+// Animation des cartes
+.profile-card, .info-card, .parking-card {
+  animation: fadeInUp 0.4s ease-out;
+  animation-fill-mode: both;
+  
+  &:nth-child(1) { animation-delay: 0.05s; }
+  &:nth-child(2) { animation-delay: 0.1s; }
+  &:nth-child(3) { animation-delay: 0.15s; }
+}
+
+// Animation des items de parking
+.parking-item {
+  animation: fadeInUp 0.3s ease-out;
+  animation-fill-mode: both;
+  
+  @for $i from 1 through 10 {
+    &:nth-child(#{$i}) {
+      animation-delay: #{0.1 + $i * 0.03}s;
+    }
+  }
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 480px) {
+  .profile-header {
+    padding: 20px;
+    
+    .profile-avatar {
+      width: 64px;
+      height: 64px;
+    }
+    
+    .profile-info h2 {
+      font-size: 18px;
+    }
+  }
+  
+  .card-header {
+    flex-wrap: wrap;
+    gap: 12px;
+    
+    .edit-btn, .add-btn {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+  }
+  
+  .parking-item {
+    .parking-icon {
+      width: 40px;
+      height: 40px;
+      
+      ion-icon {
+        font-size: 20px;
+      }
+    }
+    
+    .parking-details {
+      h4 {
+        font-size: 14px;
+      }
+      
+      p {
+        font-size: 12px;
+      }
+    }
+  }
+  
+  .bottom-sheet {
+    .sheet-body {
+      padding: 16px;
+    }
+    
+    .input-group input {
+      padding: 12px 14px;
+    }
+  }
+}

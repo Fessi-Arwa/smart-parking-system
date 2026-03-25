@@ -30,7 +30,7 @@ export class SigninComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit() {
     if (this.authService.isAuthenticated()) {
-      this.router.navigate(['/dashboard']);
+      this.router.navigate(['/owner/dashboard']);
     }
   }
 
@@ -93,7 +93,7 @@ export class SigninComponent implements OnInit, AfterViewInit, OnDestroy {
         const { email, password } = this.signinForm.value;
         await this.authService.signin(email, password).toPromise();
         this.toastService.show('Connexion réussie ! Bienvenue sur PARKINI 🚗', 'success');
-        this.router.navigate(['/dashboard']);
+        this.router.navigate(['/owner/dashboard']);
       } catch (error: any) {
         this.toastService.show(error.error?.error || 'Erreur de connexion', 'error');
       } finally {
@@ -103,7 +103,7 @@ export class SigninComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   goToSignup() {
-    this.router.navigate(['/pages/auth/signup']);
+    this.router.navigate(['/auth/signup']);
   }
 
   ngOnDestroy() {

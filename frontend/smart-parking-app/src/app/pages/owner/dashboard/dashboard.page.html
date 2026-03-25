@@ -1,0 +1,116 @@
+<ion-content class="dashboard-container">
+  <app-header></app-header>
+
+  <div class="dashboard-content">
+    <h1 class="welcome-title">Bonjour, Parking Express</h1>
+    <p class="welcome-subtitle">Voici votre activité d'aujourd'hui</p>
+
+    <!-- Statistiques : 2 lignes de 3 éléments -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <ion-icon name="business-outline" class="stat-icon"></ion-icon>
+        <div class="stat-value">{{ stats.totalParkings }}</div>
+        <div class="stat-label">Parkings</div>
+      </div>
+
+      <div class="stat-card">
+        <ion-icon name="car-outline" class="stat-icon"></ion-icon>
+        <div class="stat-value">{{ stats.totalSpaces }}</div>
+        <div class="stat-label">Places totales</div>
+      </div>
+
+      <div class="stat-card">
+        <ion-icon name="trending-up-outline" class="stat-icon"></ion-icon>
+        <div class="stat-value">{{ stats.occupancyRate }}%</div>
+        <div class="stat-label">Taux d'occupation</div>
+      </div>
+
+      <div class="stat-card">
+        <ion-icon name="cash-outline" class="stat-icon"></ion-icon>
+        <div class="stat-value">{{ stats.todayRevenue }} €</div>
+        <div class="stat-label">Chiffre du jour</div>
+      </div>
+
+      <div class="stat-card">
+        <ion-icon name="calendar-outline" class="stat-icon"></ion-icon>
+        <div class="stat-value">{{ stats.todayReservations }}</div>
+        <div class="stat-label">Réservations</div>
+      </div>
+
+      <div class="stat-card">
+        <ion-icon name="people-outline" class="stat-icon"></ion-icon>
+        <div class="stat-value">{{ stats.activeSubscriptions }}</div>
+        <div class="stat-label">Abonnements</div>
+      </div>
+    </div>
+
+    <!-- Mes parkings -->
+    <ion-card class="section-card">
+      <ion-card-header>
+        <ion-card-title>Mes parkings</ion-card-title>
+        <ion-button fill="clear" slot="end" routerLink="/owner/parkings">
+          Voir tout
+          <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
+        </ion-button>
+      </ion-card-header>
+
+      <ion-card-content>
+        <ion-list>
+          <ion-item *ngFor="let parking of parkings" lines="none" class="parking-item">
+            <ion-thumbnail slot="start">
+              <div class="parking-placeholder">
+                <ion-icon name="business-outline"></ion-icon>
+              </div>
+            </ion-thumbnail>
+
+            <ion-label>
+              <h3>{{ parking.name }}</h3>
+              <p>{{ parking.address }}</p>
+              <div class="parking-stats">
+                <span class="available">{{ parking.availableSpaces }} dispo</span>
+                <span class="total">/ {{ parking.totalSpaces }} places</span>
+              </div>
+            </ion-label>
+
+            <ion-badge slot="end" color="success" *ngIf="parking.status === 'active'">
+              Actif
+            </ion-badge>
+
+            <ion-badge slot="end" color="warning" *ngIf="parking.status === 'maintenance'">
+              Maintenance
+            </ion-badge>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Réservations du jour -->
+    <ion-card class="section-card">
+      <ion-card-header>
+        <ion-card-title>Réservations du jour</ion-card-title>
+        <ion-button fill="clear" slot="end" routerLink="/owner/reservations">
+          Voir tout
+          <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
+        </ion-button>
+      </ion-card-header>
+
+      <ion-card-content>
+        <ion-list>
+          <ion-item *ngFor="let res of todayReservations" lines="none" class="reservation-item">
+            <ion-icon name="car-outline" slot="start" class="car-icon"></ion-icon>
+
+            <ion-label>
+              <h3>{{ res.parkingName }}</h3>
+              <p>{{ res.userName }} - {{ res.plate }}</p>
+              <p class="time">{{ res.time }}</p>
+            </ion-label>
+
+            <ion-note slot="end">{{ res.amount }} €</ion-note>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <app-navbar></app-navbar>
+</ion-content>
