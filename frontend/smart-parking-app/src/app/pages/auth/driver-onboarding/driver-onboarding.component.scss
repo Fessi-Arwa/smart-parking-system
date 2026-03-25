@@ -1,12 +1,19 @@
 .onboarding-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px 20px;
+  padding:
+    calc(24px + env(safe-area-inset-top))
+    calc(20px + env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom))
+    calc(20px + env(safe-area-inset-left));
   background:
     radial-gradient(circle at top left, rgba(74, 144, 226, 0.18), transparent 28%),
     linear-gradient(135deg, #ffffff 0%, #f3f6fb 100%);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .onboarding-card {
@@ -137,39 +144,6 @@ input::placeholder {
   color: #ffffff;
 }
 
-.car-zipper {
-  position: fixed;
-  z-index: 9999;
-  pointer-events: none;
-  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
-  top: 50%;
-  left: 0;
-  transform: translateX(100vw) translateY(-50%);
-  opacity: 0;
-  will-change: transform, opacity;
-}
-
-.car-zipper.run {
-  animation: auth-car-pass 4.2s cubic-bezier(0.2, 0.9, 0.4, 1.1) forwards;
-}
-
-.car-svg {
-  width: 180px;
-  height: auto;
-  display: block;
-}
-
-@keyframes auth-car-pass {
-  0% {
-    transform: translateX(100vw) translateY(-50%);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(-200px) translateY(-50%);
-    opacity: 0;
-  }
-}
-
 @media (max-width: 640px) {
   .onboarding-card {
     padding: 28px 22px;
@@ -177,9 +151,5 @@ input::placeholder {
 
   .actions {
     flex-direction: column;
-  }
-
-  .car-svg {
-    width: 120px;
   }
 }

@@ -1,29 +1,39 @@
 .auth-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  min-height: 100dvh;
   background: white;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .hidden-content {
   width: 100%;
-  height: 100%;
+  min-height: 100dvh;
   display: flex;
   justify-content: center;
+  align-items: center;
+  padding:
+    calc(24px + env(safe-area-inset-top))
+    calc(20px + env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom))
+    calc(20px + env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at top left, rgba(74, 144, 226, 0.18), transparent 28%),
+    linear-gradient(135deg, #ffffff 0%, #f3f6fb 100%);
 }
 
 .right-content {
   width: 100%;
-  max-width: 520px;
+  max-width: 440px;
   background: #0a0a0f;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: 36px 32px;
   position: relative;
+  border-radius: 24px;
+  box-shadow: 0 30px 70px rgba(10, 10, 15, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   opacity: 0;
   transform: translateY(18px);
   transition: opacity 0.45s ease, transform 0.45s ease;
@@ -176,47 +186,31 @@
   }
 }
 
-.car-zipper {
-  position: fixed;
-  z-index: 9999;
-  pointer-events: none;
-  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
-  top: 50%;
-  left: 0;
-  transform: translateX(100vw) translateY(-50%);
-  opacity: 0;
-  will-change: transform, opacity;
-
-  &.run {
-    animation: auth-car-pass 4.2s cubic-bezier(0.2, 0.9, 0.4, 1.1) forwards;
-  }
-}
-
-.car-svg {
-  width: 180px;
-  height: auto;
-  display: block;
-}
-
-@keyframes auth-car-pass {
-  0% {
-    transform: translateX(100vw) translateY(-50%);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(-200px) translateY(-50%);
-    opacity: 0;
-  }
-}
-
 @media (max-width: 900px) {
   .right-content {
-    width: 100%;
+    max-width: 440px;
+  }
+}
+
+@media (max-width: 640px) {
+  .right-content {
     max-width: none;
-    min-height: 100%;
+    padding: 28px 22px;
   }
 
-  .car-svg {
-    width: 120px;
+  .right-content .login-form {
+    max-width: none;
+  }
+
+  .right-content .login-form .form-header {
+    margin-bottom: 28px;
+  }
+
+  .right-content .login-form .form-header h2 {
+    font-size: 24px;
+  }
+
+  .right-content .login-form .input-group {
+    margin-bottom: 18px;
   }
 }

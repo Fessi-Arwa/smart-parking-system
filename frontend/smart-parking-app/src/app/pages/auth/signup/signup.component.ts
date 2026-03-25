@@ -82,6 +82,6 @@ export class SignupComponent implements OnInit, AfterViewInit {
   }
 
   goToSignin(): void {
-    this.router.navigate(['/pages/auth/signin']);
+    this.router.navigate(['/pages/auth/signin/form']);
   }
 }

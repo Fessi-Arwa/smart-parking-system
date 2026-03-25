@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterModule, Routes } from '@angular/router';
 
+import { CarAnimationComponent } from './auth/car-animation/car-animation.component';
 import { SigninIntroComponent } from './auth/signin-intro/signin-intro.component';
 import { SigninComponent } from './auth/signin/signin.component';
 import { SignupComponent } from './auth/signup/signup.component';
@@ -20,6 +21,7 @@ const routes: Routes = [
 
 @NgModule({
   declarations: [
+    CarAnimationComponent,
     SigninIntroComponent,
     SigninComponent,
     SignupComponent,
