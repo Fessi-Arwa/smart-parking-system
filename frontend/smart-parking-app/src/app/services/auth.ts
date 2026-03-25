@@ -8,6 +8,7 @@ export interface User {
   id: number;
   username: string;
   email: string;
+  role?: string;
 }
 
 @Injectable({
@@ -57,7 +58,7 @@ export class AuthService {
   logout() {
     localStorage.removeItem(this.tokenKey);
     this.userSubject.next(null);
-    this.router.navigate(['/pages/auth/signin']);
+    this.router.navigate(['/auth/signin']);
   }
 
   private saveToken(token: string) {
@@ -75,6 +76,10 @@ export class AuthService {
 
   isAuthenticated(): boolean {
     return this.userSubject.value !== null;
+  }
+
+  getCurrentUser(): User | null {
+    return this.userSubject.value;
   }
 
   getToken(): string | null {

@@ -1,0 +1,69 @@
+.modern-header {
+  --background: #ffffff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  
+  ion-toolbar {
+    --background: transparent;
+    --border-width: 0;
+    --padding-start: 16px;
+    --padding-end: 16px;
+    --padding-top: 8px;
+    --padding-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  
+  .car-icon {
+    font-size: 28px;
+    color: #3b82f6;
+  }
+  
+  .app-name {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    color: #0f172a;
+  }
+}
+
+.notification-btn {
+  margin: 0;
+  position: relative;
+  
+  .notif-icon {
+    font-size: 24px;
+    color: #475569;
+  }
+  
+  .notification-dot {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border-radius: 50%;
+    border: 1.5px solid white;
+  }
+}
+
+// Animation pour la voiture
+@keyframes carMove {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-3px);
+  }
+}
+
+.car-icon {
+  animation: carMove 1.5s ease-in-out infinite;
+}

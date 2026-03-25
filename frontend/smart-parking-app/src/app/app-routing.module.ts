@@ -1,20 +1,17 @@
 import { NgModule } from '@angular/core';
 import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
-import { AuthGuard } from './guards/auth-guard';
 
 const routes: Routes = [
+  // Module Owner (Parking Owner) - Directement pour le test
   {
-    path: 'pages/auth',
-    loadChildren: () => import('./pages/auth.module').then(m => m.AuthModule)
+    path: 'owner',
+    loadChildren: () => import('./pages/owner/owner.module').then(m => m.OwnerModule)
   },
-  {
-    path: 'dashboard',
-    loadChildren: () => import('./pages/dashboard/dashboard.module').then(m => m.DashboardPageModule),
-    canActivate: [AuthGuard]
-  },
+  
+  // Redirection par défaut vers le dashboard owner
   {
     path: '',
-    redirectTo: 'pages/auth/signin',
+    redirectTo: 'owner/dashboard',
     pathMatch: 'full'
   }
 ];
