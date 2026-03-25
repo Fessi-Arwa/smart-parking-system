@@ -199,7 +199,13 @@
           <div class="profile-avatar">{{ driverProfile.avatar }}</div>
           <div class="profile-hero__content">
             <span class="profile-kicker">Conducteur</span>
-            <h1>{{ driverProfile.nom }}</h1>
+            <div class="profile-hero__top">
+              <h1>{{ driverProfile.nom }}</h1>
+              <button class="logout-btn" type="button" (click)="logout()">
+                <ion-icon name="log-out-outline"></ion-icon>
+                <span>Déconnexion</span>
+              </button>
+            </div>
             <p>{{ defaultVehicle?.marque }} {{ defaultVehicle?.type }}</p>
           </div>
         </div>

@@ -240,6 +240,10 @@ export class DashboardPage implements OnInit {
     });
   }
 
+  logout(): void {
+    this.authService.logout();
+  }
+
   ngOnInit(): void {
     const currentUser = this.authService.getCurrentUser();
     if (currentUser) {

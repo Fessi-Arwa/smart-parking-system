@@ -1,5 +1,5 @@
-import { Component } from '@angular/core';
-import { ModalController } from '@ionic/angular';
+import { Component, OnInit } from '@angular/core';
+import { AuthService } from '../../../services/auth.service';
 
 export interface OwnerProfile {
   id_compte: number;
@@ -29,7 +29,7 @@ export interface ParkingInfo {
   styleUrls: ['./profile.page.scss'],
   standalone: false,
 })
-export class ProfilePage {
+export class ProfilePage implements OnInit {
   // Données Owner
   owner: OwnerProfile = {
     id_compte: 1,
@@ -115,12 +115,28 @@ export class ProfilePage {
     activeSubscriptions: 0
   };
 
-  constructor() {}
+  constructor(private authService: AuthService) {}
+
+  ngOnInit(): void {
+    const currentUser = this.authService.getCurrentUser();
+    if (currentUser) {
+      this.owner = {
+        ...this.owner,
+        nom: currentUser.nom || this.owner.nom,
+        email: currentUser.email || this.owner.email,
+        telephone: currentUser.telephone || this.owner.telephone,
+      };
+    }
+  }
 
   get ownerInitials(): string {
     const source = (this.owner.nom || this.owner.companyName || '').trim();
     const parts = source.split(/\s+/).slice(0, 2);
     return parts.map((part) => part.charAt(0).toUpperCase()).join('') || 'OW';
+  }
+
+  logout(): void {
+    this.authService.logout();
   }
 
   // Modifier profil

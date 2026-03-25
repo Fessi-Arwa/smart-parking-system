@@ -1031,6 +1031,13 @@
   gap: 4px;
 }
 
+.profile-hero__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .profile-kicker {
   display: inline-flex;
   width: fit-content;
@@ -1781,6 +1788,32 @@
   font-size: 15px;
   font-weight: 600;
   border-radius: 30px;
+}
+
+.logout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 30px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.logout-btn ion-icon {
+  font-size: 15px;
+}
+
+.logout-btn:hover {
+  background: #e2e8f0;
 }
 
 .primary-btn:hover,

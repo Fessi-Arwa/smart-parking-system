@@ -41,6 +41,14 @@
 .profile-info {
   flex: 1;
 
+  .profile-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+  }
+
   .profile-kicker {
     display: inline-flex;
     width: fit-content;
@@ -67,6 +75,32 @@
     color: #64748b;
     margin: 0;
   }
+}
+
+.logout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 30px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.logout-btn ion-icon {
+  font-size: 15px;
+}
+
+.logout-btn:hover {
+  background: #e2e8f0;
 }
 
 /* ========== CARTES ========== */
@@ -730,6 +764,11 @@
 
   .profile-info h2 {
     font-size: 18px;
+  }
+
+  .profile-info .profile-top-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
   
   .card-header {

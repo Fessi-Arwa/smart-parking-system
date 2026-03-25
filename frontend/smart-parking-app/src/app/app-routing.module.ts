@@ -16,7 +16,7 @@ const routes: Routes = [
   },
   {
     path: '',
-    redirectTo: 'owner/dashboard',
+    redirectTo: 'pages/auth/signin',
     pathMatch: 'full'
   }
 ];

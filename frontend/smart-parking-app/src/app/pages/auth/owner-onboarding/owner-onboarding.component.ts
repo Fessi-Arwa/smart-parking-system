@@ -57,16 +57,16 @@ export class OwnerOnboardingComponent implements AfterViewInit {
           prix_heure: Number(prix_heure),
         })
       );
-      this.toastService.show('Parking ajouté avec succès', 'success');
-      await this.router.navigate(['/dashboard']);
+      this.toastService.show('Parking ajoute avec succes', 'success');
+      await this.router.navigate(['/owner/dashboard']);
     } catch (error: any) {
-      this.toastService.show(error.error?.msg || error.error?.error || 'Erreur lors de la création du parking', 'error');
+      this.toastService.show(error.error?.msg || error.error?.error || 'Erreur lors de la creation du parking', 'error');
     } finally {
       this.isLoading = false;
     }
   }
 
   async skip(): Promise<void> {
-    await this.router.navigate(['/dashboard']);
+    await this.router.navigate(['/owner/dashboard']);
   }
 }

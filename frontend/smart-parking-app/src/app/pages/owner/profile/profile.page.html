@@ -6,7 +6,13 @@
       <div class="profile-avatar-text">{{ ownerInitials }}</div>
       <div class="profile-info">
         <span class="profile-kicker">Gestionnaire de parking</span>
-        <h2>{{ owner.nom }}</h2>
+        <div class="profile-top-row">
+          <h2>{{ owner.nom }}</h2>
+          <button class="logout-btn" type="button" (click)="logout()">
+            <ion-icon name="log-out-outline"></ion-icon>
+            <span>Déconnexion</span>
+          </button>
+        </div>
         <p class="role">{{ owner.companyName || 'Parking principal' }}</p>
       </div>
     </div>
