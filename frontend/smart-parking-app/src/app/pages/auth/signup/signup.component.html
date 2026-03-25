@@ -1,0 +1,103 @@
+<div class="auth-container">
+  <div class="hidden-content">
+    <div class="left-content" #leftContent>
+      <div class="app-name">
+        <h1>
+          PARKINI
+          <span>SMART PARKING</span>
+        </h1>
+        <div class="app-tagline">● STATIONNEMENT INTELLIGENT ●</div>
+      </div>
+    </div>
+    
+    <div class="right-content" #rightContent>
+      <div class="login-form">
+        <div class="form-header">
+          <h2>Créer un compte</h2>
+          <p>Inscrivez-vous en quelques secondes</p>
+        </div>
+        
+        <form [formGroup]="signupForm" (ngSubmit)="onSubmit()">
+          <div class="input-group">
+            <label>NOM D'UTILISATEUR</label>
+            <input 
+              type="text" 
+              formControlName="username"
+              placeholder="Jean Dupont">
+            <div class="error-message" *ngIf="signupForm.get('username')?.touched && signupForm.get('username')?.invalid">
+              <span *ngIf="signupForm.get('username')?.errors?.['required']">Nom d'utilisateur requis</span>
+              <span *ngIf="signupForm.get('username')?.errors?.['minlength']">Minimum 3 caractères</span>
+            </div>
+          </div>
+          
+          <div class="input-group">
+            <label>EMAIL</label>
+            <input 
+              type="email" 
+              formControlName="email"
+              placeholder="exemple@parkini.com">
+            <div class="error-message" *ngIf="signupForm.get('email')?.touched && signupForm.get('email')?.invalid">
+              <span *ngIf="signupForm.get('email')?.errors?.['required']">Email requis</span>
+              <span *ngIf="signupForm.get('email')?.errors?.['email']">Email valide requis</span>
+            </div>
+          </div>
+          
+          <div class="input-group">
+            <label>MOT DE PASSE</label>
+            <input 
+              type="password" 
+              formControlName="password"
+              placeholder="••••••••">
+            <div class="error-message" *ngIf="signupForm.get('password')?.touched && signupForm.get('password')?.invalid">
+              <span *ngIf="signupForm.get('password')?.errors?.['required']">Mot de passe requis</span>
+              <span *ngIf="signupForm.get('password')?.errors?.['minlength']">Minimum 6 caractères</span>
+            </div>
+          </div>
+          
+          <div class="input-group">
+            <label>CONFIRMER</label>
+            <input 
+              type="password" 
+              formControlName="confirmPassword"
+              placeholder="••••••••">
+            <div class="error-message" *ngIf="signupForm.get('confirmPassword')?.touched && signupForm.errors?.['mismatch']">
+              Les mots de passe ne correspondent pas
+            </div>
+          </div>
+          
+          <button 
+            type="submit" 
+            class="btn-login"
+            [disabled]="signupForm.invalid || isLoading">
+            <span *ngIf="!isLoading">S'inscrire</span>
+            <span *ngIf="isLoading">Inscription...</span>
+          </button>
+        </form>
+        
+        <div class="signup-link">
+          <p>Déjà un compte ? <a (click)="goToSignin()">Se connecter</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reveal-layer" #revealLayer></div>
+  <div class="car-zipper" #carZipper>
+    <svg class="car-svg" width="180" height="90" viewBox="0 0 180 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="20" y="35" width="130" height="35" rx="8" fill="#2c3e50"/>
+      <rect x="45" y="15" width="80" height="25" rx="6" fill="#34495e"/>
+      <polygon points="45,40 60,20 80,20 80,40" fill="#7f8c8d"/>
+      <polygon points="90,40 90,20 110,20 125,40" fill="#7f8c8d"/>
+      <rect x="60" y="22" width="20" height="15" fill="#bdc3c7"/>
+      <rect x="90" y="22" width="20" height="15" fill="#bdc3c7"/>
+      <circle cx="45" cy="70" r="12" fill="#1a1a2e"/>
+      <circle cx="45" cy="70" r="6" fill="#4a5568"/>
+      <circle cx="125" cy="70" r="12" fill="#1a1a2e"/>
+      <circle cx="125" cy="70" r="6" fill="#4a5568"/>
+      <circle cx="25" cy="52" r="5" fill="#f39c12"/>
+      <circle cx="148" cy="52" r="5" fill="#e74c3c"/>
+      <rect x="95" y="48" width="15" height="3" rx="1" fill="#95a5a6"/>
+    </svg>
+  </div>
+  <div class="trail" #trail></div>
+</div>
