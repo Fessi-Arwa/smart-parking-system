@@ -8,7 +8,7 @@ const routes: Routes = [
   },
   {
     path: 'dashboard',
-    loadChildren: () => import('./pages/dashboard/dashboard.module').then((m) => m.DashboardPageModule)
+    loadChildren: () => import('./pages/driver/driver.module').then((m) => m.DriverModule)
   },
   {
     path: 'owner',

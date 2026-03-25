@@ -64,6 +64,10 @@
   border: 1px solid #e2e8f0;
   
   ion-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
     padding-bottom: 8px;
     
     ion-card-title {
@@ -81,6 +85,21 @@
   ion-card-content {
     padding-top: 8px;
   }
+}
+
+.section-heading-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.section-kicker {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 700;
 }
 
 /* Liste des parkings et réservations */

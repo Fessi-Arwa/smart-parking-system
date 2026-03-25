@@ -5,7 +5,6 @@
     <h1 class="welcome-title">Bonjour, Parking Express</h1>
     <p class="welcome-subtitle">Voici votre activité d'aujourd'hui</p>
 
-    <!-- Statistiques : 2 lignes de 3 éléments -->
     <div class="stats-grid">
       <div class="stat-card">
         <ion-icon name="business-outline" class="stat-icon"></ion-icon>
@@ -44,10 +43,12 @@
       </div>
     </div>
 
-    <!-- Mes parkings -->
     <ion-card class="section-card">
       <ion-card-header>
-        <ion-card-title>Mes parkings</ion-card-title>
+        <div class="section-heading-group">
+          <p class="section-kicker">Gestion</p>
+          <ion-card-title>Mes parkings</ion-card-title>
+        </div>
         <ion-button fill="clear" slot="end" routerLink="/owner/parkings">
           Voir tout
           <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
@@ -84,10 +85,12 @@
       </ion-card-content>
     </ion-card>
 
-    <!-- Réservations du jour -->
     <ion-card class="section-card">
       <ion-card-header>
-        <ion-card-title>Réservations du jour</ion-card-title>
+        <div class="section-heading-group">
+          <p class="section-kicker">Activité</p>
+          <ion-card-title>Réservations du jour</ion-card-title>
+        </div>
         <ion-button fill="clear" slot="end" routerLink="/owner/reservations">
           Voir tout
           <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>

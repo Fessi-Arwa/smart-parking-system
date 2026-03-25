@@ -201,6 +201,43 @@
   gap: 12px;
 }
 
+.section-heading__group {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.section-heading__group--inline {
+  width: 100%;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.section-heading__title-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.section-heading__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  background: #eff6ff;
+  border-radius: 16px;
+}
+
+.section-heading__icon ion-icon {
+  font-size: 22px;
+  color: #3b82f6;
+}
+
 .section-heading h2 {
   margin: 4px 0 0;
   font-size: 22px;
@@ -1353,4 +1390,546 @@
     min-height: 50px;
     padding: 8px 6px;
   }
+
+  .section-heading__group {
+    width: 100%;
+  }
+}
+
+/* Driver aligned to owner visual system */
+.driver-shell {
+  --driver-bg: #f5f7fb;
+  --driver-surface: #ffffff;
+  --driver-surface-soft: #f8fafc;
+  --driver-border: rgba(0, 0, 0, 0.04);
+  --driver-text: #0f172a;
+  --driver-muted: #64748b;
+  --driver-primary: #3b82f6;
+  --driver-primary-strong: #2563eb;
+  --driver-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  background: var(--driver-bg);
+  color: var(--driver-text);
+}
+
+.driver-page {
+  --background: var(--driver-bg);
+}
+
+.driver-content {
+  padding: 20px 16px 100px;
+}
+
+.page-section {
+  gap: 20px;
+}
+
+.eyebrow {
+  color: var(--driver-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.section-heading h2,
+.profile-hero h1,
+.history-hero h1,
+.parking-card h3,
+.history-card h3,
+.vehicle-card h3,
+.subscription-card h3 {
+  color: var(--driver-text);
+}
+
+.section-heading h2 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.profile-hero h1,
+.history-hero h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.history-hero__content p,
+.profile-hero p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.parking-card h3,
+.history-card h3,
+.vehicle-card h3,
+.subscription-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.parking-card p,
+.history-card p,
+.vehicle-card p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.map-card,
+.list-card,
+.profile-section,
+.history-card,
+.parking-card,
+.vehicle-card,
+.subscription-card {
+  background: var(--driver-surface);
+  border: 1px solid var(--driver-border);
+  border-radius: 28px;
+  box-shadow: var(--driver-shadow);
+  backdrop-filter: none;
+}
+
+.map-card,
+.list-card,
+.profile-section {
+  padding: 20px 16px;
+}
+
+.map-card,
+.list-card,
+.profile-section--info,
+.profile-section--vehicles,
+.profile-section--subscriptions,
+.parking-card,
+.history-card,
+.vehicle-card,
+.subscription-card {
+  background-image: none;
+}
+
+.history-hero,
+.profile-hero {
+  padding: 24px;
+  border-radius: 28px;
+  background: var(--driver-surface);
+  border: 1px solid var(--driver-border);
+  box-shadow: var(--driver-shadow);
+  color: var(--driver-text);
+}
+
+.history-hero__content p,
+.profile-hero p,
+.profile-kicker {
+  color: var(--driver-muted);
+}
+
+.history-hero__icon,
+.profile-avatar {
+  background: #eff6ff;
+  color: var(--driver-primary);
+  box-shadow: none;
+  border-radius: 20px;
+}
+
+.history-hero__icon ion-icon {
+  color: var(--driver-primary);
+}
+
+.history-hero__icon {
+  width: 56px;
+  height: 56px;
+}
+
+.history-hero__icon ion-icon {
+  font-size: 28px;
+}
+
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.profile-kicker {
+  background: #eff6ff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.map-surface {
+  min-height: 260px;
+  margin-top: 16px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+  border: 1px solid var(--driver-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.map-road {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.9);
+}
+
+.map-hud,
+.map-stat-card {
+  border-radius: 16px;
+  border: 1px solid var(--driver-border);
+  box-shadow: var(--driver-shadow);
+  backdrop-filter: none;
+}
+
+.map-hud {
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.map-hud__item {
+  color: #334155;
+}
+
+.map-stat-card {
+  background: #ffffff;
+  color: var(--driver-text);
+}
+
+.map-stat-card span {
+  color: var(--driver-muted);
+}
+
+.driver-car {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--driver-primary), #60a5fa);
+  border: 3px solid #ffffff;
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.24);
+}
+
+.parking-pin {
+  width: 42px;
+  height: 42px;
+  border-radius: 20px 20px 20px 6px;
+  background: linear-gradient(135deg, var(--driver-primary), var(--driver-primary-strong));
+  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.18);
+}
+
+.parking-marker small {
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid var(--driver-border);
+  box-shadow: var(--driver-shadow);
+}
+
+.map-locate-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--driver-primary);
+  border: 1px solid var(--driver-border);
+  box-shadow: var(--driver-shadow);
+}
+
+.search-box {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--driver-surface);
+  border: 1px solid var(--driver-border);
+  box-shadow: var(--driver-shadow);
+}
+
+.search-box__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: var(--driver-primary);
+  box-shadow: none;
+}
+
+.search-box__content small,
+.parking-card p,
+.history-card p,
+.vehicle-card p,
+.profile-hero p {
+  color: var(--driver-muted);
+}
+
+.price-pill,
+.parking-badge,
+.vehicle-badge {
+  background: #eff6ff;
+  color: var(--driver-primary-strong);
+  border: 1px solid #bfdbfe;
+}
+
+.parking-card,
+.history-card,
+.vehicle-card,
+.subscription-card {
+  padding: 20px;
+}
+
+.parking-card::before,
+.history-card::before,
+.vehicle-card::before {
+  background: var(--driver-primary);
+  top: 14px;
+  height: 48px;
+}
+
+.parking-meta span,
+.history-grid div,
+.form-grid label,
+.modal-form label {
+  background: var(--driver-surface-soft);
+  border: 1px solid #e2e8f0;
+  box-shadow: none;
+}
+
+.parking-meta span {
+  color: #334155;
+}
+
+.parking-meta ion-icon {
+  color: var(--driver-primary);
+}
+
+.history-grid strong,
+.form-grid span,
+.modal-form span,
+.payment-choice > span {
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.history-grid span,
+.parking-meta strong {
+  color: var(--driver-text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.history-card__bottom {
+  border-top: 1px solid var(--driver-border);
+}
+
+.history-card__bottom span {
+  color: #475569;
+  font-size: 14px;
+}
+
+.history-card__bottom strong {
+  color: var(--driver-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.primary-btn,
+.parking-card__cta,
+.floating-reserve-btn {
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: none;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 30px;
+}
+
+.secondary-btn,
+.default-toggle,
+.close-btn {
+  background: #f1f5f9;
+  color: #334155;
+  box-shadow: none;
+}
+
+.edit-icon-btn {
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 30px;
+  color: #3b82f6;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.edit-icon-btn ion-icon {
+  font-size: 20px;
+}
+
+.edit-icon-btn:hover {
+  background: #eff6ff;
+  transform: scale(1.05);
+}
+
+.secondary-btn,
+.default-toggle {
+  padding: 14px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 30px;
+}
+
+.primary-btn:hover,
+.parking-card__cta:hover,
+.floating-reserve-btn:hover {
+  background: #2563eb;
+  box-shadow: none;
+  filter: none;
+}
+
+.secondary-btn:hover,
+.default-toggle:hover {
+  background: #e2e8f0;
+}
+
+.default-toggle.active {
+  background: #dbeafe;
+  color: var(--driver-primary-strong);
+}
+
+.bottom-nav {
+  background: linear-gradient(180deg, rgba(11, 19, 36, 0.94), rgba(11, 19, 36, 0.86));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.18);
+}
+
+.floating-reserve-btn {
+  min-height: 58px;
+}
+
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.modal-panel {
+  padding: 24px 20px;
+  border-radius: 28px 28px 0 0;
+  background: #ffffff;
+  box-shadow: 0 -20px 50px rgba(15, 23, 42, 0.16);
+}
+
+.modal-form {
+  gap: 20px;
+}
+
+.modal-form label {
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.modal-header h2 {
+  color: var(--driver-text);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 20px;
+}
+
+.search-box input,
+.form-grid input,
+.modal-form input,
+.modal-form select {
+  color: var(--driver-text);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.modal-form select,
+.modal-form input,
+.form-grid input {
+  min-height: auto;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  transition: all 0.2s;
+}
+
+.modal-form input::placeholder,
+.form-grid input::placeholder {
+  color: #94a3b8;
+}
+
+.modal-form input:focus,
+.modal-form select:focus,
+.form-grid input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.radio-card small {
+  color: var(--driver-muted);
+  font-size: 13px;
+}
+
+.radio-card strong,
+.search-box__content small,
+.parking-badge,
+.vehicle-badge,
+.price-pill,
+.status-chip {
+  font-weight: 500;
+}
+
+.status-chip {
+  font-size: 11px;
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.info-value {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: right;
+}
+
+.floating-reserve-btn {
+  min-height: 56px;
+  padding: 0 20px;
 }

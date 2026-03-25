@@ -2,49 +2,52 @@
   <app-header></app-header>
 
   <div class="profile-content" [class.blur-background]="isEditingProfile || showAddParking || isEditingParking || showDeleteConfirm">
-    <!-- Header profil moderne : image + nom côte à côte -->
     <div class="profile-header">
-      <div class="avatar-wrapper">
-        <img [src]="owner.avatar" alt="Avatar" class="profile-avatar" />
-      </div>
+      <div class="profile-avatar-text">{{ ownerInitials }}</div>
       <div class="profile-info">
-        <h2>{{ owner.companyName || owner.nom }}</h2>
-        <p class="role">Gestionnaire de parking</p>
+        <span class="profile-kicker">Gestionnaire de parking</span>
+        <h2>{{ owner.nom }}</h2>
+        <p class="role">{{ owner.companyName || 'Parking principal' }}</p>
       </div>
     </div>
 
-<!-- Cadre Informations personnelles -->
-<div class="info-card">
-  <div class="card-header">
-    <div class="header-left">
-      <ion-icon name="person-outline" class="header-icon"></ion-icon>
-      <h3>Informations</h3>
+    <div class="info-card">
+      <div class="card-header">
+        <div class="header-left">
+          <ion-icon name="person-outline" class="header-icon"></ion-icon>
+          <div class="section-heading-group">
+            <p class="section-kicker">Informations personnelles</p>
+            <h3>Compte propriétaire</h3>
+          </div>
+        </div>
+        <button class="edit-icon-btn" (click)="startEditProfile()">
+          <ion-icon name="create-outline"></ion-icon>
+        </button>
+      </div>
+      <div class="info-list">
+        <div class="info-item">
+          <span class="info-label">Nom complet</span>
+          <span class="info-value">{{ owner.nom }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Email</span>
+          <span class="info-value">{{ owner.email }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Téléphone</span>
+          <span class="info-value">{{ owner.telephone }}</span>
+        </div>
+      </div>
     </div>
-    <button class="edit-icon-btn" (click)="startEditProfile()">
-      <ion-icon name="create-outline"></ion-icon>
-    </button>
-  </div>
-  <div class="info-list">
-    <div class="info-item">
-      <span class="info-label">Nom complet</span>
-      <span class="info-value">{{ owner.nom }}</span>
-    </div>
-    <div class="info-item">
-      <span class="info-label">Email</span>
-      <span class="info-value">{{ owner.email }}</span>
-    </div>
-    <div class="info-item">
-      <span class="info-label">Téléphone</span>
-      <span class="info-value">{{ owner.telephone }}</span>
-    </div>
-  </div>
-</div>
-    <!-- Cadre Mes parkings -->
+
     <div class="parking-card">
       <div class="card-header">
         <div class="header-left">
           <ion-icon name="business-outline" class="header-icon"></ion-icon>
-          <h3>Mes parkings</h3>
+          <div class="section-heading-group">
+            <p class="section-kicker">Gestion</p>
+            <h3>Mes parkings</h3>
+          </div>
         </div>
         <button class="add-btn" (click)="openAddParking()">
           <ion-icon name="add-outline"></ion-icon>
@@ -52,7 +55,6 @@
         </button>
       </div>
 
-      <!-- Vue liste des parkings -->
       <div *ngIf="!selectedParking && !showAddParking" class="parking-list">
         <div *ngFor="let parking of parkings" class="parking-item" (click)="selectParking(parking)">
           <div class="parking-icon">
@@ -81,7 +83,6 @@
         </div>
       </div>
 
-      <!-- Vue détail d'un parking -->
       <div *ngIf="selectedParking && !showAddParking" class="parking-detail">
         <div class="detail-nav">
           <button class="back-btn" (click)="backToList()">
@@ -132,12 +133,11 @@
     </div>
   </div>
 
-  <!-- ========== MODAL MODIFIER PROFIL ========== -->
   <div class="modal-overlay" *ngIf="isEditingProfile" (click)="cancelEditProfile()"></div>
   <div class="bottom-sheet" [class.show]="isEditingProfile">
     <div class="sheet-handle"></div>
     <div class="sheet-header">
-      <h3>Modifier le profil</h3>
+      <h3>Modifier les informations personnelles</h3>
       <button class="close-btn" (click)="cancelEditProfile()">
         <ion-icon name="close-outline"></ion-icon>
       </button>
@@ -162,7 +162,6 @@
     </div>
   </div>
 
-  <!-- ========== MODAL AJOUTER PARKING ========== -->
   <div class="modal-overlay" *ngIf="showAddParking" (click)="backToList()"></div>
   <div class="bottom-sheet" [class.show]="showAddParking">
     <div class="sheet-handle"></div>
@@ -215,7 +214,6 @@
     </div>
   </div>
 
-  <!-- ========== MODAL MODIFIER PARKING ========== -->
   <div class="modal-overlay" *ngIf="isEditingParking" (click)="cancelEditParking()"></div>
   <div class="bottom-sheet" [class.show]="isEditingParking">
     <div class="sheet-handle"></div>
@@ -278,7 +276,6 @@
     </div>
   </div>
 
-  <!-- ========== MODAL CONFIRMATION SUPPRESSION ========== -->
   <div class="modal-overlay" *ngIf="showDeleteConfirm" (click)="cancelDelete()"></div>
   <div class="bottom-sheet confirm-sheet" [class.show]="showDeleteConfirm">
     <div class="sheet-handle"></div>

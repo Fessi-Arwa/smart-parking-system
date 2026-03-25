@@ -117,6 +117,12 @@ export class ProfilePage {
 
   constructor() {}
 
+  get ownerInitials(): string {
+    const source = (this.owner.nom || this.owner.companyName || '').trim();
+    const parts = source.split(/\s+/).slice(0, 2);
+    return parts.map((part) => part.charAt(0).toUpperCase()).join('') || 'OW';
+  }
+
   // Modifier profil
   startEditProfile() {
     this.editProfileData = {

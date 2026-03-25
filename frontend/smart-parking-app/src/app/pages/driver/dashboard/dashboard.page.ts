@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { AuthService } from '../../services/auth';
+import { AuthService } from '../../../services/auth';
 
 type DriverTab = 'home' | 'historique' | 'profil';
 type PaymentMode = 'en_ligne' | 'sur_place';
@@ -68,11 +68,11 @@ interface SubscriptionItem {
 
 @Component({
   selector: 'app-dashboard',
-  templateUrl: './dashboard.component.html',
-  styleUrls: ['./dashboard.component.scss'],
+  templateUrl: './dashboard.page.html',
+  styleUrls: ['./dashboard.page.scss'],
   standalone: false,
 })
-export class DashboardComponent implements OnInit {
+export class DashboardPage implements OnInit {
   activeTab: DriverTab = 'home';
   searchTerm = '';
   notificationsCount = 3;
@@ -81,6 +81,7 @@ export class DashboardComponent implements OnInit {
   isReservationModalOpen = false;
   isVehicleModalOpen = false;
   isSubscriptionModalOpen = false;
+  isProfileModalOpen = false;
 
   selectedParking: ParkingCard | null = null;
 
@@ -402,6 +403,17 @@ export class DashboardComponent implements OnInit {
       ...this.profileForm.value,
       avatar: this.buildAvatar(this.profileForm.value.nom),
     };
+
+    this.closeProfileModal();
+  }
+
+  openProfileModal(): void {
+    this.profileForm.patchValue(this.driverProfile);
+    this.isProfileModalOpen = true;
+  }
+
+  closeProfileModal(): void {
+    this.isProfileModalOpen = false;
   }
 
   openSubscriptionModal(): void {
