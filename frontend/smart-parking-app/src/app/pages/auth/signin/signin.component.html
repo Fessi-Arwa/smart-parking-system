@@ -1,61 +1,36 @@
 <div class="auth-container">
-  <!-- Contenu qui sera révélé -->
   <div class="content-wrapper">
-    <div class="left-content">
-      <div class="app-name">
-        <h1>
-          PARKINI
-          <span>SMART PARKING</span>
-        </h1>
-        <div class="app-tagline">● STATIONNEMENT INTELLIGENT ●</div>
-      </div>
-    </div>
-    
-    <div class="right-content">
+    <div class="right-content" [class.revealed]="isFormVisible">
       <div class="login-form">
         <div class="form-header">
           <h2>Bienvenue</h2>
-          <p>Connectez-vous à votre espace</p>
+          <p>Connectez-vous a votre espace</p>
         </div>
-        
+
         <form [formGroup]="signinForm" (ngSubmit)="onSubmit()">
           <div class="input-group">
             <label>EMAIL</label>
-            <input 
-              type="email" 
-              formControlName="email"
-              placeholder="exemple@parkini.com">
+            <input type="email" formControlName="email" placeholder="exemple@parkini.com" />
           </div>
-          
+
           <div class="input-group">
             <label>MOT DE PASSE</label>
-            <input 
-              type="password" 
-              formControlName="password"
-              placeholder="••••••••">
+            <input type="password" formControlName="password" placeholder="........" />
           </div>
-          
-          <button 
-            type="submit" 
-            class="btn-login"
-            [disabled]="signinForm.invalid || isLoading">
+
+          <button type="submit" class="btn-login" [disabled]="signinForm.invalid || isLoading">
             <span *ngIf="!isLoading">Se connecter</span>
             <span *ngIf="isLoading">Connexion...</span>
           </button>
         </form>
-        
+
         <div class="signup-link">
-          <p>Pas encore de compte ? <a (click)="goToSignup()">Créer un compte</a></p>
+          <p>Pas encore de compte ? <a (click)="goToSignup()">Creer un compte</a></p>
         </div>
       </div>
     </div>
   </div>
-
-  <!-- Voile blanc -->
-  <div class="reveal-layer" id="revealLayer"></div>
-  
-  <!-- Voiture -->
-  <div class="car-zipper" id="carZipper">
+  <div class="car-zipper" [class.run]="animateCar">
     <svg class="car-svg" width="180" height="90" viewBox="0 0 180 90" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="20" y="35" width="130" height="35" rx="8" fill="#2c3e50"/>
       <rect x="45" y="15" width="80" height="25" rx="6" fill="#34495e"/>

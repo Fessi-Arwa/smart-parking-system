@@ -1,0 +1,88 @@
+.auth-container {
+  position: fixed;
+  inset: 0;
+  background: white;
+  overflow: hidden;
+}
+
+.reveal-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: white;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.content-wrapper {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.left-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  background: white;
+}
+
+.app-name h1 {
+  font-size: 90px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: #1a1a2e;
+  text-transform: uppercase;
+  line-height: 1;
+  margin-bottom: 15px;
+}
+
+.app-name h1 span {
+  display: block;
+  font-size: 52px;
+  font-weight: 500;
+  color: #4a90e2;
+  margin-top: 12px;
+}
+
+.app-tagline {
+  font-size: 14px;
+  color: #888;
+  letter-spacing: 2px;
+  margin-top: 24px;
+  text-align: center;
+}
+
+.car-zipper {
+  position: absolute;
+  z-index: 30;
+  pointer-events: none;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+
+.car-svg {
+  width: 180px;
+  height: auto;
+}
+
+@media (max-width: 900px) {
+  .app-name h1 {
+    font-size: 52px;
+  }
+
+  .app-name h1 span {
+    font-size: 30px;
+  }
+
+  .car-svg {
+    width: 120px;
+  }
+}

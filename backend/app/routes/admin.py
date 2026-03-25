@@ -82,7 +82,7 @@ def update_parking(parking_id):
     data = request.get_json() or {}
     parking.update_from_dict(
         data,
-        ("nom", "adresse", "ville", "latitude", "longitude", "prix_heure", "statut"),
+        ("nom", "adresse", "capacite", "prix_heure", "statut"),
     )
 
     db.session.commit()

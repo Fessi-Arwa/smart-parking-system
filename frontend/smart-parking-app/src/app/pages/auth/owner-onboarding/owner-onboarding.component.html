@@ -1,0 +1,55 @@
+<div class="onboarding-shell">
+  <div class="onboarding-card" [class.revealed]="isFormVisible">
+    <div class="header">
+      <span class="eyebrow">Parking Owner</span>
+      <h1>Ajoutez votre premier parking</h1>
+      <p>Renseignez les informations essentielles pour publier votre espace de stationnement.</p>
+    </div>
+
+    <form [formGroup]="parkingForm" (ngSubmit)="onSubmit()">
+      <div class="input-group">
+        <label>Nom du parking</label>
+        <input type="text" formControlName="nom" placeholder="Parking Centre Ville" />
+      </div>
+
+      <div class="input-group">
+        <label>Adresse détaillée</label>
+        <input type="text" formControlName="adresse" placeholder="12 rue de la Gare, 2ème étage, près du centre commercial" />
+      </div>
+
+      <div class="input-group">
+        <label>Capacité</label>
+        <input type="number" formControlName="capacite" placeholder="20" />
+      </div>
+
+      <div class="input-group">
+        <label>Tarif horaire</label>
+        <input type="number" formControlName="prix_heure" placeholder="5" />
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="primary-btn" [disabled]="parkingForm.invalid || isLoading">
+          {{ isLoading ? 'Enregistrement...' : 'Continuer' }}
+        </button>
+        <button type="button" class="secondary-btn" (click)="skip()">Passer pour le moment</button>
+      </div>
+    </form>
+  </div>
+  <div class="car-zipper" [class.run]="animateCar">
+    <svg class="car-svg" width="180" height="90" viewBox="0 0 180 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="20" y="35" width="130" height="35" rx="8" fill="#2c3e50"/>
+      <rect x="45" y="15" width="80" height="25" rx="6" fill="#34495e"/>
+      <polygon points="45,40 60,20 80,20 80,40" fill="#7f8c8d"/>
+      <polygon points="90,40 90,20 110,20 125,40" fill="#7f8c8d"/>
+      <rect x="60" y="22" width="20" height="15" fill="#bdc3c7"/>
+      <rect x="90" y="22" width="20" height="15" fill="#bdc3c7"/>
+      <circle cx="45" cy="70" r="12" fill="#1a1a2e"/>
+      <circle cx="45" cy="70" r="6" fill="#4a5568"/>
+      <circle cx="125" cy="70" r="12" fill="#1a1a2e"/>
+      <circle cx="125" cy="70" r="6" fill="#4a5568"/>
+      <circle cx="25" cy="52" r="5" fill="#f39c12"/>
+      <circle cx="148" cy="52" r="5" fill="#e74c3c"/>
+      <rect x="95" y="48" width="15" height="3" rx="1" fill="#95a5a6"/>
+    </svg>
+  </div>
+</div>

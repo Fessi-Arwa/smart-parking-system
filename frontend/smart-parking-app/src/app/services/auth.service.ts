@@ -6,8 +6,9 @@ import { tap } from 'rxjs/operators';
 
 export interface User {
   id: number;
-  username: string;
+  nom: string;
   email: string;
+  role: 'conducteur' | 'owner' | 'admin';
 }
 
 @Injectable({
@@ -16,6 +17,7 @@ export interface User {
 export class AuthService {
   private apiUrl = 'http://localhost:5000/api/auth';
   private tokenKey = 'access_token';
+  private userKey = 'auth_user';
   private userSubject = new BehaviorSubject<User | null>(null);
   
   public user$ = this.userSubject.asObservable();
@@ -29,48 +31,54 @@ export class AuthService {
 
   private loadUserFromStorage() {
     const token = localStorage.getItem(this.tokenKey);
-    if (token) {
-      this.loadUserFromToken(token);
+    const user = localStorage.getItem(this.userKey);
+
+    if (token && user) {
+      this.userSubject.next(JSON.parse(user) as User);
     }
   }
 
-  signup(username: string, email: string, password: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/signup`, { username, email, password })
+  signup(
+    username: string,
+    email: string,
+    password: string,
+    phone?: string,
+    role: 'conducteur' | 'owner' = 'conducteur'
+  ): Observable<any> {
+    return this.http.post(`${this.apiUrl}/register`, {
+      nom: username,
+      email,
+      telephone: phone,
+      mot_passe: password,
+      role,
+    })
       .pipe(
         tap((response: any) => {
-          this.saveToken(response.token);
-          this.userSubject.next(response.user);
+          this.saveSession(response.access_token, response.user);
         })
       );
   }
 
   signin(email: string, password: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/signin`, { email, password })
+    return this.http.post(`${this.apiUrl}/login`, { email, mot_passe: password })
       .pipe(
         tap((response: any) => {
-          this.saveToken(response.token);
-          this.userSubject.next(response.user);
+          this.saveSession(response.access_token, response.user);
         })
       );
   }
 
   logout() {
     localStorage.removeItem(this.tokenKey);
+    localStorage.removeItem(this.userKey);
     this.userSubject.next(null);
     this.router.navigate(['/pages/auth/signin']);
   }
 
-  private saveToken(token: string) {
+  private saveSession(token: string, user: User) {
     localStorage.setItem(this.tokenKey, token);
-  }
-
-  private loadUserFromToken(token: string) {
-    this.http.get(`${this.apiUrl}/me`, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).subscribe({
-      next: (user: any) => this.userSubject.next(user),
-      error: () => this.logout()
-    });
+    localStorage.setItem(this.userKey, JSON.stringify(user));
+    this.userSubject.next(user);
   }
 
   isAuthenticated(): boolean {
@@ -79,5 +87,9 @@ export class AuthService {
 
   getToken(): string | null {
     return localStorage.getItem(this.tokenKey);
+  }
+
+  getCurrentUser(): User | null {
+    return this.userSubject.value;
   }
 }
