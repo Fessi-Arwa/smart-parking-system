@@ -7,11 +7,11 @@ const routes: Routes = [
     path: 'pages/auth',
     loadChildren: () => import('./pages/auth.module').then(m => m.AuthModule)
   },
-  {
-    path: 'dashboard',
-    loadChildren: () => import('./pages/dashboard/dashboard.module').then(m => m.DashboardPageModule),
-    canActivate: [AuthGuard]
-  },
+{
+  path: 'dashboard',
+  loadChildren: () => import('./pages/dashboard/dashboard.module').then(m => m.DashboardPageModule)
+},
+
   {
     path: '',
     redirectTo: 'pages/auth/signin',
