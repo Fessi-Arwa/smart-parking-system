@@ -42,7 +42,7 @@ export class SignupComponent implements OnInit, AfterViewInit {
 
   ngOnInit() {
     if (this.authService.isAuthenticated()) {
-      this.router.navigate(['/dashboard']);
+      this.router.navigate(['/owner/dashboard']);
     }
   }
 
@@ -65,7 +65,7 @@ export class SignupComponent implements OnInit, AfterViewInit {
     try {
       const { username, phone, email, password, role } = this.signupForm.value;
       await firstValueFrom(this.authService.signup(username, email, password, phone, role));
-      this.toastService.show('Inscription réussie ! Bienvenue sur PARKINI 🚗', 'success');
+      this.toastService.show("Inscription reussie ! Bienvenue sur PARKINI", 'success');
       await this.router.navigate([
         role === 'owner' ? '/pages/auth/onboarding/owner' : '/pages/auth/onboarding/driver',
       ]);

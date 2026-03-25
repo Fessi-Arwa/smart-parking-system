@@ -1,2 +1,232 @@
-// For information on how to create your own theme, please refer to:
-// https://ionicframework.com/docs/theming/
+// ========== VARIABLES MODERNES ==========
+:root {
+  // Couleurs principales
+  --primary-color: #3b82f6;
+  --primary-dark: #2563eb;
+  --primary-light: #60a5fa;
+  --primary-soft: #eff6ff;
+  
+  --secondary-color: #8b5cf6;
+  --secondary-dark: #7c3aed;
+  --secondary-light: #a78bfa;
+  
+  --success-color: #22c55e;
+  --warning-color: #f97316;
+  --danger-color: #ef4444;
+  --info-color: #06b6d4;
+  
+  // Neutres
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  
+  // Fond
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  
+  // Ombres modernes
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
+  
+  // Arrondis
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
+  
+  // Transitions
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  // Espacements
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+}
+
+// Animation de fondu
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+// Styles globaux
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+ion-content {
+  --background: var(--bg-primary);
+  --padding-bottom: 0;
+}
+
+ion-toolbar {
+  --background: var(--bg-secondary);
+  --border-color: transparent;
+  --padding-top: var(--space-2);
+  --padding-bottom: var(--space-2);
+}
+
+ion-title {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.3px;
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+ion-avatar {
+  border: 2px solid var(--primary-color);
+  box-shadow: var(--shadow-sm);
+}
+
+// Boutons modernes
+ion-button {
+  --border-radius: var(--radius-xl);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: -0.2px;
+  transition: all var(--transition-fast);
+}
+
+ion-button[fill="solid"] {
+  --box-shadow: var(--shadow-sm);
+}
+
+ion-button[fill="outline"] {
+  --border-color: var(--primary-color);
+  --color: var(--primary-color);
+}
+
+// Cartes modernes
+ion-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-md);
+  margin: 0 0 var(--space-4) 0;
+  transition: all var(--transition-normal);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+ion-card-header {
+  padding: var(--space-5) var(--space-5) 0;
+}
+
+ion-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-800);
+  letter-spacing: -0.3px;
+}
+
+ion-card-content {
+  padding: var(--space-5);
+}
+
+// Items modernes
+ion-item {
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  --background: transparent;
+  transition: all var(--transition-fast);
+}
+
+// Badges modernes
+ion-badge {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --padding-top: 4px;
+  --padding-bottom: 4px;
+  border-radius: 20px;
+  font-weight: 500;
+  font-size: 11px;
+}
+
+// Animations pour les pages
+.page-container {
+  animation: fadeIn 0.4s ease-out;
+}
+
+// Skeleton loader
+.skeleton {
+  background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-100) 50%, var(--gray-200) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+
+// Scrollbar personnalisée
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-100);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-color);
+  border-radius: 10px;
+}

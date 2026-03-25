@@ -31,7 +31,7 @@ export class SigninComponent implements OnInit, AfterViewInit {
 
   ngOnInit() {
     if (this.authService.isAuthenticated()) {
-      this.router.navigate(['/dashboard']);
+      this.redirectByRole();
     }
   }
 
@@ -50,8 +50,8 @@ export class SigninComponent implements OnInit, AfterViewInit {
       try {
         const { email, password } = this.signinForm.value;
         await firstValueFrom(this.authService.signin(email, password));
-        this.toastService.show('Connexion réussie ! Bienvenue sur PARKINI 🚗', 'success');
-        this.router.navigate(['/dashboard']);
+        this.toastService.show('Connexion reussie ! Bienvenue sur PARKINI', 'success');
+        this.redirectByRole();
       } catch (error: any) {
         this.toastService.show(error.error?.msg || error.error?.error || 'Erreur de connexion', 'error');
       } finally {
@@ -66,5 +66,16 @@ export class SigninComponent implements OnInit, AfterViewInit {
 
   goToForgotPassword() {
     this.router.navigate(['/pages/auth/forgot-password']);
+  }
+
+  private redirectByRole(): void {
+    const user = this.authService.getCurrentUser();
+
+    if (user?.role === 'owner') {
+      this.router.navigate(['/owner/dashboard']);
+      return;
+    }
+
+    this.router.navigate(['/dashboard']);
   }
 }
