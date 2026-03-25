@@ -3,7 +3,7 @@
     <div class="right-content" [class.revealed]="isFormVisible">
       <div class="login-form">
         <div class="form-header">
-          <h2>Creer un compte</h2>
+          <h2>Créer un compte</h2>
           <p>Inscrivez-vous en quelques secondes</p>
         </div>
 
@@ -13,7 +13,7 @@
             <input type="text" formControlName="username" placeholder="Jean Dupont" />
             <div class="error-message" *ngIf="signupForm.get('username')?.touched && signupForm.get('username')?.invalid">
               <span *ngIf="signupForm.get('username')?.errors?.['required']">Nom d'utilisateur requis</span>
-              <span *ngIf="signupForm.get('username')?.errors?.['minlength']">Minimum 3 caracteres</span>
+              <span *ngIf="signupForm.get('username')?.errors?.['minlength']">Minimum 3 caractéres</span>
             </div>
           </div>
 
@@ -21,7 +21,7 @@
             <label>Numero de telephone</label>
             <input type="text" formControlName="phone" placeholder="+216 6 12 34 56 78" />
             <div class="error-message" *ngIf="signupForm.get('phone')?.touched && signupForm.get('phone')?.invalid">
-              <span *ngIf="signupForm.get('phone')?.errors?.['pattern']">Format de numero invalide</span>
+              <span *ngIf="signupForm.get('phone')?.errors?.['pattern']">Format de numéro invalide</span>
             </div>
           </div>
 
@@ -59,7 +59,7 @@
             <input type="password" formControlName="password" placeholder="........" />
             <div class="error-message" *ngIf="signupForm.get('password')?.touched && signupForm.get('password')?.invalid">
               <span *ngIf="signupForm.get('password')?.errors?.['required']">Mot de passe requis</span>
-              <span *ngIf="signupForm.get('password')?.errors?.['minlength']">Minimum 6 caracteres</span>
+              <span *ngIf="signupForm.get('password')?.errors?.['minlength']">Minimum 6 caractéres</span>
             </div>
           </div>
 
@@ -78,7 +78,7 @@
         </form>
 
         <div class="signup-link">
-          <p>Deja un compte ? <a (click)="goToSignin()">Se connecter</a></p>
+          <p>Déja un compte ? <a (click)="goToSignin()">Se connecter</a></p>
         </div>
       </div>
     </div>
