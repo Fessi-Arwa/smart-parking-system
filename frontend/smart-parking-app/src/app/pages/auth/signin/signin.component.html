@@ -18,6 +18,10 @@
             <input type="password" formControlName="password" placeholder="........" />
           </div>
 
+          <div class="forgot-link">
+            <a (click)="goToForgotPassword()">Mot de passe oublie ?</a>
+          </div>
+
           <button type="submit" class="btn-login" [disabled]="signinForm.invalid || isLoading">
             <span *ngIf="!isLoading">Se connecter</span>
             <span *ngIf="isLoading">Connexion...</span>

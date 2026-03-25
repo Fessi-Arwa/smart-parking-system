@@ -63,4 +63,8 @@ export class SigninComponent implements OnInit, AfterViewInit {
   goToSignup() {
     this.router.navigate(['/pages/auth/signup']);
   }
+
+  goToForgotPassword() {
+    this.router.navigate(['/pages/auth/forgot-password']);
+  }
 }

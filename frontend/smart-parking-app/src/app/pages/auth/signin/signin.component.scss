@@ -124,6 +124,24 @@
       }
     }
 
+    .forgot-link {
+      text-align: right;
+      margin-top: -8px;
+      margin-bottom: 8px;
+
+      a {
+        color: #4a90e2;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+    }
+
     .signup-link {
       text-align: center;
       margin-top: 32px;
