@@ -1,5 +1,7 @@
 <ion-content class="dashboard-container">
-  <app-header></app-header>
+  <app-header
+    [notificationCount]="notificationsCount"
+    [notifications]="notificationItems"></app-header>
 
   <div class="dashboard-content">
     <h1 class="welcome-title">Bonjour, Parking Express</h1>

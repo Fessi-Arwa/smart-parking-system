@@ -4,23 +4,17 @@ import { Observable } from 'rxjs';
 
 import { AuthService } from './auth.service';
 
-export interface CreateReservationPayload {
-  vehicule_id: number;
-  place_id: number;
+export interface SubscriptionDto {
+  id_abon: number;
+  type: 'mensuel' | 'trimestriel' | 'annuel';
   date_debut: string;
   date_fin: string;
-}
-
-export interface ReservationHistoryDto {
-  id_res: number;
-  conducteur_id: number;
-  vehicule_id?: number | null;
-  place_id: number;
-  date_debut: string;
-  date_fin: string;
-  statut: 'en_attente' | 'confirmee' | 'annulee' | 'terminee';
-  prix_total: number;
+  statut: 'actif' | 'expire' | 'suspendu' | 'en_attente';
+  tarif: number;
   created_at?: string;
+  categorie?: string;
+  conducteur_id?: number;
+  place_id?: number;
   place?: {
     id_place: number;
     parking_id: number;
@@ -29,12 +23,6 @@ export interface ReservationHistoryDto {
     zone?: string;
     etage?: string;
   } | null;
-  vehicule?: {
-    id_veh: number;
-    matricule: string;
-    marque?: string;
-    type?: string;
-  } | null;
   parking?: {
     id_park: number;
     nom: string;
@@ -42,47 +30,48 @@ export interface ReservationHistoryDto {
     prix_heure: number;
     statut: string;
   } | null;
-  conducteur?: {
-    id_compte: number;
-    nom: string;
-    email: string;
-    telephone?: string;
-    role?: string;
-  } | null;
+}
+
+export interface CreateSubscriptionPayload {
+  type: 'mensuel' | 'trimestriel' | 'annuel';
+  date_debut: string;
+  date_fin: string;
+  tarif: number;
+  place_id: number;
 }
 
 @Injectable({
   providedIn: 'root',
 })
-export class ReservationService {
-  private apiUrl = 'http://localhost:5000/api/reservations';
+export class SubscriptionService {
+  private apiUrl = 'http://localhost:5000/api/abonnements';
 
   constructor(private http: HttpClient, private authService: AuthService) {}
 
-  getReservations(): Observable<ReservationHistoryDto[]> {
+  getSubscriptions(): Observable<SubscriptionDto[]> {
     const token = this.authService.getToken();
     const headers = token
       ? new HttpHeaders({ Authorization: `Bearer ${token}` })
       : undefined;
 
-    return this.http.get<ReservationHistoryDto[]>(`${this.apiUrl}/`, { headers });
+    return this.http.get<SubscriptionDto[]>(`${this.apiUrl}/`, { headers });
   }
 
-  getOwnerReservations(): Observable<ReservationHistoryDto[]> {
+  getOwnerSubscriptions(): Observable<SubscriptionDto[]> {
     const token = this.authService.getToken();
     const headers = token
       ? new HttpHeaders({ Authorization: `Bearer ${token}` })
       : undefined;
 
-    return this.http.get<ReservationHistoryDto[]>(`${this.apiUrl}/owner`, { headers });
+    return this.http.get<SubscriptionDto[]>(`${this.apiUrl}/owner`, { headers });
   }
 
-  createReservation(payload: CreateReservationPayload): Observable<any> {
+  createPlaceSubscription(payload: CreateSubscriptionPayload): Observable<SubscriptionDto> {
     const token = this.authService.getToken();
     const headers = token
       ? new HttpHeaders({ Authorization: `Bearer ${token}` })
       : undefined;
 
-    return this.http.post(`${this.apiUrl}/`, payload, { headers });
+    return this.http.post<SubscriptionDto>(`${this.apiUrl}/place`, payload, { headers });
   }
 }

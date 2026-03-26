@@ -1,6 +1,8 @@
 <div class="driver-shell">
   <ion-content [fullscreen]="true" class="driver-page">
-    <app-header></app-header>
+    <app-header
+      [notificationCount]="notificationsCount"
+      [notifications]="notificationItems"></app-header>
 
     <main class="driver-content">
       <section *ngIf="activeTab === 'home'" class="page-section">
@@ -48,7 +50,7 @@
 
             <div class="map-stat-card">
               <span>Disponibles</span>
-              <strong>47 places</strong>
+              <strong>{{ totalAvailablePlaces }} places</strong>
             </div>
 
             <div

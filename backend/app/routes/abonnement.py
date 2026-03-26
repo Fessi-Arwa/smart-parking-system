@@ -1,10 +1,14 @@
 from datetime import date
 from flask import Blueprint, jsonify, request
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from .. import db
 from ..models.abonnement import Abonnement
 from ..models.abonnement_app import AbonnementApp
 from ..models.abonnement_place import AbonnementPlace
+from ..models.compte import Compte, RoleCompte
+from ..models.parking import Parking
+from ..models.place import Place
 
 
 abonnement_bp = Blueprint("abonnement", __name__)
@@ -46,9 +50,97 @@ def _build_abonnement(data):
 
 
 @abonnement_bp.route("/", methods=["GET"])
+@jwt_required()
 def get_abonnements():
-    abonnements = Abonnement.query.order_by(Abonnement.id_abon.asc()).all()
-    return jsonify([_abonnement_to_dict(abonnement) for abonnement in abonnements])
+    user_id = int(get_jwt_identity())
+    abonnement_links = (
+        AbonnementPlace.query.filter_by(conducteur_id=user_id)
+        .order_by(AbonnementPlace.id_abon.desc())
+        .all()
+    )
+
+    abonnement_ids = [link.id_abon for link in abonnement_links]
+    place_ids = [link.place_id for link in abonnement_links]
+
+    abonnements = {
+        abonnement.id_abon: abonnement
+        for abonnement in Abonnement.query.filter(Abonnement.id_abon.in_(abonnement_ids)).all()
+    } if abonnement_ids else {}
+    places = {
+        place.id_place: place
+        for place in Place.query.filter(Place.id_place.in_(place_ids)).all()
+    } if place_ids else {}
+
+    parking_ids = [place.parking_id for place in places.values() if place.parking_id is not None]
+    parkings = {
+        parking.id_park: parking
+        for parking in Parking.query.filter(Parking.id_park.in_(parking_ids)).all()
+    } if parking_ids else {}
+
+    data = []
+    for link in abonnement_links:
+        abonnement = abonnements.get(link.id_abon)
+        if not abonnement:
+            continue
+
+        item = _abonnement_to_dict(abonnement)
+        place = places.get(link.place_id)
+        parking = parkings.get(place.parking_id) if place else None
+
+        item["place"] = place.to_dict() if place else None
+        item["parking"] = parking.to_dict() if parking else None
+        data.append(item)
+
+    return jsonify(data)
+
+
+@abonnement_bp.route("/owner", methods=["GET"])
+@jwt_required()
+def get_owner_abonnements():
+    user_id = int(get_jwt_identity())
+    user = Compte.query.get(user_id)
+
+    if not user:
+        return jsonify({"msg": "Utilisateur introuvable"}), 404
+
+    if user.role != RoleCompte.owner:
+        return jsonify({"msg": "Seuls les owners peuvent consulter ces abonnements"}), 403
+
+    owner_parkings = Parking.query.filter_by(owner_id=user.id_compte).all()
+    parking_ids = [parking.id_park for parking in owner_parkings]
+    places = Place.query.filter(Place.parking_id.in_(parking_ids)).all() if parking_ids else []
+    place_map = {place.id_place: place for place in places}
+    parking_map = {parking.id_park: parking for parking in owner_parkings}
+    place_ids = list(place_map.keys())
+
+    abonnement_links = (
+        AbonnementPlace.query.filter(AbonnementPlace.place_id.in_(place_ids))
+        .order_by(AbonnementPlace.id_abon.desc())
+        .all()
+        if place_ids
+        else []
+    )
+    abonnement_ids = [link.id_abon for link in abonnement_links]
+    abonnements = {
+        abonnement.id_abon: abonnement
+        for abonnement in Abonnement.query.filter(Abonnement.id_abon.in_(abonnement_ids)).all()
+    } if abonnement_ids else {}
+
+    data = []
+    for link in abonnement_links:
+        abonnement = abonnements.get(link.id_abon)
+        if not abonnement:
+            continue
+
+        item = _abonnement_to_dict(abonnement)
+        place = place_map.get(link.place_id)
+        parking = parking_map.get(place.parking_id) if place else None
+
+        item["place"] = place.to_dict() if place else None
+        item["parking"] = parking.to_dict() if parking else None
+        data.append(item)
+
+    return jsonify(data)
 
 
 @abonnement_bp.route("/<int:abonnement_id>", methods=["GET"])
@@ -82,13 +174,15 @@ def create_abonnement_app():
 
 
 @abonnement_bp.route("/place", methods=["POST"])
+@jwt_required()
 def create_abonnement_place():
     data = request.get_json() or {}
-    required_fields = ("type", "date_debut", "date_fin", "tarif", "conducteur_id", "place_id")
+    user_id = int(get_jwt_identity())
+    required_fields = ("type", "date_debut", "date_fin", "tarif", "place_id")
 
     if any(data.get(field) is None for field in required_fields):
         return jsonify(
-            {"error": "type, date_debut, date_fin, tarif, conducteur_id and place_id are required"}
+            {"error": "type, date_debut, date_fin, tarif and place_id are required"}
         ), 400
 
     abonnement = _build_abonnement(data)
@@ -97,7 +191,7 @@ def create_abonnement_place():
 
     abonnement_place = AbonnementPlace(
         id_abon=abonnement.id_abon,
-        conducteur_id=data["conducteur_id"],
+        conducteur_id=user_id,
         place_id=data["place_id"],
     )
     db.session.add(abonnement_place)

@@ -11,11 +11,19 @@
           <div class="input-group">
             <label>Email</label>
             <input type="email" formControlName="email" placeholder="exemple@parkini.com" />
+            <div class="error-message" *ngIf="signinForm.get('email')?.touched && signinForm.get('email')?.invalid">
+              <span *ngIf="signinForm.get('email')?.errors?.['required']">Email requis</span>
+              <span *ngIf="signinForm.get('email')?.errors?.['email']">Email valide requis</span>
+            </div>
           </div>
 
           <div class="input-group">
             <label>Mot de passe</label>
             <input type="password" formControlName="password" placeholder="........" />
+            <div class="error-message" *ngIf="signinForm.get('password')?.touched && signinForm.get('password')?.invalid">
+              <span *ngIf="signinForm.get('password')?.errors?.['required']">Mot de passe requis</span>
+              <span *ngIf="signinForm.get('password')?.errors?.['minlength']">Minimum 6 caracteres</span>
+            </div>
           </div>
 
           <div class="forgot-link">

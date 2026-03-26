@@ -1,5 +1,7 @@
 <ion-content class="profile-container">
-  <app-header></app-header>
+  <app-header
+    [notificationCount]="notificationsCount"
+    [notifications]="notificationItems"></app-header>
 
   <div class="profile-content" [class.blur-background]="isEditingProfile || showAddParking || isEditingParking || showDeleteConfirm">
     <div class="profile-header">

@@ -97,6 +97,13 @@
           color: rgba(255, 255, 255, 0.3);
         }
       }
+
+      .error-message {
+        margin-top: 8px;
+        color: #ff8a8a;
+        font-size: 12px;
+        line-height: 1.4;
+      }
     }
 
     .btn-login {

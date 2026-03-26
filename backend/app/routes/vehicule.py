@@ -9,6 +9,26 @@ from ..models.vehicule import Vehicule
 vehicule_bp = Blueprint("vehicule", __name__)
 
 
+@vehicule_bp.route("/", methods=["GET"])
+@jwt_required()
+def get_vehicles():
+    user_id = get_jwt_identity()
+    user = Compte.query.get(int(user_id))
+
+    if not user:
+        return jsonify({"msg": "Utilisateur introuvable"}), 404
+
+    if user.role != RoleCompte.conducteur:
+        return jsonify({"msg": "Seuls les conducteurs peuvent consulter leurs vehicules"}), 403
+
+    vehicules = (
+        Vehicule.query.filter_by(conducteur_id=user.id_compte)
+        .order_by(Vehicule.created_at.desc(), Vehicule.id_veh.desc())
+        .all()
+    )
+    return jsonify([vehicule.to_dict() for vehicule in vehicules]), 200
+
+
 @vehicule_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_vehicle():

@@ -6,10 +6,40 @@
     </div>
     
     <ion-buttons slot="end">
-      <ion-button class="notification-btn">
+      <ion-button class="notification-btn" (click)="toggleNotifications(); $event.stopPropagation()">
         <ion-icon name="notifications-outline" class="notif-icon"></ion-icon>
-        <span class="notification-dot"></span>
+        <span *ngIf="notificationCount > 0" class="notification-badge">{{ notificationCount }}</span>
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
+
+  <div
+    *ngIf="isNotificationsOpen"
+    class="notification-panel"
+    (click)="onNotificationPanelClick($event)">
+    <div class="notification-panel__header">
+      <strong>Notifications</strong>
+      <span *ngIf="notificationCount > 0">{{ notificationCount }} nouvelles</span>
+    </div>
+
+    <div *ngIf="notifications.length; else emptyNotifications" class="notification-list">
+      <div *ngFor="let notification of notifications" class="notification-item">
+        <div class="notification-item__icon">
+          <ion-icon name="notifications-outline"></ion-icon>
+        </div>
+        <div class="notification-item__content">
+          <strong>{{ notification.title }}</strong>
+          <p>{{ notification.description }}</p>
+          <small>{{ notification.timestamp }}</small>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #emptyNotifications>
+      <div class="notification-empty">
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+        <span>Aucune notification pour le moment</span>
+      </div>
+    </ng-template>
+  </div>
 </ion-header>

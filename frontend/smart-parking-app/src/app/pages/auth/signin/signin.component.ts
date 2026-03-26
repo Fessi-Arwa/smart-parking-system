@@ -45,18 +45,21 @@ export class SigninComponent implements OnInit, AfterViewInit {
   }
 
   async onSubmit() {
-    if (this.signinForm.valid) {
-      this.isLoading = true;
-      try {
-        const { email, password } = this.signinForm.value;
-        await firstValueFrom(this.authService.signin(email, password));
-        this.toastService.show('Connexion reussie ! Bienvenue sur PARKINI', 'success');
-        this.redirectByRole();
-      } catch (error: any) {
-        this.toastService.show(error.error?.msg || error.error?.error || 'Erreur de connexion', 'error');
-      } finally {
-        this.isLoading = false;
-      }
+    if (this.signinForm.invalid) {
+      this.signinForm.markAllAsTouched();
+      return;
+    }
+
+    this.isLoading = true;
+    try {
+      const { email, password } = this.signinForm.value;
+      await firstValueFrom(this.authService.signin(email, password));
+      this.toastService.show('Connexion reussie ! Bienvenue sur PARKINI', 'success');
+      this.redirectByRole();
+    } catch (error: any) {
+      this.toastService.show(error.error?.msg || error.error?.error || 'Erreur de connexion', 'error');
+    } finally {
+      this.isLoading = false;
     }
   }
 
