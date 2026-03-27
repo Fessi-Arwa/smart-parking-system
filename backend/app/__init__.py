@@ -31,6 +31,7 @@ def create_app():
     from .routes.place import place_bp
     from .routes.reservation import reservation_bp
     from .routes.paiement import paiement_bp
+    from .routes.owner_workflow import owner_workflow_bp
     from .routes.vehicule import vehicule_bp
 
     app.register_blueprint(abonnement_bp, url_prefix="/api/abonnements")
@@ -42,6 +43,15 @@ def create_app():
     app.register_blueprint(place_bp, url_prefix="/api/places")
     app.register_blueprint(reservation_bp, url_prefix="/api/reservations")
     app.register_blueprint(paiement_bp, url_prefix="/api/paiements")
+    app.register_blueprint(owner_workflow_bp, url_prefix="/api/owner")
     app.register_blueprint(vehicule_bp, url_prefix="/api/vehicules")
+
+    @app.get("/")
+    def root():
+        return {
+            "status": "ok",
+            "service": "smart-parking-backend",
+            "health": "/api/health/db",
+        }
 
     return app

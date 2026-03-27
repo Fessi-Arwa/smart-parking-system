@@ -13,6 +13,17 @@
   }
 }
 
+.profile-hero {
+  display: grid;
+  margin-bottom: 20px;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 20px;
+}
+
 /* ========== HEADER PROFIL ========== */
 .profile-header {
   display: flex;
@@ -74,6 +85,24 @@
     font-size: 13px;
     color: #64748b;
     margin: 0;
+  }
+
+  .profile-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .profile-metrics span {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 600;
   }
 }
 
@@ -193,6 +222,63 @@
   }
 }
 
+.parking-toolbar {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.parking-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.parking-search ion-icon {
+  color: #64748b;
+}
+
+.parking-search input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.parking-search input:focus {
+  outline: none;
+}
+
+.parking-filters {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  width: fit-content;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.parking-filters button {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 999px;
+}
+
+.parking-filters button.is-active {
+  background: #0f172a;
+  color: #ffffff;
+}
+
 /* ========== INFORMATIONS PERSONNELLES ========== */
 .info-list {
   .info-item {
@@ -250,6 +336,13 @@
     
     .parking-details {
       flex: 1;
+
+      .parking-topline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
       
       h4 {
         font-size: 16px;
@@ -268,6 +361,7 @@
         display: flex;
         align-items: center;
         gap: 12px;
+        flex-wrap: wrap;
         
         .status {
           font-size: 11px;
@@ -305,6 +399,17 @@
       font-size: 18px;
     }
   }
+}
+
+.occupancy-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 /* ========== DÉTAIL PARKING ========== */
@@ -386,6 +491,40 @@
         color: #f97316;
       }
     }
+  }
+
+  .detail-hero {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .detail-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .detail-stats article {
+    padding: 14px;
+    border-radius: 18px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+  }
+
+  .detail-stats span {
+    display: block;
+    color: #64748b;
+    font-size: 12px;
+  }
+
+  .detail-stats strong {
+    display: block;
+    margin-top: 6px;
+    color: #0f172a;
+    font-size: 24px;
   }
   
   .detail-info {
@@ -752,14 +891,24 @@
 
 /* ========== RESPONSIVE ========== */
 @media (max-width: 480px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-content {
+    padding: 14px 12px 92px;
+  }
+
   .profile-header {
-    padding: 20px;
+    padding: 18px;
+    border-radius: 24px;
   }
 
   .profile-avatar-text {
-    width: 64px;
-    height: 64px;
-    font-size: 20px;
+    width: 60px;
+    height: 60px;
+    font-size: 18px;
+    border-radius: 20px;
   }
 
   .profile-info h2 {
@@ -769,6 +918,18 @@
   .profile-info .profile-top-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .profile-kicker,
+  .section-kicker {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .info-card,
+  .parking-card {
+    padding: 16px;
+    border-radius: 24px;
   }
   
   .card-header {
@@ -780,18 +941,70 @@
       font-size: 12px;
     }
   }
+
+  .header-icon {
+    font-size: 20px;
+  }
+
+  .card-header h3 {
+    font-size: 16px;
+  }
+
+  .add-btn,
+  .logout-btn {
+    font-size: 11px;
+    padding: 8px 12px;
+  }
+
+  .profile-info .profile-metrics {
+    gap: 6px;
+  }
+
+  .profile-info .profile-metrics span {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+
+  .parking-toolbar {
+    gap: 10px;
+  }
+
+  .parking-search {
+    padding: 10px 12px;
+    border-radius: 16px;
+  }
+
+  .parking-search input {
+    font-size: 13px;
+  }
+
+  .parking-filters {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .parking-filters button {
+    flex: 1;
+    padding: 8px 6px;
+    font-size: 11px;
+  }
   
   .parking-item {
     .parking-icon {
-      width: 40px;
-      height: 40px;
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
       
       ion-icon {
-        font-size: 20px;
+        font-size: 18px;
       }
     }
     
     .parking-details {
+      .parking-topline {
+        align-items: flex-start;
+      }
+
       h4 {
         font-size: 14px;
       }
@@ -800,6 +1013,42 @@
         font-size: 12px;
       }
     }
+  }
+
+  .parking-detail .detail-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .occupancy-pill {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+
+  .detail-hero {
+    align-items: flex-start;
+  }
+
+  .detail-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+  }
+
+  .detail-icon ion-icon {
+    font-size: 22px;
+  }
+
+  .detail-header h3,
+  .detail-hero h3 {
+    font-size: 16px;
+  }
+
+  .detail-stats article {
+    padding: 12px;
+  }
+
+  .detail-stats strong {
+    font-size: 20px;
   }
   
   .bottom-sheet {

@@ -4,141 +4,188 @@
     [notifications]="notificationItems"></app-header>
 
   <div class="profile-content" [class.blur-background]="isEditingProfile || showAddParking || isEditingParking || showDeleteConfirm">
-    <div class="profile-header">
-      <div class="profile-avatar-text">{{ ownerInitials }}</div>
-      <div class="profile-info">
-        <span class="profile-kicker">Gestionnaire de parking</span>
-        <div class="profile-top-row">
-          <h2>{{ owner.nom }}</h2>
-          <button class="logout-btn" type="button" (click)="logout()">
-            <ion-icon name="log-out-outline"></ion-icon>
-            <span>Déconnexion</span>
+    <section class="profile-hero">
+      <div class="profile-header">
+        <div class="profile-avatar-text">{{ ownerInitials }}</div>
+        <div class="profile-info">
+          <span class="profile-kicker">Gestionnaire de parking</span>
+          <div class="profile-top-row">
+            <h2>{{ owner.nom }}</h2>
+            <button class="logout-btn" type="button" (click)="logout()">
+              <ion-icon name="log-out-outline"></ion-icon>
+              <span>Deconnexion</span>
+            </button>
+          </div>
+          <p class="role">{{ owner.companyName || 'Parking principal' }}</p>
+          <div class="profile-metrics">
+            <span>{{ portfolioStats.totalParkings }} parkings</span>
+            <span>{{ portfolioStats.totalSpaces }} places</span>
+            <span>{{ portfolioStats.occupancyRate }}% occupation</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="profile-grid">
+      <div class="info-card">
+        <div class="card-header">
+          <div class="header-left">
+            <ion-icon name="person-outline" class="header-icon"></ion-icon>
+            <div class="section-heading-group">
+              <p class="section-kicker">Informations personnelles</p>
+              <h3>Compte proprietaire</h3>
+            </div>
+          </div>
+          <button class="edit-icon-btn" (click)="startEditProfile()">
+            <ion-icon name="create-outline"></ion-icon>
           </button>
         </div>
-        <p class="role">{{ owner.companyName || 'Parking principal' }}</p>
-      </div>
-    </div>
-
-    <div class="info-card">
-      <div class="card-header">
-        <div class="header-left">
-          <ion-icon name="person-outline" class="header-icon"></ion-icon>
-          <div class="section-heading-group">
-            <p class="section-kicker">Informations personnelles</p>
-            <h3>Compte propriétaire</h3>
+        <div class="info-list">
+          <div class="info-item">
+            <span class="info-label">Nom complet</span>
+            <span class="info-value">{{ owner.nom }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Email</span>
+            <span class="info-value">{{ owner.email }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Telephone</span>
+            <span class="info-value">{{ owner.telephone }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Societe</span>
+            <span class="info-value">{{ owner.companyName || 'A renseigner' }}</span>
           </div>
         </div>
-        <button class="edit-icon-btn" (click)="startEditProfile()">
-          <ion-icon name="create-outline"></ion-icon>
-        </button>
-      </div>
-      <div class="info-list">
-        <div class="info-item">
-          <span class="info-label">Nom complet</span>
-          <span class="info-value">{{ owner.nom }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Email</span>
-          <span class="info-value">{{ owner.email }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Téléphone</span>
-          <span class="info-value">{{ owner.telephone }}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="parking-card">
-      <div class="card-header">
-        <div class="header-left">
-          <ion-icon name="business-outline" class="header-icon"></ion-icon>
-          <div class="section-heading-group">
-            <p class="section-kicker">Gestion</p>
-            <h3>Mes parkings</h3>
-          </div>
-        </div>
-        <button class="add-btn" (click)="openAddParking()">
-          <ion-icon name="add-outline"></ion-icon>
-          Ajouter
-        </button>
       </div>
 
-      <div *ngIf="!selectedParking && !showAddParking" class="parking-list">
-        <div *ngFor="let parking of parkings" class="parking-item" (click)="selectParking(parking)">
-          <div class="parking-icon">
-            <ion-icon name="car-outline"></ion-icon>
+      <div class="parking-card">
+        <div class="card-header">
+          <div class="header-left">
+            <ion-icon name="business-outline" class="header-icon"></ion-icon>
+            <div class="section-heading-group">
+              <p class="section-kicker">Gestion</p>
+              <h3>Mes parkings</h3>
+            </div>
           </div>
-          <div class="parking-details">
-            <h4>{{ parking.nom }}</h4>
-            <p>{{ parking.adresse }}</p>
-            <div class="parking-meta">
-              <span class="status" [class.active]="parking.statut === 'actif'" [class.maintenance]="parking.statut !== 'actif'">
-                {{ getStatusLabel(parking.statut) }}
-              </span>
-              <span class="spaces">
-                <ion-icon name="location-outline"></ion-icon>
-                {{ parking.availableSpaces }}/{{ parking.totalSpaces }} places
+          <button class="add-btn" (click)="openAddParking()">
+            <ion-icon name="add-outline"></ion-icon>
+            Ajouter
+          </button>
+        </div>
+
+        <div class="parking-toolbar" *ngIf="!selectedParking && !showAddParking">
+          <div class="parking-search">
+            <ion-icon name="search-outline"></ion-icon>
+            <input type="text" [(ngModel)]="parkingSearch" placeholder="Rechercher un parking ou une ville" />
+          </div>
+          <div class="parking-filters">
+            <button type="button" [class.is-active]="parkingStatusFilter === 'all'" (click)="setParkingStatusFilter('all')">Tous</button>
+            <button type="button" [class.is-active]="parkingStatusFilter === 'actif'" (click)="setParkingStatusFilter('actif')">Actifs</button>
+            <button type="button" [class.is-active]="parkingStatusFilter === 'maintenance'" (click)="setParkingStatusFilter('maintenance')">Maintenance</button>
+          </div>
+        </div>
+
+        <div *ngIf="!selectedParking && !showAddParking" class="parking-list">
+          <div *ngFor="let parking of filteredParkings" class="parking-item" (click)="selectParking(parking)">
+            <div class="parking-icon">
+              <ion-icon name="car-outline"></ion-icon>
+            </div>
+            <div class="parking-details">
+              <div class="parking-topline">
+                <h4>{{ parking.nom }}</h4>
+                <span class="occupancy-pill">{{ getParkingOccupancy(parking) }}%</span>
+              </div>
+              <p>{{ parking.adresse }}</p>
+              <div class="parking-meta">
+                <span class="status" [class.active]="parking.statut === 'actif'" [class.maintenance]="parking.statut !== 'actif'">
+                  {{ getStatusLabel(parking.statut) }}
+                </span>
+                <span class="spaces">
+                  <ion-icon name="location-outline"></ion-icon>
+                  {{ parking.availableSpaces }}/{{ parking.totalSpaces }} places
+                </span>
+                <span class="spaces">
+                  <ion-icon name="cash-outline"></ion-icon>
+                  {{ parking.prix_heure }} EUR/h
+                </span>
+              </div>
+            </div>
+            <ion-icon name="chevron-forward-outline" class="chevron"></ion-icon>
+          </div>
+
+          <div *ngIf="filteredParkings.length === 0" class="empty-parking">
+            <ion-icon name="business-outline"></ion-icon>
+            <p>Aucun parking ne correspond a ce filtre.</p>
+            <button class="btn-outline" (click)="openAddParking()">Ajouter un parking</button>
+          </div>
+        </div>
+
+        <div *ngIf="selectedParking && !showAddParking" class="parking-detail">
+          <div class="detail-nav">
+            <button class="back-btn" (click)="backToList()">
+              <ion-icon name="arrow-back-outline"></ion-icon>
+              Retour
+            </button>
+            <div class="action-buttons">
+              <button class="icon-btn" (click)="startEditParking()">
+                <ion-icon name="create-outline"></ion-icon>
+              </button>
+              <button class="icon-btn danger" (click)="confirmDelete(selectedParking)">
+                <ion-icon name="trash-outline"></ion-icon>
+              </button>
+            </div>
+          </div>
+
+          <div class="detail-hero">
+            <div class="detail-icon">
+              <ion-icon name="business-outline"></ion-icon>
+            </div>
+            <div>
+              <h3>{{ selectedParking.nom }}</h3>
+              <span class="status-badge" [class.active]="selectedParking.statut === 'actif'" [class.maintenance]="selectedParking.statut !== 'actif'">
+                {{ getStatusLabel(selectedParking.statut) }}
               </span>
             </div>
           </div>
-          <ion-icon name="chevron-forward-outline" class="chevron"></ion-icon>
-        </div>
 
-        <div *ngIf="parkings.length === 0" class="empty-parking">
-          <ion-icon name="business-outline"></ion-icon>
-          <p>Aucun parking</p>
-          <button class="btn-outline" (click)="openAddParking()">Ajouter un parking</button>
-        </div>
-      </div>
+          <div class="detail-stats">
+            <article>
+              <span>Disponibles</span>
+              <strong>{{ selectedParking.availableSpaces }}</strong>
+            </article>
+            <article>
+              <span>Total</span>
+              <strong>{{ selectedParking.totalSpaces }}</strong>
+            </article>
+            <article>
+              <span>Occupation</span>
+              <strong>{{ getParkingOccupancy(selectedParking) }}%</strong>
+            </article>
+          </div>
 
-      <div *ngIf="selectedParking && !showAddParking" class="parking-detail">
-        <div class="detail-nav">
-          <button class="back-btn" (click)="backToList()">
-            <ion-icon name="arrow-back-outline"></ion-icon>
-            Retour
-          </button>
-          <div class="action-buttons">
-            <button class="icon-btn" (click)="startEditParking()">
-              <ion-icon name="create-outline"></ion-icon>
-            </button>
-            <button class="icon-btn danger" (click)="confirmDelete(selectedParking)">
-              <ion-icon name="trash-outline"></ion-icon>
-            </button>
-          </div>
-        </div>
-
-        <div class="detail-header">
-          <div class="detail-icon">
-            <ion-icon name="business-outline"></ion-icon>
-          </div>
-          <div>
-            <h3>{{ selectedParking.nom }}</h3>
-            <span class="status-badge" [class.active]="selectedParking.statut === 'actif'" [class.maintenance]="selectedParking.statut !== 'actif'">
-              {{ getStatusLabel(selectedParking.statut) }}
-            </span>
-          </div>
-        </div>
-
-        <div class="detail-info" *ngIf="!isEditingParking">
-          <div class="info-row">
-            <ion-icon name="location-outline"></ion-icon>
-            <span>{{ selectedParking.adresse }}, {{ selectedParking.ville }}</span>
-          </div>
-          <div class="info-row">
-            <ion-icon name="cash-outline"></ion-icon>
-            <span>{{ selectedParking.prix_heure }} € / heure</span>
-          </div>
-          <div class="info-row">
-            <ion-icon name="car-outline"></ion-icon>
-            <span>{{ selectedParking.availableSpaces }} / {{ selectedParking.totalSpaces }} places disponibles</span>
-          </div>
-          <div class="info-row">
-            <ion-icon name="people-outline"></ion-icon>
-            <span>{{ selectedParking.activeSubscriptions }} abonnements actifs</span>
+          <div class="detail-info" *ngIf="!isEditingParking">
+            <div class="info-row">
+              <ion-icon name="location-outline"></ion-icon>
+              <span>{{ selectedParking.adresse }}, {{ selectedParking.ville }}</span>
+            </div>
+            <div class="info-row">
+              <ion-icon name="cash-outline"></ion-icon>
+              <span>{{ selectedParking.prix_heure }} EUR / heure</span>
+            </div>
+            <div class="info-row">
+              <ion-icon name="car-outline"></ion-icon>
+              <span>{{ selectedParking.availableSpaces }} / {{ selectedParking.totalSpaces }} places disponibles</span>
+            </div>
+            <div class="info-row">
+              <ion-icon name="people-outline"></ion-icon>
+              <span>{{ selectedParking.activeSubscriptions }} abonnements actifs</span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   </div>
 
   <div class="modal-overlay" *ngIf="isEditingProfile" (click)="cancelEditProfile()"></div>
@@ -160,8 +207,8 @@
         <input type="email" [(ngModel)]="editProfileData.email" placeholder="Email">
       </div>
       <div class="input-group">
-        <label>Téléphone</label>
-        <input type="tel" [(ngModel)]="editProfileData.telephone" placeholder="Téléphone">
+        <label>Telephone</label>
+        <input type="tel" [(ngModel)]="editProfileData.telephone" placeholder="Telephone">
       </div>
     </div>
     <div class="sheet-footer">
@@ -196,7 +243,7 @@
       </div>
       <div class="input-row">
         <div class="input-group half">
-          <label>Prix horaire (€)</label>
+          <label>Prix horaire (EUR)</label>
           <input type="number" [(ngModel)]="newParkingData.prix_heure">
         </div>
         <div class="input-group half">
@@ -248,7 +295,7 @@
       </div>
       <div class="input-row">
         <div class="input-group half">
-          <label>Prix horaire (€)</label>
+          <label>Prix horaire (EUR)</label>
           <input type="number" [(ngModel)]="editParkingData.prix_heure">
         </div>
         <div class="input-group half">
@@ -294,7 +341,7 @@
         <ion-icon name="alert-circle-outline"></ion-icon>
       </div>
       <h4>Supprimer le parking ?</h4>
-      <p>Êtes-vous sûr de vouloir supprimer <strong>"{{ parkingToDelete?.nom }}"</strong> ? Cette action est irréversible.</p>
+      <p>Etes-vous sur de vouloir supprimer <strong>"{{ parkingToDelete?.nom }}"</strong> ? Cette action est irreversible.</p>
     </div>
     <div class="sheet-footer confirm-footer">
       <button class="btn-secondary" (click)="cancelDelete()">Annuler</button>

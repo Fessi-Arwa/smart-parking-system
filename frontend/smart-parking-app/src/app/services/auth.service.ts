@@ -41,7 +41,16 @@ export class AuthService {
     const user = localStorage.getItem(this.userKey);
 
     if (token && user) {
-      this.userSubject.next(JSON.parse(user) as User);
+      if (this.isTokenExpired(token)) {
+        this.clearSession();
+        return;
+      }
+
+      try {
+        this.userSubject.next(JSON.parse(user) as User);
+      } catch {
+        this.clearSession();
+      }
     }
   }
 
@@ -98,10 +107,19 @@ export class AuthService {
   }
 
   logout() {
+    this.clearSession();
+    this.router.navigate(['/pages/auth/signin/form']);
+  }
+
+  handleUnauthorized() {
+    this.clearSession();
+    this.router.navigate(['/pages/auth/signin/form']);
+  }
+
+  private clearSession() {
     localStorage.removeItem(this.tokenKey);
     localStorage.removeItem(this.userKey);
     this.userSubject.next(null);
-    this.router.navigate(['/pages/auth/signin/form']);
   }
 
   private saveSession(token: string, user: User) {
@@ -119,11 +137,46 @@ export class AuthService {
   }
 
   getToken(): string | null {
-    return localStorage.getItem(this.tokenKey);
+    const token = localStorage.getItem(this.tokenKey);
+
+    if (!token) {
+      return null;
+    }
+
+    if (this.isTokenExpired(token)) {
+      this.clearSession();
+      return null;
+    }
+
+    return token;
   }
 
   private buildAuthHeaders(): HttpHeaders | undefined {
     const token = this.getToken();
     return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+  }
+
+  private isTokenExpired(token: string): boolean {
+    try {
+      const payload = this.decodeJwtPayload(token);
+      if (typeof payload?.['exp'] !== 'number') {
+        return false;
+      }
+
+      return Date.now() >= payload['exp'] * 1000;
+    } catch {
+      return true;
+    }
+  }
+
+  private decodeJwtPayload(token: string): Record<string, unknown> {
+    const [, payloadSegment] = token.split('.');
+    if (!payloadSegment) {
+      throw new Error('Invalid JWT payload');
+    }
+
+    const normalizedPayload = payloadSegment.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = '='.repeat((4 - (normalizedPayload.length % 4)) % 4);
+    return JSON.parse(atob(`${normalizedPayload}${padding}`));
   }
 }

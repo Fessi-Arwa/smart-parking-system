@@ -9,6 +9,7 @@ import { AuthService } from '../../../services/auth.service';
   standalone: false,
 })
 export class SigninIntroComponent implements OnInit, AfterViewInit, OnDestroy {
+  private readonly introSeenKey = 'signin_intro_seen';
   private animationFrame: number | null = null;
 
   constructor(private authService: AuthService, private router: Router) {}
@@ -16,7 +17,10 @@ export class SigninIntroComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     if (this.authService.isAuthenticated()) {
       this.router.navigate(['/dashboard']);
+      return;
     }
+
+    localStorage.setItem(this.introSeenKey, 'true');
   }
 
   ngAfterViewInit(): void {

@@ -57,7 +57,7 @@ export class OwnerOnboardingComponent implements AfterViewInit {
           prix_heure: Number(prix_heure),
         })
       );
-      this.toastService.show('Parking ajoute avec succes', 'success');
+      this.toastService.show('Parking ajoute. Attendez la validation admin pour lancer sa configuration.', 'success');
       await this.router.navigate(['/owner/dashboard']);
     } catch (error: any) {
       this.toastService.show(error.error?.msg || error.error?.error || 'Erreur lors de la creation du parking', 'error');

@@ -108,6 +108,21 @@
   font-size: 20px;
 }
 
+.notification-item__icon--success {
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+}
+
+.notification-item__icon--warning {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
+.notification-item__icon--alert {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
+
 .notification-item__content {
   strong {
     display: block;
@@ -155,4 +170,72 @@
 
 .car-icon {
   animation: carMove 1.5s ease-in-out infinite;
+}
+
+@media (max-width: 480px) {
+  .modern-header {
+    ion-toolbar {
+      --padding-start: 12px;
+      --padding-end: 12px;
+      --padding-top: 6px;
+      --padding-bottom: 6px;
+    }
+  }
+
+  .logo-section {
+    gap: 8px;
+
+    .car-icon {
+      font-size: 22px;
+    }
+
+    .app-name {
+      font-size: 16px;
+      letter-spacing: -0.2px;
+    }
+  }
+
+  .notification-btn {
+    .notif-icon {
+      font-size: 21px;
+    }
+
+    .notification-badge {
+      min-width: 16px;
+      height: 16px;
+      font-size: 10px;
+      padding: 0 4px;
+    }
+  }
+
+  .notification-panel {
+    right: 12px;
+    width: min(320px, calc(100vw - 24px));
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .notification-item {
+    grid-template-columns: 36px 1fr;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .notification-item__icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    font-size: 18px;
+  }
+
+  .notification-item__content {
+    strong {
+      font-size: 13px;
+    }
+
+    p,
+    small {
+      font-size: 11px;
+    }
+  }
 }

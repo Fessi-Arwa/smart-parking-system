@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from '../../../services/auth.service';
@@ -34,6 +35,14 @@ export interface ParkingInfo {
   activeSubscriptions: number;
 }
 
+interface OwnerPortfolioStats {
+  totalParkings: number;
+  totalSpaces: number;
+  availableSpaces: number;
+  occupancyRate: number;
+  activeParkings: number;
+}
+
 @Component({
   selector: 'app-profile',
   templateUrl: './profile.page.html',
@@ -52,6 +61,8 @@ export class ProfilePage implements OnInit {
   };
 
   parkings: ParkingInfo[] = [];
+  parkingSearch = '';
+  parkingStatusFilter: 'all' | 'actif' | 'maintenance' = 'all';
 
   isEditingProfile = false;
   showAddParking = false;
@@ -93,7 +104,8 @@ export class ProfilePage implements OnInit {
     private authService: AuthService,
     private parkingService: ParkingService,
     private placeService: PlaceService,
-    private toastService: ToastService
+    private toastService: ToastService,
+    private router: Router
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -117,6 +129,37 @@ export class ProfilePage implements OnInit {
     return parts.map((part) => part.charAt(0).toUpperCase()).join('') || 'OW';
   }
 
+  get portfolioStats(): OwnerPortfolioStats {
+    const totalParkings = this.parkings.length;
+    const totalSpaces = this.parkings.reduce((sum, parking) => sum + parking.totalSpaces, 0);
+    const availableSpaces = this.parkings.reduce((sum, parking) => sum + parking.availableSpaces, 0);
+    const activeParkings = this.parkings.filter((parking) => parking.statut === 'actif').length;
+    const occupiedSpaces = Math.max(totalSpaces - availableSpaces, 0);
+
+    return {
+      totalParkings,
+      totalSpaces,
+      availableSpaces,
+      occupancyRate: totalSpaces > 0 ? Math.round((occupiedSpaces / totalSpaces) * 100) : 0,
+      activeParkings,
+    };
+  }
+
+  get filteredParkings(): ParkingInfo[] {
+    const search = this.parkingSearch.trim().toLowerCase();
+    return this.parkings.filter((parking) => {
+      const matchesStatus =
+        this.parkingStatusFilter === 'all' || parking.statut === this.parkingStatusFilter;
+      const matchesSearch =
+        !search ||
+        parking.nom.toLowerCase().includes(search) ||
+        parking.adresse.toLowerCase().includes(search) ||
+        parking.ville.toLowerCase().includes(search);
+
+      return matchesStatus && matchesSearch;
+    });
+  }
+
   get notificationItems(): HeaderNotificationItem[] {
     const maintenanceNotifications = this.parkings
       .filter((parking) => parking.statut === 'maintenance')
@@ -124,6 +167,8 @@ export class ProfilePage implements OnInit {
         title: 'Parking en maintenance',
         description: `${parking.nom} est actuellement indisponible`,
         timestamp: 'Mise a jour recente',
+        icon: 'construct-outline',
+        tone: 'warning' as const,
       }));
 
     const lowCapacityNotifications = this.parkings
@@ -132,6 +177,8 @@ export class ProfilePage implements OnInit {
         title: 'Faible disponibilite',
         description: `${parking.nom} n a plus que ${parking.availableSpaces} places libres`,
         timestamp: 'Aujourd hui',
+        icon: 'alert-circle-outline',
+        tone: 'alert' as const,
       }));
 
     return [...maintenanceNotifications, ...lowCapacityNotifications].slice(0, 5);
@@ -277,7 +324,8 @@ export class ProfilePage implements OnInit {
 
     await firstValueFrom(this.parkingService.createParking(payload));
     this.showAddParking = false;
-    await this.loadOwnerParkings();
+    this.toastService.show('Parking ajoute. Il devra etre valide par l admin puis configure.', 'success');
+    await this.router.navigate(['/owner/dashboard']);
   }
 
   getStatusColor(status: string): string {
@@ -286,6 +334,18 @@ export class ProfilePage implements OnInit {
 
   getStatusLabel(status: string): string {
     return status === 'actif' ? 'Actif' : 'Maintenance';
+  }
+
+  getParkingOccupancy(parking: ParkingInfo): number {
+    if (parking.totalSpaces <= 0) {
+      return 0;
+    }
+
+    return Math.round(((parking.totalSpaces - parking.availableSpaces) / parking.totalSpaces) * 100);
+  }
+
+  setParkingStatusFilter(status: 'all' | 'actif' | 'maintenance'): void {
+    this.parkingStatusFilter = status;
   }
 
   private async loadOwnerParkings(selectedParkingId?: number): Promise<void> {
