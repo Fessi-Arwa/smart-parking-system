@@ -22,7 +22,7 @@ class Feedback(ModelMixin, db.Model):
         Index("idx_feedback_parking_id", "parking_id"),
     )
 
-    id_feed = db.Column(db.BigInteger, primary_key=True)
+    id_feed = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     conducteur_id = db.Column(
         db.BigInteger,
         db.ForeignKey("comptes.id_compte", ondelete="CASCADE"),

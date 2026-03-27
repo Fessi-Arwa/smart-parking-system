@@ -36,7 +36,7 @@ class Abonnement(ModelMixin, db.Model):
         CheckConstraint("date_fin > date_debut", name="ck_abonnement_date_fin_gt_date_debut"),
     )
 
-    id_abon = db.Column(db.BigInteger, primary_key=True)
+    id_abon = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     type = db.Column(db.Enum(TypeAbonnement, name="type_abonnement"), nullable=False)
     date_debut = db.Column(db.Date, nullable=False)
     date_fin = db.Column(db.Date, nullable=False)

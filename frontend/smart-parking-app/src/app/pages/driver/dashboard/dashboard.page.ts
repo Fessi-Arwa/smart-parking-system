@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from '../../../services/auth.service';
 import { ParkingDto, ParkingService } from '../../../services/parking.service';
+import { PaymentService } from '../../../services/payment.service';
 import { PlaceDto, PlaceService } from '../../../services/place.service';
 import { ReservationHistoryDto, ReservationService } from '../../../services/reservation';
 import { CreateSubscriptionPayload, SubscriptionDto, SubscriptionService } from '../../../services/subscription.service';
@@ -113,10 +114,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   latitude: 36.8065,   // Latitude de Tunis Centre
   longitude: 10.1815,  // Longitude de Tunis Centre
 };
-  vehicles: Vehicle[] = [
-    { id: 1, matricule: '123456-115-16', marque: 'Mercedes', type: 'Classe C', isDefault: true },
-    { id: 2, matricule: '458972-116-16', marque: 'BMW', type: 'Serie 3', isDefault: false },
-  ];
+  vehicles: Vehicle[] = [];
 
   parkings: ParkingCard[] = [
     {
@@ -225,6 +223,7 @@ export class DashboardPage implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private authService: AuthService,
     private parkingService: ParkingService,
+    private paymentService: PaymentService,
     private placeService: PlaceService,
     private reservationService: ReservationService,
     private subscriptionService: SubscriptionService,
@@ -244,6 +243,11 @@ export class DashboardPage implements OnInit, OnDestroy {
       date_debut: ['', Validators.required],
       date_fin: ['', Validators.required],
       payment_mode: ['en_ligne', Validators.required],
+      payment_method: ['carte_bancaire'],
+      card_holder: [''],
+      card_number: [''],
+      card_expiry: [''],
+      card_cvv: [''],
     });
 
     this.vehicleForm = this.fb.group({
@@ -341,6 +345,53 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   get totalAvailablePlaces(): number {
     return this.parkings.reduce((total, parking) => total + parking.availablePlaces, 0);
+  }
+
+  get selectedReservationParking(): ParkingCard | undefined {
+    const parkingId = Number(this.reservationForm.get('parking_id')?.value);
+    return this.parkings.find((parking) => parking.id_park === parkingId);
+  }
+
+  get reservationDurationHours(): number | null {
+    const startValue = this.reservationForm.get('date_debut')?.value;
+    const endValue = this.reservationForm.get('date_fin')?.value;
+
+    if (!startValue || !endValue) {
+      return null;
+    }
+
+    const start = new Date(startValue);
+    const end = new Date(endValue);
+    const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+
+    if (Number.isNaN(duration) || duration <= 0) {
+      return null;
+    }
+
+    return Math.round(duration * 100) / 100;
+  }
+
+  get reservationEstimatedTotal(): number | null {
+    const parking = this.selectedReservationParking;
+    const duration = this.reservationDurationHours;
+
+    if (!parking || duration === null) {
+      return null;
+    }
+
+    return Math.round(duration * parking.prix_heure);
+  }
+
+  get isOnlinePaymentSelected(): boolean {
+    return this.reservationForm.get('payment_mode')?.value === 'en_ligne';
+  }
+
+  get reservationSubmitLabel(): string {
+    if (this.isReservationSubmitting) {
+      return this.isOnlinePaymentSelected ? 'Paiement en cours...' : 'Confirmation...';
+    }
+
+    return this.isOnlinePaymentSelected ? 'Payer et confirmer' : 'Confirmer la réservation';
   }
 
   private async loadParkingsAndPlaces(): Promise<void> {
@@ -542,16 +593,25 @@ export class DashboardPage implements OnInit, OnDestroy {
   openReservation(parking?: ParkingCard): void {
     this.selectedParking = parking ?? null;
     const preferredParkingId = parking?.id_park ?? this.parkings[0]?.id_park ?? '';
+    const fallbackParkingId = this.findFirstParkingWithAvailableSpot();
+    const targetParkingId = this.hasAvailableSpot(preferredParkingId) ? preferredParkingId : fallbackParkingId;
     const defaultVehicleId = this.defaultVehicle?.id ?? '';
-    const availableSpot = this.spots.find((spot) => spot.parking_id === preferredParkingId && spot.etat === 'libre');
+    const availableSpot = targetParkingId
+      ? this.spots.find((spot) => spot.parking_id === targetParkingId && spot.etat === 'libre')
+      : undefined;
 
     this.reservationForm.reset({
-      parking_id: preferredParkingId,
+      parking_id: targetParkingId ?? '',
       vehicule_id: defaultVehicleId,
       place_id: availableSpot?.id_place ?? '',
       date_debut: '',
       date_fin: '',
       payment_mode: 'en_ligne',
+      payment_method: 'carte_bancaire',
+      card_holder: '',
+      card_number: '',
+      card_expiry: '',
+      card_cvv: '',
     });
 
     this.isReservationModalOpen = true;
@@ -576,19 +636,44 @@ export class DashboardPage implements OnInit, OnDestroy {
     });
   }
 
+  private hasAvailableSpot(parkingId: number | string | undefined): boolean {
+    const normalizedParkingId = Number(parkingId);
+    if (!normalizedParkingId) {
+      return false;
+    }
+
+    return this.spots.some((spot) => spot.parking_id === normalizedParkingId && spot.etat === 'libre');
+  }
+
+  private findFirstParkingWithAvailableSpot(): number | null {
+    const parking = this.parkings.find((item) => this.hasAvailableSpot(item.id_park));
+    return parking?.id_park ?? null;
+  }
+
   async submitReservation(): Promise<void> {
-    if (this.reservationForm.invalid) {
+    const values = this.reservationForm.value;
+
+    const validationError = this.getReservationFormErrorMessage();
+    if (validationError) {
       this.reservationForm.markAllAsTouched();
+      this.toastService.show(validationError, 'error');
       return;
     }
 
-    const values = this.reservationForm.value;
     const parking = this.parkings.find((item) => item.id_park === Number(values.parking_id));
     const spot = this.spots.find((item) => item.id_place === Number(values.place_id));
-    const vehicle = this.vehicles.find((item) => item.id === Number(values.vehicule_id));
+    const selectedVehicleId = values.vehicule_id ? Number(values.vehicule_id) : null;
+    const vehicle = selectedVehicleId !== null
+      ? this.vehicles.find((item) => item.id === selectedVehicleId)
+      : undefined;
 
-    if (!parking || !spot || !vehicle) {
-      this.toastService.show('Selection de reservation invalide', 'error');
+    if (!parking || !spot) {
+      this.toastService.show('Selection de parking ou de place invalide', 'error');
+      return;
+    }
+
+    if (!vehicle) {
+      this.toastService.show('Ajoutez d abord une voiture dans votre profil avant de reserver', 'error');
       return;
     }
 
@@ -599,16 +684,47 @@ export class DashboardPage implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.isOnlinePaymentSelected) {
+      const paymentValidationError = this.validateOnlinePaymentFields();
+      if (paymentValidationError) {
+        this.toastService.show(paymentValidationError, 'error');
+        return;
+      }
+    }
+
     this.isReservationSubmitting = true;
     try {
-      await firstValueFrom(
+      if (this.isOnlinePaymentSelected) {
+        await firstValueFrom(
+          this.paymentService.simulatePayment({
+            amount: this.reservationEstimatedTotal ?? 0,
+            method: this.reservationForm.value.payment_method,
+            card_holder: this.reservationForm.value.card_holder,
+            card_number: this.reservationForm.value.card_number,
+            card_expiry: this.reservationForm.value.card_expiry,
+            card_cvv: this.reservationForm.value.card_cvv,
+          })
+        );
+      }
+
+      const reservationResponse = await firstValueFrom(
         this.reservationService.createReservation({
-          vehicule_id: Number(values.vehicule_id),
+          vehicule_id: vehicle.id,
           place_id: Number(values.place_id),
           date_debut: values.date_debut,
           date_fin: values.date_fin,
         })
       );
+
+      if (this.isOnlinePaymentSelected) {
+        await firstValueFrom(
+          this.paymentService.createPayment({
+            reservation_id: Number(reservationResponse?.reservation?.id_res),
+            montant: Number(reservationResponse?.prix ?? this.reservationEstimatedTotal ?? 0),
+            mode: this.reservationForm.value.payment_method,
+          })
+        );
+      }
 
       this.spots = this.spots.map((item) =>
         item.id_place === spot.id_place
@@ -622,7 +738,12 @@ export class DashboardPage implements OnInit, OnDestroy {
       );
 
       await this.loadReservations();
-      this.toastService.show('Reservation creee avec succes', 'success');
+      this.toastService.show(
+        this.isOnlinePaymentSelected
+          ? 'Paiement valide et reservation creee avec succes'
+          : 'Reservation creee avec succes',
+        'success'
+      );
       this.closeReservationModal();
       this.activeTab = 'historique';
     } catch (error: any) {
@@ -896,6 +1017,68 @@ export class DashboardPage implements OnInit, OnDestroy {
       hour: '2-digit',
       minute: '2-digit',
     });
+  }
+
+  private validateOnlinePaymentFields(): string | null {
+    const values = this.reservationForm.value;
+
+    if (!values.payment_method) {
+      return 'Choisissez une methode de paiement';
+    }
+
+    if (!values.card_holder?.trim()) {
+      return 'Saisissez le nom du porteur';
+    }
+
+    const normalizedCardNumber = String(values.card_number || '').replace(/\s+/g, '');
+    if (normalizedCardNumber.length < 12) {
+      return 'Saisissez un numero de carte valide';
+    }
+
+    if (!String(values.card_expiry || '').trim()) {
+      return 'Saisissez la date d expiration';
+    }
+
+    const normalizedCvv = String(values.card_cvv || '').trim();
+    if (normalizedCvv.length < 3) {
+      return 'Saisissez un code de securite valide';
+    }
+
+    return null;
+  }
+
+  private getReservationFormErrorMessage(): string | null {
+    const values = this.reservationForm.value;
+
+    if (!values.parking_id) {
+      return 'Choisissez un parking';
+    }
+
+    if (!values.vehicule_id) {
+      return 'Choisissez une voiture pour continuer';
+    }
+
+    if (!values.place_id) {
+      return 'Choisissez une place disponible';
+    }
+
+    if (!values.date_debut) {
+      return 'Choisissez la date de debut';
+    }
+
+    if (!values.date_fin) {
+      return 'Choisissez la date de fin';
+    }
+
+    if (!values.payment_mode) {
+      return 'Choisissez un mode de paiement';
+    }
+
+    if (this.isOnlinePaymentSelected) {
+      return this.validateOnlinePaymentFields();
+    }
+
+    return null;
   }
 
   get mapParkings(): MapParking[] {

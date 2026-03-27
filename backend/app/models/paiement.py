@@ -26,7 +26,7 @@ class Paiement(ModelMixin, db.Model):
     )
     __table_args__ = (CheckConstraint("montant >= 0", name="ck_paiement_montant_positive"),)
 
-    id_paiement = db.Column(db.BigInteger, primary_key=True)
+    id_paiement = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     reservation_id = db.Column(
         db.BigInteger,
         db.ForeignKey("reservation.id_res", ondelete="CASCADE"),
