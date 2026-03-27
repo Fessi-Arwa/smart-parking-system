@@ -46,4 +46,12 @@ def create_app():
     app.register_blueprint(owner_workflow_bp, url_prefix="/api/owner")
     app.register_blueprint(vehicule_bp, url_prefix="/api/vehicules")
 
+    @app.get("/")
+    def root():
+        return {
+            "status": "ok",
+            "service": "smart-parking-backend",
+            "health": "/api/health/db",
+        }
+
     return app

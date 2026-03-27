@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
+import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 
 export type ParkingAISourceType = 'image' | 'video' | 'camera';
@@ -23,8 +24,8 @@ export interface ParkingAISource {
   providedIn: 'root',
 })
 export class ParkingAiSourceService {
-  private readonly apiUrl = 'http://localhost:5000/api/owner';
-  private readonly backendOrigin = 'http://localhost:5000';
+  private readonly apiUrl = `${environment.apiBaseUrl}/owner`;
+  private readonly backendOrigin = environment.backendOrigin;
 
   constructor(
     private http: HttpClient,
