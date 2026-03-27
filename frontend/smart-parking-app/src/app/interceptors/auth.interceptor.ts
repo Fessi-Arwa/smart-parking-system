@@ -24,10 +24,10 @@ export class AuthInterceptor implements HttpInterceptor {
   intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     return next.handle(req).pipe(
       catchError((error: HttpErrorResponse) => {
-        if (error.status === 401 && !this.isAuthRoute(req.url) && !this.isHandlingUnauthorized) {
+        if (error.status === 401 && !this.isAuthenticationRequest(req.url) && !this.isHandlingUnauthorized) {
           this.isHandlingUnauthorized = true;
           this.toastService.show('Session expiree. Reconnectez-vous pour continuer.', 'error');
-          this.authService.logout();
+          this.authService.handleUnauthorized();
           setTimeout(() => {
             this.isHandlingUnauthorized = false;
           }, 0);
@@ -38,7 +38,7 @@ export class AuthInterceptor implements HttpInterceptor {
     );
   }
 
-  private isAuthRoute(url: string): boolean {
+  private isAuthenticationRequest(url: string): boolean {
     return url.includes('/api/auth/login') || url.includes('/api/auth/register');
   }
 }

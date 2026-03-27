@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
+import { OwnerWorkflowGuard } from '../../guards/owner-workflow.guard';
 import { AiSetupPage } from './ai-setup/ai-setup.page';
 import { ParkingSetupPage } from './parking-setup/parking-setup.page';
 import { PendingPage } from './pending/pending.page';
@@ -14,6 +15,7 @@ const routes: Routes = [
   },
   {
     path: 'overview',
+    canActivate: [OwnerWorkflowGuard],
     loadChildren: () => import('./dashboard/dashboard.module').then(m => m.DashboardPageModule)
   },
   {
@@ -34,6 +36,7 @@ const routes: Routes = [
   },
   {
     path: 'profile',
+    canActivate: [OwnerWorkflowGuard],
     loadChildren: () => import('./profile/profile.module').then(m => m.ProfilePageModule)
   },
   // Pour l'instant, commente les pages en construction

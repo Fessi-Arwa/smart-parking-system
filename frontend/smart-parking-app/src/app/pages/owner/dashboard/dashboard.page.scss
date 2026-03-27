@@ -183,6 +183,87 @@ ion-list {
   }
 }
 
+.ai-sources-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.ai-source-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.ai-source-card__preview {
+  height: 140px;
+  background: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  img,
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+}
+
+.ai-source-card__preview--camera {
+  ion-icon {
+    font-size: 42px;
+    color: #3b82f6;
+  }
+}
+
+.ai-source-card__body {
+  padding: 14px;
+
+  strong {
+    display: block;
+    color: #0f172a;
+    margin-bottom: 6px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 12px;
+    color: #64748b;
+    word-break: break-word;
+  }
+}
+
+.ai-source-card__type {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.empty-ai-state {
+  padding: 12px 0;
+  text-align: center;
+  color: #64748b;
+
+  ion-icon {
+    font-size: 28px;
+    color: #3b82f6;
+    margin-bottom: 8px;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
 /* Badges personnalisés */
 ion-badge {
   &.success {
