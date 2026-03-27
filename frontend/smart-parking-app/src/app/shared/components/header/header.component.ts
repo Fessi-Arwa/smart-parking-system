@@ -4,6 +4,8 @@ export interface HeaderNotificationItem {
   title: string;
   description: string;
   timestamp: string;
+  icon?: string;
+  tone?: 'info' | 'success' | 'warning' | 'alert';
 }
 
 @Component({
