@@ -1,10 +1,10 @@
 <ion-content class="owner-step owner-step--ai">
   <div class="owner-step__wrap">
     <span class="owner-step__eyebrow">Etape 4</span>
-    <h1>Configurer le module IA</h1>
+    <h1>Configurer les sources du module IA</h1>
     <p>
-      Le parking est pret. Il reste maintenant a brancher les elements necessaires a la detection
-      des vehicules et a la detection de l occupation des places.
+      Ajoutez maintenant les medias et flux de surveillance que le modele IA utilisera pour
+      detecter les vehicules, estimer l occupation et assister la configuration finale du parking.
     </p>
 
     <div class="ai-grid">
@@ -13,9 +13,93 @@
       </article>
     </div>
 
+    <section class="ai-panel">
+      <div class="ai-panel__header">
+        <div>
+          <h2>Sources IA du parking</h2>
+          <p>Vous pouvez melanger images, videos et cameras de surveillance.</p>
+        </div>
+        <span class="ai-panel__tag">{{ aiSources.length }} source(s)</span>
+      </div>
+
+      <div class="ai-actions-grid">
+        <label class="ai-upload-card">
+          <input type="file" accept="image/*" (change)="onImageSelected($event)" hidden />
+          <strong>{{ isUploadingImage ? 'Upload image...' : 'Ajouter une image' }}</strong>
+          <span>JPEG, PNG ou autre vue statique du parking</span>
+        </label>
+
+        <label class="ai-upload-card">
+          <input type="file" accept="video/*" (change)="onVideoSelected($event)" hidden />
+          <strong>{{ isUploadingVideo ? 'Upload video...' : 'Ajouter une video' }}</strong>
+          <span>Courte sequence video pour detection et calibration</span>
+        </label>
+      </div>
+
+      <div class="camera-form">
+        <label class="field">
+          <span>Nom de la camera</span>
+          <input type="text" [(ngModel)]="cameraDraft.label" name="cameraLabel" placeholder="Entree principale" />
+        </label>
+
+        <label class="field field--full">
+          <span>URL camera / flux surveillance</span>
+          <input
+            type="text"
+            [(ngModel)]="cameraDraft.streamUrl"
+            name="cameraStreamUrl"
+            placeholder="rtsp://..., http://..., https://..."
+          />
+        </label>
+
+        <button class="owner-step__secondary" type="button" (click)="addCamera()" [disabled]="isAddingCamera">
+          {{ isAddingCamera ? 'Ajout camera...' : 'Ajouter une camera' }}
+        </button>
+      </div>
+
+      <div class="sources-list" *ngIf="!isLoadingSources && aiSources.length > 0">
+        <article class="source-card" *ngFor="let source of aiSources">
+          <div class="source-card__preview" *ngIf="isImageSource(source) && source.preview_url">
+            <img [src]="source.preview_url" [alt]="source.label || source.original_name || 'Image IA'" />
+          </div>
+
+          <div class="source-card__preview source-card__preview--video" *ngIf="isVideoSource(source) && source.preview_url">
+            <video [src]="source.preview_url" controls preload="metadata"></video>
+          </div>
+
+          <div class="source-card__preview source-card__preview--camera" *ngIf="isCameraSource(source)">
+            <ion-icon name="videocam-outline"></ion-icon>
+          </div>
+
+          <div class="source-card__body">
+            <span class="source-card__type">{{ source.source_type | uppercase }}</span>
+            <strong>{{ source.label || source.original_name || 'Source IA' }}</strong>
+            <p *ngIf="source.stream_url">{{ source.stream_url }}</p>
+            <p *ngIf="!source.stream_url">{{ source.original_name || source.mime_type }}</p>
+          </div>
+
+          <button class="source-card__delete" type="button" (click)="removeSource(source.id_source)">
+            Supprimer
+          </button>
+        </article>
+      </div>
+
+      <div class="ai-panel__empty" *ngIf="!isLoadingSources && aiSources.length === 0">
+        <p>Aucune source IA n a encore ete configuree.</p>
+      </div>
+    </section>
+
     <div class="owner-step__actions">
-      <button class="owner-step__primary" type="button" (click)="activateAi()">
-        Marquer l integration IA comme active
+      <button
+        class="owner-step__primary"
+        type="button"
+        (click)="activateAiSetup()"
+        [disabled]="isSubmitting || isLoadingSources"
+      >
+        {{ isSubmitting ? 'Activation...' : 'Activer la configuration IA' }}
+      </button>
+      <button class="owner-step__primary" type="button" (click)="refreshStatus()">
+        Actualiser le statut
       </button>
     </div>
   </div>

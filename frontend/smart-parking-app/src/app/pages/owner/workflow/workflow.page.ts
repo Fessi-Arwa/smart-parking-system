@@ -16,7 +16,11 @@ export class WorkflowPage implements OnInit {
   ) {}
 
   async ngOnInit(): Promise<void> {
-    const route = this.ownerWorkflowService.getNextRoute(this.ownerWorkflowService.refresh());
-    await this.router.navigateByUrl(route);
+    try {
+      const state = await this.ownerWorkflowService.refresh();
+      await this.router.navigateByUrl(this.ownerWorkflowService.getNextRoute(state));
+    } catch {
+      await this.router.navigateByUrl('/owner/pending');
+    }
   }
 }

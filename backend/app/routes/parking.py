@@ -3,7 +3,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from .. import db
 from ..models.compte import Compte, RoleCompte
-from ..models.parking import Parking
+from ..models.parking import Parking, StatutConfigurationIA, StatutConfigurationParking, StatutValidationParking
 
 parking_bp = Blueprint("parking", __name__)
 
@@ -46,6 +46,9 @@ def create_parking():
         adresse=data["adresse"],
         capacite=capacite,
         prix_heure=prix_heure,
+        validation_status=StatutValidationParking.en_attente_validation,
+        setup_status=StatutConfigurationParking.non_commencee,
+        ai_setup_status=StatutConfigurationIA.non_configuree,
     )
 
     db.session.add(parking)

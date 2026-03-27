@@ -18,20 +18,15 @@ export class PendingPage implements OnInit {
     private router: Router
   ) {}
 
-  ngOnInit(): void {
-    this.workflowState = this.ownerWorkflowService.refresh();
+  async ngOnInit(): Promise<void> {
+    await this.refreshStatus();
   }
 
   async refreshStatus(): Promise<void> {
-    this.workflowState = this.ownerWorkflowService.refresh();
+    this.workflowState = await this.ownerWorkflowService.refresh();
     const route = this.ownerWorkflowService.getNextRoute(this.workflowState);
     if (route !== '/owner/pending') {
       await this.router.navigateByUrl(route);
     }
-  }
-
-  async simulateApproval(): Promise<void> {
-    this.ownerWorkflowService.approveOwner();
-    await this.refreshStatus();
   }
 }

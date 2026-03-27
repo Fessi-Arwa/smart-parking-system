@@ -1,30 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+
 import { AuthService } from '../../../services/auth.service';
+import {
+  AdminParkingRecord,
+  AdminUserRecord,
+  AdminWorkflowService,
+} from '../../../services/admin-workflow.service';
 import { ToastService } from '../../../services/toast.service';
-
-// Interfaces basées sur les modèles backend
-export interface User {
-  id_compte: number;
-  nom: string;
-  email: string;
-  telephone: string;
-  role: 'conducteur' | 'owner' | 'admin';
-  created_at: string;
-}
-
-export interface Parking {
-  id_park: number;
-  owner_id: number;
-  owner_name: string;
-  nom: string;
-  adresse: string;
-  ville: string;
-  prix_heure: number;
-  statut: 'actif' | 'inactif';
-  validation_status: 'en_attente' | 'approuve' | 'rejete';
-  created_at: string;
-}
 
 @Component({
   selector: 'app-dashboard',
@@ -33,324 +16,293 @@ export interface Parking {
   standalone: false,
 })
 export class AdminDashboardPage implements OnInit {
-  // ========== STATISTIQUES ==========
   stats = {
-    totalUsers: 8,
-    totalDrivers: 5,
-    totalOwners: 3,
-    totalParkings: 12,
-    activeParkings: 8,
-    pendingParkings: 4,
-    totalReservations: 156,
-    totalRevenue: 12450
+    totalUsers: 0,
+    totalDrivers: 0,
+    totalOwners: 0,
+    totalParkings: 0,
+    activeParkings: 0,
+    pendingParkings: 0,
+    totalReservations: 0,
+    totalRevenue: 0,
   };
 
-  // ========== UTILISATEURS ==========
-  users: User[] = [
-    {
-      id_compte: 1,
-      nom: 'Ahmed Ben Ali',
-      email: 'ahmed@parkini.com',
-      telephone: '+216 12 345 678',
-      role: 'owner',
-      created_at: '2024-01-15'
-    },
-    {
-      id_compte: 2,
-      nom: 'Nadia Benali',
-      email: 'nadia@parkini.com',
-      telephone: '+213 555 20 10 15',
-      role: 'conducteur',
-      created_at: '2024-02-20'
-    },
-    {
-      id_compte: 3,
-      nom: 'Karim Mansouri',
-      email: 'karim@parkini.com',
-      telephone: '+216 98 765 432',
-      role: 'conducteur',
-      created_at: '2024-03-10'
-    },
-    {
-      id_compte: 4,
-      nom: 'Sonia Trabelsi',
-      email: 'sonia@parkini.com',
-      telephone: '+216 55 123 456',
-      role: 'conducteur',
-      created_at: '2024-03-15'
-    },
-    {
-      id_compte: 5,
-      nom: 'Mehdi Bouazizi',
-      email: 'mehdi@parkini.com',
-      telephone: '+216 22 789 123',
-      role: 'owner',
-      created_at: '2024-03-20'
-    },
-    {
-      id_compte: 6,
-      nom: 'Leila Hammami',
-      email: 'leila@parkini.com',
-      telephone: '+216 33 456 789',
-      role: 'conducteur',
-      created_at: '2024-04-01'
-    },
-    {
-      id_compte: 7,
-      nom: 'Tarek Gharbi',
-      email: 'tarek@parkini.com',
-      telephone: '+216 44 567 890',
-      role: 'conducteur',
-      created_at: '2024-04-05'
-    },
-    {
-      id_compte: 8,
-      nom: 'Admin System',
-      email: 'admin@parkini.com',
-      telephone: '+216 11 111 111',
-      role: 'admin',
-      created_at: '2024-01-01'
-    }
-  ];
+  users: AdminUserRecord[] = [];
+  parkings: AdminParkingRecord[] = [];
+  isLoading = false;
 
-  // ========== PARKINGS ==========
-  parkings: Parking[] = [
-    {
-      id_park: 1,
-      owner_id: 1,
-      owner_name: 'Ahmed Ben Ali',
-      nom: 'Parking Centre Ville',
-      adresse: '15 Rue de la République',
-      ville: 'Tunis',
-      prix_heure: 2.5,
-      statut: 'actif',
-      validation_status: 'approuve',
-      created_at: '2024-01-20'
-    },
-    {
-      id_park: 2,
-      owner_id: 1,
-      owner_name: 'Ahmed Ben Ali',
-      nom: 'Parking Gare',
-      adresse: '2 Avenue de la Gare',
-      ville: 'Tunis',
-      prix_heure: 2.0,
-      statut: 'actif',
-      validation_status: 'approuve',
-      created_at: '2024-02-01'
-    },
-    {
-      id_park: 3,
-      owner_id: 5,
-      owner_name: 'Mehdi Bouazizi',
-      nom: 'Parking Lac',
-      adresse: 'Rue du Lac',
-      ville: 'Tunis',
-      prix_heure: 3.0,
-      statut: 'actif',
-      validation_status: 'approuve',
-      created_at: '2024-03-25'
-    },
-    {
-      id_park: 4,
-      owner_id: 5,
-      owner_name: 'Mehdi Bouazizi',
-      nom: 'Parking Berges du Lac',
-      adresse: 'Avenue Hedi Nouira',
-      ville: 'Tunis',
-      prix_heure: 3.5,
-      statut: 'actif',
-      validation_status: 'approuve',
-      created_at: '2024-04-01'
-    },
-    {
-      id_park: 5,
-      owner_id: 1,
-      owner_name: 'Ahmed Ben Ali',
-      nom: 'Parking Mutuelleville',
-      adresse: 'Rue de Mutuelleville',
-      ville: 'Tunis',
-      prix_heure: 2.8,
-      statut: 'actif',
-      validation_status: 'en_attente',
-      created_at: '2024-04-10'
-    },
-    {
-      id_park: 6,
-      owner_id: 5,
-      owner_name: 'Mehdi Bouazizi',
-      nom: 'Parking Manar',
-      adresse: 'Avenue du Stade',
-      ville: 'Tunis',
-      prix_heure: 2.2,
-      statut: 'actif',
-      validation_status: 'en_attente',
-      created_at: '2024-04-12'
-    },
-    {
-      id_park: 7,
-      owner_id: 1,
-      owner_name: 'Ahmed Ben Ali',
-      nom: 'Parking El Menzah',
-      adresse: 'Rue de Palestine',
-      ville: 'Tunis',
-      prix_heure: 2.5,
-      statut: 'inactif',
-      validation_status: 'rejete',
-      created_at: '2024-03-15'
-    },
-    {
-      id_park: 8,
-      owner_id: 5,
-      owner_name: 'Mehdi Bouazizi',
-      nom: 'Parking Ariana',
-      adresse: 'Avenue de Paris',
-      ville: 'Ariana',
-      prix_heure: 1.8,
-      statut: 'actif',
-      validation_status: 'en_attente',
-      created_at: '2024-04-15'
-    }
-  ];
-
-  // ========== FILTRES ET RECHERCHE ==========
   userSearchTerm = '';
   userRoleFilter: 'all' | 'conducteur' | 'owner' | 'admin' = 'all';
-  
+
   parkingSearchTerm = '';
-  parkingStatusFilter: 'all' | 'en_attente' | 'approuve' | 'rejete' = 'all';
+  parkingStatusFilter: 'all' | 'en_attente_validation' | 'valide' | 'rejete' = 'all';
 
   constructor(
     private router: Router,
     private authService: AuthService,
+    private adminWorkflowService: AdminWorkflowService,
     private toastService: ToastService
   ) {}
 
-  ngOnInit() {}
+  async ngOnInit(): Promise<void> {
+    await this.loadDashboardData();
+  }
 
-  // ========== MÉTHODES UTILISATEURS ==========
-  get filteredUsers(): User[] {
+  get filteredUsers(): AdminUserRecord[] {
     let filtered = this.users;
-    
+
     if (this.userRoleFilter !== 'all') {
-      filtered = filtered.filter(u => u.role === this.userRoleFilter);
+      filtered = filtered.filter((user) => user.role === this.userRoleFilter);
     }
-    
+
     if (this.userSearchTerm.trim()) {
       const term = this.userSearchTerm.toLowerCase();
-      filtered = filtered.filter(u => 
-        u.nom.toLowerCase().includes(term) ||
-        u.email.toLowerCase().includes(term) ||
-        u.telephone.includes(term)
+      filtered = filtered.filter((user) =>
+        user.nom.toLowerCase().includes(term) ||
+        user.email.toLowerCase().includes(term) ||
+        (user.telephone || '').includes(term)
       );
     }
-    
+
     return filtered;
   }
 
-  deleteUser(userId: number) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
-      this.users = this.users.filter(u => u.id_compte !== userId);
-      this.updateStats();
-    }
-  }
-
-  // ========== MÉTHODES PARKINGS ==========
-  get filteredParkings(): Parking[] {
+  get filteredParkings(): AdminParkingRecord[] {
     let filtered = this.parkings;
-    
+
     if (this.parkingStatusFilter !== 'all') {
-      filtered = filtered.filter(p => p.validation_status === this.parkingStatusFilter);
+      filtered = filtered.filter((parking) => parking.validation_status === this.parkingStatusFilter);
     }
-    
+
     if (this.parkingSearchTerm.trim()) {
       const term = this.parkingSearchTerm.toLowerCase();
-      filtered = filtered.filter(p => 
-        p.nom.toLowerCase().includes(term) ||
-        p.adresse.toLowerCase().includes(term) ||
-        p.ville.toLowerCase().includes(term) ||
-        p.owner_name.toLowerCase().includes(term)
+      filtered = filtered.filter((parking) =>
+        parking.nom.toLowerCase().includes(term) ||
+        parking.adresse.toLowerCase().includes(term) ||
+        this.getParkingOwnerName(parking.owner_id).toLowerCase().includes(term)
       );
     }
-    
+
     return filtered;
   }
 
-  approveParking(parkingId: number) {
-    const parking = this.parkings.find(p => p.id_park === parkingId);
-    if (parking) {
-      parking.validation_status = 'approuve';
-      parking.statut = 'actif';
+  async approveOwner(userId: number): Promise<void> {
+    try {
+      const updatedUser = await this.adminWorkflowService.updateOwnerStatus(userId, 'accepte');
+      this.users = this.users.map((user) => (user.id_compte === userId ? updatedUser : user));
       this.updateStats();
+      this.toastService.show('Compte owner approuve avec succes.', 'success');
+    } catch (error) {
+      console.error('Erreur approbation owner', error);
+      this.toastService.show('Impossible d approuver ce compte owner.', 'error');
     }
   }
 
-  rejectParking(parkingId: number) {
-    const parking = this.parkings.find(p => p.id_park === parkingId);
-    if (parking) {
-      parking.validation_status = 'rejete';
-      parking.statut = 'inactif';
+  async rejectOwner(userId: number): Promise<void> {
+    try {
+      const updatedUser = await this.adminWorkflowService.updateOwnerStatus(userId, 'refuse');
+      this.users = this.users.map((user) => (user.id_compte === userId ? updatedUser : user));
       this.updateStats();
+      this.toastService.show('Compte owner rejete.', 'info');
+    } catch (error) {
+      console.error('Erreur rejet owner', error);
+      this.toastService.show('Impossible de rejeter ce compte owner.', 'error');
     }
   }
 
-  deleteParking(parkingId: number) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce parking ?')) {
-      this.parkings = this.parkings.filter(p => p.id_park !== parkingId);
+  async deleteUser(userId: number): Promise<void> {
+    if (!confirm('Etes-vous sur de vouloir supprimer cet utilisateur ?')) {
+      return;
+    }
+
+    try {
+      await this.adminWorkflowService.deleteUser(userId);
+      this.users = this.users.filter((user) => user.id_compte !== userId);
+      this.parkings = this.parkings.filter((parking) => parking.owner_id !== userId);
       this.updateStats();
+      this.toastService.show('Utilisateur supprime avec succes.', 'success');
+    } catch (error) {
+      console.error('Erreur suppression utilisateur', error);
+      this.toastService.show('Impossible de supprimer cet utilisateur.', 'error');
     }
   }
 
-  // ========== STATISTIQUES ==========
-  updateStats() {
-    this.stats.totalUsers = this.users.filter(u => u.role !== 'admin').length;
-    this.stats.totalDrivers = this.users.filter(u => u.role === 'conducteur').length;
-    this.stats.totalOwners = this.users.filter(u => u.role === 'owner').length;
+  async approveParking(parkingId: number): Promise<void> {
+    try {
+      const updatedParking = await this.adminWorkflowService.updateParkingValidationStatus(
+        parkingId,
+        'valide'
+      );
+      this.parkings = this.parkings.map((parking) =>
+        parking.id_park === parkingId ? updatedParking : parking
+      );
+      this.updateStats();
+      this.toastService.show('Parking approuve avec succes.', 'success');
+    } catch (error) {
+      console.error('Erreur approbation parking', error);
+      this.toastService.show('Impossible d approuver ce parking.', 'error');
+    }
+  }
+
+  async rejectParking(parkingId: number): Promise<void> {
+    try {
+      const updatedParking = await this.adminWorkflowService.updateParkingValidationStatus(
+        parkingId,
+        'rejete'
+      );
+      this.parkings = this.parkings.map((parking) =>
+        parking.id_park === parkingId ? updatedParking : parking
+      );
+      this.updateStats();
+      this.toastService.show('Parking rejete.', 'info');
+    } catch (error) {
+      console.error('Erreur rejet parking', error);
+      this.toastService.show('Impossible de rejeter ce parking.', 'error');
+    }
+  }
+
+  async deleteParking(parkingId: number): Promise<void> {
+    if (!confirm('Etes-vous sur de vouloir supprimer ce parking ?')) {
+      return;
+    }
+
+    try {
+      await this.adminWorkflowService.deleteParking(parkingId);
+      this.parkings = this.parkings.filter((parking) => parking.id_park !== parkingId);
+      this.updateStats();
+      this.toastService.show('Parking supprime avec succes.', 'success');
+    } catch (error) {
+      console.error('Erreur suppression parking', error);
+      this.toastService.show('Impossible de supprimer ce parking.', 'error');
+    }
+  }
+
+  updateStats(): void {
+    this.stats.totalUsers = this.users.filter((user) => user.role !== 'admin').length;
+    this.stats.totalDrivers = this.users.filter((user) => user.role === 'conducteur').length;
+    this.stats.totalOwners = this.users.filter((user) => user.role === 'owner').length;
     this.stats.totalParkings = this.parkings.length;
-    this.stats.activeParkings = this.parkings.filter(p => p.statut === 'actif').length;
-    this.stats.pendingParkings = this.parkings.filter(p => p.validation_status === 'en_attente').length;
+    this.stats.activeParkings = this.parkings.filter((parking) => parking.statut === 'actif').length;
+    this.stats.pendingParkings = this.parkings.filter(
+      (parking) => parking.validation_status === 'en_attente_validation'
+    ).length;
   }
 
   getRoleLabel(role: string): string {
-    switch(role) {
-      case 'admin': return 'Admin';
-      case 'owner': return 'Propriétaire';
-      case 'conducteur': return 'Conducteur';
-      default: return role;
+    switch (role) {
+      case 'admin':
+        return 'Admin';
+      case 'owner':
+        return 'Proprietaire';
+      case 'conducteur':
+        return 'Conducteur';
+      default:
+        return role;
     }
   }
 
   getValidationLabel(status: string): string {
-    switch(status) {
-      case 'approuve': return 'Approuvé';
-      case 'en_attente': return 'En attente';
-      case 'rejete': return 'Rejeté';
-      default: return status;
+    switch (status) {
+      case 'valide':
+        return 'Valide';
+      case 'en_attente_validation':
+        return 'En attente';
+      case 'rejete':
+        return 'Rejete';
+      case 'brouillon':
+        return 'Brouillon';
+      default:
+        return status;
     }
   }
 
   getRoleBadgeClass(role: string): string {
-    switch(role) {
-      case 'admin': return 'badge-danger';
-      case 'owner': return 'badge-primary';
-      case 'conducteur': return 'badge-success';
-      default: return 'badge-secondary';
+    switch (role) {
+      case 'admin':
+        return 'badge-danger';
+      case 'owner':
+        return 'badge-primary';
+      case 'conducteur':
+        return 'badge-success';
+      default:
+        return 'badge-secondary';
     }
   }
 
   getValidationBadgeClass(status: string): string {
-    switch(status) {
-      case 'approuve': return 'badge-success';
-      case 'en_attente': return 'badge-warning';
-      case 'rejete': return 'badge-danger';
-      default: return 'badge-secondary';
+    switch (status) {
+      case 'valide':
+        return 'badge-success';
+      case 'en_attente_validation':
+        return 'badge-warning';
+      case 'rejete':
+        return 'badge-danger';
+      default:
+        return 'badge-secondary';
     }
   }
 
-  // ========== DÉCONNEXION ==========
-  logout() {
+  getOwnerStatusLabel(status?: string): string {
+    switch (status) {
+      case 'accepte':
+        return 'Accepte';
+      case 'refuse':
+        return 'Refuse';
+      case 'suspendu':
+        return 'Suspendu';
+      case 'en_attente':
+        return 'En attente';
+      default:
+        return 'N/A';
+    }
+  }
+
+  getOwnerStatusBadgeClass(status?: string): string {
+    switch (status) {
+      case 'accepte':
+        return 'badge-success';
+      case 'refuse':
+        return 'badge-danger';
+      case 'suspendu':
+        return 'badge-secondary';
+      case 'en_attente':
+        return 'badge-warning';
+      default:
+        return 'badge-secondary';
+    }
+  }
+
+  getParkingOwnerName(ownerId: number): string {
+    return this.users.find((user) => user.id_compte === ownerId)?.nom || `Owner #${ownerId}`;
+  }
+
+  async reloadData(): Promise<void> {
+    await this.loadDashboardData();
+  }
+
+  logout(): void {
     this.authService.logout();
-    this.toastService.show('Déconnexion réussie', 'success');
+    this.toastService.show('Deconnexion reussie', 'success');
     this.router.navigate(['/pages/auth/signin']);
+  }
+
+  private async loadDashboardData(): Promise<void> {
+    this.isLoading = true;
+
+    try {
+      const [users, parkings] = await Promise.all([
+        this.adminWorkflowService.getUsers(),
+        this.adminWorkflowService.getParkings(),
+      ]);
+
+      this.users = users;
+      this.parkings = parkings;
+      this.updateStats();
+    } catch (error) {
+      console.error('Erreur chargement dashboard admin', error);
+      this.toastService.show('Impossible de charger les donnees admin.', 'error');
+    } finally {
+      this.isLoading = false;
+    }
   }
 }

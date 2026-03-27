@@ -4,7 +4,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .. import db
-from ..models.compte import Compte, RoleCompte
+from ..models.compte import Compte, RoleCompte, StatutValidationOwner
 
 
 auth_bp = Blueprint("auth", __name__)
@@ -63,12 +63,18 @@ def register():
         return jsonify({"msg": "La creation d un compte admin n est pas autorisee via l inscription publique"}), 403
 
     hashed_password = generate_password_hash(mot_passe)
+    owner_status = (
+        StatutValidationOwner.en_attente
+        if role == RoleCompte.owner
+        else StatutValidationOwner.accepte
+    )
     user = Compte(
         nom=nom,
         email=email,
         telephone=telephone,
         mot_passe=hashed_password,
         role=role,
+        owner_status=owner_status,
     )
 
     db.session.add(user)

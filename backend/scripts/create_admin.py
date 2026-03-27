@@ -7,7 +7,7 @@ from werkzeug.security import generate_password_hash
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import create_app, db
-from app.models.compte import Compte, RoleCompte
+from app.models.compte import Compte, RoleCompte, StatutValidationOwner
 
 
 def parse_args():
@@ -36,6 +36,7 @@ def main():
             telephone=args.phone.strip() if args.phone else None,
             mot_passe=generate_password_hash(args.password),
             role=RoleCompte.admin,
+            owner_status=StatutValidationOwner.accepte,
         )
 
         db.session.add(admin)
