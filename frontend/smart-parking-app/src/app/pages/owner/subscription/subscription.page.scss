@@ -1,0 +1,68 @@
+.owner-step {
+  --background: linear-gradient(180deg, #fcf7ef 0%, #f9efe1 100%);
+  color: #172554;
+}
+
+.owner-step__wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+}
+
+.owner-step__eyebrow {
+  display: inline-flex;
+  margin-bottom: 1rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: #ffedd5;
+  color: #c2410c;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.owner-step h1 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.owner-step p {
+  margin: 0;
+  max-width: 44rem;
+  color: #475569;
+  line-height: 1.7;
+}
+
+.plan-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1.35rem;
+  border-radius: 1.4rem;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(23, 37, 84, 0.08);
+  box-shadow: 0 16px 40px rgba(23, 37, 84, 0.06);
+}
+
+.plan-card strong,
+.plan-card span {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.owner-step__actions {
+  display: flex;
+  gap: 0.9rem;
+  margin-top: 2rem;
+}
+
+.owner-step__primary {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.95rem 1.25rem;
+  font-weight: 700;
+  background: #ea580c;
+  color: #fff;
+}

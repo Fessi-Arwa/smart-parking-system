@@ -1966,3 +1966,29 @@
   min-height: 56px;
   padding: 0 20px;
 }
+/* ========== GPS STATUS ========== */
+.gps-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #f1f5f9;
+  border-radius: 30px;
+  font-size: 12px;
+  color: #64748b;
+  
+  ion-icon {
+    font-size: 16px;
+  }
+  
+  &.active {
+    background: #dcfce7;
+    color: #22c55e;
+  }
+  
+  &.error {
+    background: #fee2e2;
+    color: #ef4444;
+  }
+}

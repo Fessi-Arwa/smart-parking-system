@@ -1,0 +1,23 @@
+<ion-content class="owner-step owner-step--setup">
+  <div class="owner-step__wrap">
+    <span class="owner-step__eyebrow">Etape 3</span>
+    <h1>Finaliser la configuration du parking</h1>
+    <p>
+      Cette etape sert a structurer le parking avant l integration du module IA: zones, capacite,
+      places et organisation physique.
+    </p>
+
+    <div class="checklist">
+      <article class="checklist__item" *ngFor="let item of setupChecklist">
+        <span>•</span>
+        <strong>{{ item }}</strong>
+      </article>
+    </div>
+
+    <div class="owner-step__actions">
+      <button class="owner-step__primary" type="button" (click)="completeSetup()">
+        Marquer la configuration comme terminee
+      </button>
+    </div>
+  </div>
+</ion-content>

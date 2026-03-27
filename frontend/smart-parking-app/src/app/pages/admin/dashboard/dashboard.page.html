@@ -1,0 +1,188 @@
+<ion-content class="admin-container" [fullscreen]="true">
+  <!-- Header simplifié pour mobile -->
+  <div class="mobile-header">
+    <div class="logo-section">
+      <ion-icon name="car-sport-outline" class="car-icon"></ion-icon>
+      <span class="app-name">PARKINI ADMIN</span>
+    </div>
+    <button class="logout-btn" (click)="logout()">
+      <ion-icon name="log-out-outline"></ion-icon>
+    </button>
+  </div>
+
+  <div class="admin-content">
+    <!-- Titre avec statistiques intégrées -->
+    <div class="page-header">
+      <h1>Dashboard Admin</h1>
+      <p>Gestion complète de la plateforme</p>
+    </div>
+
+    <!-- ========== STATISTIQUES - Version mobile ========== -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon-wrapper">
+          <ion-icon name="people-outline" class="stat-icon"></ion-icon>
+        </div>
+        <div class="stat-value">{{ stats.totalUsers }}</div>
+        <div class="stat-label">Utilisateurs</div>
+        <div class="stat-detail">{{ stats.totalDrivers }} conducteurs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon-wrapper">
+          <ion-icon name="business-outline" class="stat-icon"></ion-icon>
+        </div>
+        <div class="stat-value">{{ stats.totalParkings }}</div>
+        <div class="stat-label">Parkings</div>
+        <div class="stat-detail">{{ stats.pendingParkings }} en attente</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon-wrapper">
+          <ion-icon name="cash-outline" class="stat-icon"></ion-icon>
+        </div>
+        <div class="stat-value">{{ stats.totalRevenue }} €</div>
+        <div class="stat-label">Revenus</div>
+        <div class="stat-detail">Total cumulé</div>
+      </div>
+    </div>
+
+    <!-- ========== SECTION UTILISATEURS ========== -->
+    <div class="data-card">
+      <div class="card-header">
+        <div class="header-left">
+          <div class="header-icon-wrapper">
+            <ion-icon name="people-outline" class="header-icon"></ion-icon>
+          </div>
+          <div>
+            <h2>Utilisateurs</h2>
+            <p>Gestion des comptes</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <div class="search-box">
+          <ion-icon name="search-outline"></ion-icon>
+          <input type="text" [(ngModel)]="userSearchTerm" placeholder="Rechercher...">
+        </div>
+        <div class="filter-chips">
+          <button class="filter-chip" [class.active]="userRoleFilter === 'all'" (click)="userRoleFilter = 'all'">Tous</button>
+          <button class="filter-chip" [class.active]="userRoleFilter === 'conducteur'" (click)="userRoleFilter = 'conducteur'">Conducteurs</button>
+          <button class="filter-chip" [class.active]="userRoleFilter === 'owner'" (click)="userRoleFilter = 'owner'">Propriétaires</button>
+          <button class="filter-chip" [class.active]="userRoleFilter === 'admin'" (click)="userRoleFilter = 'admin'">Admins</button>
+        </div>
+      </div>
+
+      <div class="users-list">
+        <div *ngFor="let user of filteredUsers" class="user-card">
+          <div class="user-avatar">
+            <span>{{ user.nom.charAt(0) }}{{ user.nom.split(' ')[1]?.charAt(0) || '' }}</span>
+          </div>
+          <div class="user-info">
+            <div class="user-name">
+              <strong>{{ user.nom }}</strong>
+              <span class="role-badge" [class]="getRoleBadgeClass(user.role)">
+                {{ getRoleLabel(user.role) }}
+              </span>
+            </div>
+            <div class="user-details">
+              <span class="user-email">{{ user.email }}</span>
+              <span class="user-phone">{{ user.telephone }}</span>
+            </div>
+            <div class="user-date">Inscrit le {{ user.created_at }}</div>
+          </div>
+          <button class="delete-btn" (click)="deleteUser(user.id_compte)" *ngIf="user.role !== 'admin'">
+            <ion-icon name="trash-outline"></ion-icon>
+          </button>
+        </div>
+        
+        <div *ngIf="filteredUsers.length === 0" class="empty-state">
+          <ion-icon name="people-outline"></ion-icon>
+          <p>Aucun utilisateur trouvé</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== SECTION PARKINGS ========== -->
+    <div class="data-card">
+      <div class="card-header">
+        <div class="header-left">
+          <div class="header-icon-wrapper">
+            <ion-icon name="business-outline" class="header-icon"></ion-icon>
+          </div>
+          <div>
+            <h2>Parkings</h2>
+            <p>Validation des demandes</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <div class="search-box">
+          <ion-icon name="search-outline"></ion-icon>
+          <input type="text" [(ngModel)]="parkingSearchTerm" placeholder="Rechercher...">
+        </div>
+        <div class="filter-chips">
+          <button class="filter-chip" [class.active]="parkingStatusFilter === 'all'" (click)="parkingStatusFilter = 'all'">Tous</button>
+          <button class="filter-chip" [class.active]="parkingStatusFilter === 'en_attente'" (click)="parkingStatusFilter = 'en_attente'">En attente</button>
+          <button class="filter-chip" [class.active]="parkingStatusFilter === 'approuve'" (click)="parkingStatusFilter = 'approuve'">Approuvés</button>
+          <button class="filter-chip" [class.active]="parkingStatusFilter === 'rejete'" (click)="parkingStatusFilter = 'rejete'">Rejetés</button>
+        </div>
+      </div>
+
+      <div class="parkings-list">
+        <div *ngFor="let parking of filteredParkings" class="parking-card">
+          <div class="parking-header">
+            <div class="parking-icon">
+              <ion-icon name="car-outline"></ion-icon>
+            </div>
+            <div class="parking-title">
+              <h3>{{ parking.nom }}</h3>
+              <p>{{ parking.owner_name }}</p>
+            </div>
+            <div class="parking-price">{{ parking.prix_heure }} €/h</div>
+          </div>
+          
+          <div class="parking-address">
+            <ion-icon name="location-outline"></ion-icon>
+            <span>{{ parking.adresse }}, {{ parking.ville }}</span>
+          </div>
+          
+          <div class="parking-badges">
+            <span class="status-badge" [class]="parking.statut === 'actif' ? 'active' : 'inactive'">
+              {{ parking.statut === 'actif' ? 'Actif' : 'Inactif' }}
+            </span>
+            <span class="validation-badge" [class]="getValidationBadgeClass(parking.validation_status)">
+              {{ getValidationLabel(parking.validation_status) }}
+            </span>
+          </div>
+          
+          <div class="parking-actions" *ngIf="parking.validation_status === 'en_attente'">
+            <button class="action-btn approve" (click)="approveParking(parking.id_park)">
+              <ion-icon name="checkmark-outline"></ion-icon>
+              Approuver
+            </button>
+            <button class="action-btn reject" (click)="rejectParking(parking.id_park)">
+              <ion-icon name="close-outline"></ion-icon>
+              Rejeter
+            </button>
+            <button class="action-btn delete" (click)="deleteParking(parking.id_park)">
+              <ion-icon name="trash-outline"></ion-icon>
+            </button>
+          </div>
+          
+          <div class="parking-actions" *ngIf="parking.validation_status !== 'en_attente'">
+            <button class="action-btn delete" (click)="deleteParking(parking.id_park)">
+              <ion-icon name="trash-outline"></ion-icon>
+              Supprimer
+            </button>
+          </div>
+        </div>
+        
+        <div *ngIf="filteredParkings.length === 0" class="empty-state">
+          <ion-icon name="business-outline"></ion-icon>
+          <p>Aucun parking trouvé</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</ion-content>

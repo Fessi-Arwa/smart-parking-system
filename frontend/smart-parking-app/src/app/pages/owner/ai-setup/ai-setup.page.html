@@ -1,0 +1,22 @@
+<ion-content class="owner-step owner-step--ai">
+  <div class="owner-step__wrap">
+    <span class="owner-step__eyebrow">Etape 4</span>
+    <h1>Configurer le module IA</h1>
+    <p>
+      Le parking est pret. Il reste maintenant a brancher les elements necessaires a la detection
+      des vehicules et a la detection de l occupation des places.
+    </p>
+
+    <div class="ai-grid">
+      <article class="ai-grid__item" *ngFor="let item of aiTasks">
+        <strong>{{ item }}</strong>
+      </article>
+    </div>
+
+    <div class="owner-step__actions">
+      <button class="owner-step__primary" type="button" (click)="activateAi()">
+        Marquer l integration IA comme active
+      </button>
+    </div>
+  </div>
+</ion-content>

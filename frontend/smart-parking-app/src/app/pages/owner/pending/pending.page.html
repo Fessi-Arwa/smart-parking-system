@@ -1,0 +1,32 @@
+<ion-content class="owner-step owner-step--pending">
+  <div class="owner-step__wrap">
+    <span class="owner-step__eyebrow">Etape 1</span>
+    <h1>Validation administrative en attente</h1>
+    <p>
+      Votre compte owner et votre premier parking ont bien ete soumis. L admin doit maintenant
+      valider votre dossier avant de debloquer l abonnement de l application.
+    </p>
+
+    <div class="owner-step__status-grid">
+      <article class="owner-step__status-card">
+        <strong>Compte owner</strong>
+        <span>{{ workflowState.ownerStatus }}</span>
+      </article>
+      <article class="owner-step__status-card">
+        <strong>Premier parking</strong>
+        <span>{{ workflowState.parkingStatus }}</span>
+      </article>
+      <article class="owner-step__status-card">
+        <strong>Abonnement app</strong>
+        <span>{{ workflowState.subscriptionStatus }}</span>
+      </article>
+    </div>
+
+    <div class="owner-step__actions">
+      <button class="owner-step__secondary" type="button" (click)="refreshStatus()">Actualiser</button>
+      <button class="owner-step__primary" type="button" (click)="simulateApproval()">
+        Simuler validation admin
+      </button>
+    </div>
+  </div>
+</ion-content>

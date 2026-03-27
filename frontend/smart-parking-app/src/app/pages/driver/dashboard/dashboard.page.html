@@ -5,80 +5,47 @@
       [notifications]="notificationItems"></app-header>
 
     <main class="driver-content">
-      <section *ngIf="activeTab === 'home'" class="page-section">
-        <div class="map-card">
-          <div class="section-heading">
-            <div class="section-heading__group">
-              <div class="section-heading__icon">
-                <ion-icon name="map-outline"></ion-icon>
-              </div>
-              <div>
-                <p class="eyebrow">Carte</p>
-                <h2>Parkings à proximité</h2>
-              </div>
-            </div>
-          </div>
+    <section *ngIf="activeTab === 'home'" class="page-section">
+ <!-- Carte interactive -->
+<div class="map-card">
+  <div class="section-heading">
+    <div class="section-heading__group">
+      <div class="section-heading__icon">
+        <ion-icon name="map-outline"></ion-icon>
+      </div>
+      <div>
+        <p class="eyebrow">Carte interactive</p>
+        <h2>Parkings à proximité</h2>
+      </div>
+    </div>
+  </div>
 
-          <div class="map-surface">
-            <div class="map-overlay map-overlay--top"></div>
-            <div class="map-overlay map-overlay--bottom"></div>
-            <div class="map-noise"></div>
-            <div class="map-water"></div>
-            <div class="map-park map-park--one"></div>
-            <div class="map-park map-park--two"></div>
-            <div class="map-block map-block--one"></div>
-            <div class="map-block map-block--two"></div>
-            <div class="map-block map-block--three"></div>
-            <div class="map-block map-block--four"></div>
-            <div class="map-grid"></div>
-            <div class="map-road map-road-one"></div>
-            <div class="map-road map-road-two"></div>
-            <div class="map-road map-road-three"></div>
-            <div class="map-road map-road-four"></div>
-            <div class="map-route"></div>
+  <app-map
+  [parkings]="mapParkings"
+  [userLatitude]="driverPosition.latitude"
+  [userLongitude]="driverPosition.longitude"
+(parkingSelected)="handleMapParkingSelected($event)">
+</app-map>
 
-            <div class="map-hud">
-              <div class="map-hud__item">
-                <span class="map-hud__dot driver"></span>
-                <strong>Conducteur</strong>
-              </div>
-              <div class="map-hud__item">
-                <span class="map-hud__dot parking"></span>
-                <strong>Parkings</strong>
-              </div>
-            </div>
+  <!-- 👇 AJOUTE CETTE SECTION APRÈS LA CARTE -->
+  <div class="gps-status" [class.active]="gpsStatus === 'active'" [class.error]="gpsStatus === 'error'">
+    <ion-icon name="location-outline"></ion-icon>
+    <span *ngIf="gpsStatus === 'waiting'">Recherche de position...</span>
+    <span *ngIf="gpsStatus === 'active'">GPS actif - Position en temps réel</span>
+    <span *ngIf="gpsStatus === 'error'">GPS indisponible - Position approximative</span>
+  </div>
 
-            <div class="map-stat-card">
-              <span>Disponibles</span>
-              <strong>{{ totalAvailablePlaces }} places</strong>
-            </div>
-
-            <div
-              class="driver-marker"
-              [class.is-focused]="isDriverLocationFocused"
-              [ngStyle]="getDriverMarkerStyle()">
-              <div class="driver-car">
-                <ion-icon name="car-sport-outline"></ion-icon>
-              </div>
-            </div>
-
-            <button
-              *ngFor="let parking of parkings; trackBy: trackByParking"
-              class="parking-marker"
-              type="button"
-              [ngStyle]="getMarkerStyle(parking)"
-              (click)="openReservation(parking)">
-              <div class="parking-pin">
-                <ion-icon name="location"></ion-icon>
-              </div>
-              <small>{{ parking.nom }}</small>
-            </button>
-
-            <button class="map-locate-btn" type="button" (click)="focusDriverLocation()">
-              <ion-icon name="locate-outline"></ion-icon>
-            </button>
-          </div>
-        </div>
+  <div class="map-stats">
+    <div class="stat-badge">
+      <ion-icon name="location-outline"></ion-icon>
+      <span>{{ parkings.length }} parkings à proximité</span>
+    </div>
+    <div class="stat-badge">
+      <ion-icon name="car-outline"></ion-icon>
+      <span>{{ totalAvailableSpaces }} places libres</span>
+    </div>
+  </div>
+</div>
 
         <div class="list-card">
           <div class="section-heading">

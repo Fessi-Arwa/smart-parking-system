@@ -1,10 +1,36 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
+import { AiSetupPage } from './ai-setup/ai-setup.page';
+import { ParkingSetupPage } from './parking-setup/parking-setup.page';
+import { PendingPage } from './pending/pending.page';
+import { SubscriptionPage } from './subscription/subscription.page';
+import { WorkflowPage } from './workflow/workflow.page';
+
 const routes: Routes = [
   {
     path: 'dashboard',
+    component: WorkflowPage,
+  },
+  {
+    path: 'overview',
     loadChildren: () => import('./dashboard/dashboard.module').then(m => m.DashboardPageModule)
+  },
+  {
+    path: 'pending',
+    component: PendingPage,
+  },
+  {
+    path: 'subscription',
+    component: SubscriptionPage,
+  },
+  {
+    path: 'parking-setup',
+    component: ParkingSetupPage,
+  },
+  {
+    path: 'ai-setup',
+    component: AiSetupPage,
   },
   {
     path: 'profile',

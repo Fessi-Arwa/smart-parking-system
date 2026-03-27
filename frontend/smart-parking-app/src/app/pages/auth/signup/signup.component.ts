@@ -70,7 +70,7 @@ export class SignupComponent implements OnInit, AfterViewInit {
         role === 'owner' ? '/pages/auth/onboarding/owner' : '/pages/auth/onboarding/driver',
       ]);
     } catch (error: any) {
-      this.toastService.show(error.error?.msg || error.error?.error || "Erreur d'inscription", 'error');
+      this.toastService.show(this.getAuthErrorMessage(error, "Erreur d'inscription"), 'error');
     } finally {
       this.isLoading = false;
     }
@@ -83,5 +83,17 @@ export class SignupComponent implements OnInit, AfterViewInit {
 
   goToSignin(): void {
     this.router.navigate(['/pages/auth/signin/form']);
+  }
+
+  private getAuthErrorMessage(error: any, fallback: string): string {
+    if (error?.status === 0) {
+      return "API indisponible. Verifie que le backend Flask tourne et que DATABASE_URL est configuree.";
+    }
+
+    if (typeof error?.error === 'string' && error.error.includes('<!doctype html>')) {
+      return "Erreur serveur backend. Verifie le demarrage du serveur et la configuration Supabase.";
+    }
+
+    return error?.error?.msg || error?.error?.error || fallback;
   }
 }

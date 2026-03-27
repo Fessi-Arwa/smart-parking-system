@@ -4,11 +4,12 @@ import { IonicModule } from '@ionic/angular';
 import { RouterModule } from '@angular/router';
 
 import { HeaderComponent } from './components/header/header.component';
+import { MapComponent } from './components/map/map.component';
 import { NavbarComponent } from './components/navbar/navbar.component';
 
 @NgModule({
-  declarations: [HeaderComponent, NavbarComponent],
+  declarations: [HeaderComponent, NavbarComponent, MapComponent],
   imports: [CommonModule, IonicModule, RouterModule],
-  exports: [HeaderComponent, NavbarComponent]  // ← Important : exporte les composants
+  exports: [HeaderComponent, NavbarComponent, MapComponent]
 })
 export class SharedModule { }
