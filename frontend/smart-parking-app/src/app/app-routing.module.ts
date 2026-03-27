@@ -4,15 +4,44 @@ import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
 const routes: Routes = [
   {
     path: 'pages/auth',
-    loadChildren: () => import('./pages/auth.module').then((m) => m.AuthModule)
+    loadChildren: () => import('./pages/auth.module').then(m => m.AuthModule)
+  },
+  {
+    path: 'signin',
+    redirectTo: 'pages/auth/signin',
+    pathMatch: 'full'
+  },
+  {
+    path: 'signup',
+    redirectTo: 'pages/auth/signup',
+    pathMatch: 'full'
+  },
+  {
+    path: 'forgot-password',
+    redirectTo: 'pages/auth/forgot-password',
+    pathMatch: 'full'
+  },
+  {
+    path: 'reset-password',
+    redirectTo: 'pages/auth/reset-password',
+    pathMatch: 'full'
   },
   {
     path: 'dashboard',
-    loadChildren: () => import('./pages/driver/driver.module').then((m) => m.DriverModule)
+    redirectTo: 'driver',
+    pathMatch: 'full'
   },
   {
     path: 'owner',
-    loadChildren: () => import('./pages/owner/owner.module').then((m) => m.OwnerModule)
+    loadChildren: () => import('./pages/owner/owner.module').then(m => m.OwnerModule)
+  },
+  {
+    path: 'driver',
+    loadChildren: () => import('./pages/driver/driver.module').then(m => m.DriverModule)
+  },
+  {
+    path: 'admin',
+    loadChildren: () => import('./pages/admin/admin.module').then(m => m.AdminModule)
   },
   {
     path: '',
@@ -27,4 +56,4 @@ const routes: Routes = [
   ],
   exports: [RouterModule]
 })
-export class AppRoutingModule {}
+export class AppRoutingModule { }

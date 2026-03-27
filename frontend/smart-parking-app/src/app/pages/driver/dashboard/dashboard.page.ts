@@ -1,6 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AuthService } from '../../../services/auth.service';
+import { MapParking } from '../../../shared/components/map/map.component';
 
 type DriverTab = 'home' | 'historique' | 'profil';
 type PaymentMode = 'en_ligne' | 'sur_place';
@@ -72,35 +73,35 @@ interface SubscriptionItem {
   styleUrls: ['./dashboard.page.scss'],
   standalone: false,
 })
-export class DashboardPage implements OnInit {
+export class DashboardPage implements OnInit, OnDestroy {
   activeTab: DriverTab = 'home';
   searchTerm = '';
   notificationsCount = 3;
   isDriverLocationFocused = false;
-
+  gpsStatus: 'waiting' | 'active' | 'error' = 'waiting';
   isReservationModalOpen = false;
   isVehicleModalOpen = false;
   isSubscriptionModalOpen = false;
   isProfileModalOpen = false;
 
   selectedParking: ParkingCard | null = null;
+  private locationWatchId: number | null = null;
 
   driverProfile: DriverProfile = {
     nom: 'Nadia Benali',
     email: 'nadia.benali@parkini.com',
     telephone: '+213 555 20 10 15',
-    adresse: 'Cité 120 logements, Alger',
+    adresse: 'Cite 120 logements, Alger',
     avatar: 'NB',
   };
 
-  readonly driverPosition = {
-    latitude: 36.7538,
-    longitude: 3.0588,
-  };
-
+  driverPosition = {
+  latitude: 36.8065,   // Latitude de Tunis Centre
+  longitude: 10.1815,  // Longitude de Tunis Centre
+};
   vehicles: Vehicle[] = [
     { id: 1, matricule: '123456-115-16', marque: 'Mercedes', type: 'Classe C', isDefault: true },
-    { id: 2, matricule: '458972-116-16', marque: 'BMW', type: 'Série 3', isDefault: false },
+    { id: 2, matricule: '458972-116-16', marque: 'BMW', type: 'Serie 3', isDefault: false },
   ];
 
   parkings: ParkingCard[] = [
@@ -142,7 +143,7 @@ export class DashboardPage implements OnInit {
     },
     {
       id_park: 4,
-      nom: 'Parking Aéroport',
+      nom: 'Parking Aeroport',
       adresse: 'Terminal Ouest, Dar El Beida',
       ville: 'Alger',
       latitude: 36.6945,
@@ -240,10 +241,6 @@ export class DashboardPage implements OnInit {
     });
   }
 
-  logout(): void {
-    this.authService.logout();
-  }
-
   ngOnInit(): void {
     const currentUser = this.authService.getCurrentUser();
     if (currentUser) {
@@ -256,6 +253,17 @@ export class DashboardPage implements OnInit {
     }
 
     this.profileForm.patchValue(this.driverProfile);
+    this.startLocationTracking();
+  }
+
+  ngOnDestroy(): void {
+    if (this.locationWatchId !== null && 'geolocation' in navigator) {
+      navigator.geolocation.clearWatch(this.locationWatchId);
+    }
+  }
+
+  logout(): void {
+    this.authService.logout();
   }
 
   setActiveTab(tab: DriverTab): void {
@@ -304,6 +312,13 @@ export class DashboardPage implements OnInit {
     });
 
     this.isReservationModalOpen = true;
+  }
+
+  handleMapParkingSelected(parking: MapParking): void {
+    const selectedParking = this.parkings.find((item) => item.id_park === parking.id);
+    if (selectedParking) {
+      this.openReservation(selectedParking);
+    }
   }
 
   closeReservationModal(): void {
@@ -493,11 +508,11 @@ export class DashboardPage implements OnInit {
   getStatusLabel(status: ReservationItem['statut'] | SubscriptionItem['statut']): string {
     const labels: Record<string, string> = {
       en_attente: 'En attente',
-      confirmee: 'Confirmée',
-      annulee: 'Annulée',
-      terminee: 'Terminée',
+      confirmee: 'Confirmee',
+      annulee: 'Annulee',
+      terminee: 'Terminee',
       actif: 'Actif',
-      expire: 'Expiré',
+      expire: 'Expire',
       suspendu: 'Suspendu',
     };
 
@@ -565,8 +580,160 @@ export class DashboardPage implements OnInit {
     return `Place ${spot.zone}-${spot.num_place} • Etage ${spot.etage}`;
   }
 
+  get mapParkings(): MapParking[] {
+    return this.parkings.map((parking) => ({
+      id: parking.id_park,
+      nom: parking.nom,
+      adresse: `${parking.adresse}, ${parking.ville}`,
+      latitude: parking.latitude,
+      longitude: parking.longitude,
+      availableSpaces: parking.availablePlaces,
+      price: parking.prix_heure
+    }));
+  }
+
+  get totalAvailableSpaces(): number {
+    return this.parkings.reduce((sum, parking) => sum + parking.availablePlaces, 0);
+  }
+
+private startLocationTracking(): void {
+  // Vérifier si la géolocalisation est supportée
+  if (!('geolocation' in navigator)) {
+    console.warn('⚠️ Géolocalisation non supportée par ce navigateur');
+    this.gpsStatus = 'error';
+    this.driverPosition = {
+      latitude: 36.7538,
+      longitude: 3.0588
+    };
+    return;
+  }
+
+  console.log('📍 Demande de géolocalisation en cours...');
+  this.gpsStatus = 'waiting';
+
+  // Options pour une meilleure précision
+  const options: PositionOptions = {
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 0
+  };
+
+  // Récupérer la position
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      console.log(`✅ Position trouvée: ${latitude}, ${longitude}`);
+      console.log(`🎯 Précision: ±${accuracy} mètres`);
+      
+      this.driverPosition = { latitude, longitude };
+      this.gpsStatus = 'active';
+      
+      // Forcer la mise à jour de la carte
+      setTimeout(() => {
+        const mapComponent = document.querySelector('app-map') as any;
+        if (mapComponent && mapComponent.focusOnUser) {
+          mapComponent.focusOnUser();
+        }
+      }, 500);
+    },
+    (error) => {
+      console.error('❌ Erreur de géolocalisation:', error.message);
+      
+      // Analyser le type d'erreur
+      let errorMessage = '';
+      switch(error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage = 'Accès à la position refusé. Activez la localisation.';
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMessage = 'Position non disponible. Vérifiez le GPS.';
+          break;
+        case error.TIMEOUT:
+          errorMessage = 'Délai d\'attente dépassé.';
+          break;
+      }
+      console.warn(errorMessage);
+      
+      this.gpsStatus = 'error';
+      // Garder la position par défaut
+      this.driverPosition = {
+        latitude: 36.7538,
+        longitude: 3.0588
+      };
+    },
+    options
+  );
+
+  // Suivi en temps réel
+  if (this.locationWatchId !== null) {
+    navigator.geolocation.clearWatch(this.locationWatchId);
+  }
+  
+  this.locationWatchId = navigator.geolocation.watchPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords;
+      console.log(`🔄 Position mise à jour: ${latitude}, ${longitude}`);
+      this.driverPosition = { latitude, longitude };
+      this.gpsStatus = 'active';
+    },
+    (error) => {
+      console.warn('⚠️ Erreur de suivi:', error.message);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 5000
+    }
+  );
+}
+
+// Ajoute cette méthode pour afficher un toast de confirmation
+private showLocationToast(latitude: number, longitude: number): void {
+  // Créer un toast simple (sans dépendance)
+  const toast = document.createElement('div');
+  toast.textContent = `📍 Position détectée: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    z-index: 1000;
+    animation: fadeOut 3s forwards;
+  `;
+  
+  // Ajouter l'animation
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes fadeOut {
+      0% { opacity: 1; }
+      70% { opacity: 1; }
+      100% { opacity: 0; visibility: hidden; }
+    }
+  `;
+  document.head.appendChild(style);
+  
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+  private updateDriverPosition(latitude: number, longitude: number): void {
+  this.driverPosition = { latitude, longitude };
+  this.gpsStatus = 'active';
+  console.log(`📍 Position mise à jour: ${latitude}, ${longitude}`);
+}
   private buildAvatar(name: string): string {
     const parts = name.trim().split(/\s+/).slice(0, 2);
     return parts.map((part) => part.charAt(0).toUpperCase()).join('');
   }
+
+  // Ajoute cette propriété (remplace ou ajoute)
+get mapWithoutParkings(): MapParking[] {
+  // Retourne un tableau vide pour ne pas afficher les parkings
+  return [];
+}
 }
