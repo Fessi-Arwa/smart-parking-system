@@ -12,6 +12,13 @@ class RoleCompte(str, enum.Enum):
     admin = "admin"
 
 
+class StatutValidationOwner(str, enum.Enum):
+    en_attente = "en_attente"
+    accepte = "accepte"
+    refuse = "refuse"
+    suspendu = "suspendu"
+
+
 class Compte(ModelMixin, db.Model):
     __tablename__ = "comptes"
     __public_fields__ = (
@@ -20,6 +27,7 @@ class Compte(ModelMixin, db.Model):
         "email",
         "telephone",
         "role",
+        "owner_status",
         "created_at",
         "updated_at",
     )
@@ -30,6 +38,11 @@ class Compte(ModelMixin, db.Model):
     mot_passe = db.Column(db.String(255), nullable=False)
     telephone = db.Column(db.String(30))
     role = db.Column(db.Enum(RoleCompte, name="role_compte"), nullable=False)
+    owner_status = db.Column(
+        db.Enum(StatutValidationOwner, name="statut_validation_owner"),
+        nullable=False,
+        server_default=StatutValidationOwner.en_attente.value,
+    )
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = db.Column(
         db.DateTime(timezone=True),

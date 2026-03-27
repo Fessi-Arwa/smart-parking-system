@@ -25,3 +25,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "jwt-secret")
+    UPLOAD_FOLDER = os.getenv(
+        "UPLOAD_FOLDER",
+        str(Path(__file__).resolve().parents[1] / "uploads"),
+    )

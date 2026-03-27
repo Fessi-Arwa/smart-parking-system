@@ -12,6 +12,26 @@ class StatutParking(str, enum.Enum):
     inactif = "inactif"
 
 
+class StatutValidationParking(str, enum.Enum):
+    brouillon = "brouillon"
+    en_attente_validation = "en_attente_validation"
+    valide = "valide"
+    rejete = "rejete"
+
+
+class StatutConfigurationParking(str, enum.Enum):
+    non_commencee = "non_commencee"
+    en_cours = "en_cours"
+    terminee = "terminee"
+
+
+class StatutConfigurationIA(str, enum.Enum):
+    non_configuree = "non_configuree"
+    en_cours = "en_cours"
+    testee = "testee"
+    active = "active"
+
+
 class Parking(ModelMixin, db.Model):
     __tablename__ = "parking"
     __public_fields__ = (
@@ -22,6 +42,9 @@ class Parking(ModelMixin, db.Model):
         "capacite",
         "prix_heure",
         "statut",
+        "validation_status",
+        "setup_status",
+        "ai_setup_status",
         "created_at",
     )
     __table_args__ = (
@@ -44,6 +67,21 @@ class Parking(ModelMixin, db.Model):
         db.Enum(StatutParking, name="statut_parking"),
         nullable=False,
         server_default=StatutParking.actif.value,
+    )
+    validation_status = db.Column(
+        db.Enum(StatutValidationParking, name="statut_validation_parking"),
+        nullable=False,
+        server_default=StatutValidationParking.brouillon.value,
+    )
+    setup_status = db.Column(
+        db.Enum(StatutConfigurationParking, name="statut_configuration_parking"),
+        nullable=False,
+        server_default=StatutConfigurationParking.non_commencee.value,
+    )
+    ai_setup_status = db.Column(
+        db.Enum(StatutConfigurationIA, name="statut_configuration_ia"),
+        nullable=False,
+        server_default=StatutConfigurationIA.non_configuree.value,
     )
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
 

@@ -10,6 +10,8 @@ export interface OwnerWorkflowState {
   subscriptionStatus: SubscriptionStatus;
   parkingSetupStatus: SetupStatus;
   aiSetupStatus: AiSetupStatus;
+  parkingId?: number | null;
+  hasParking?: boolean;
 }
 
 export const DEFAULT_OWNER_WORKFLOW_STATE: OwnerWorkflowState = {

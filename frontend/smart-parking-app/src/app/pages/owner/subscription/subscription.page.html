@@ -16,8 +16,16 @@
     </article>
 
     <div class="owner-step__actions">
-      <button class="owner-step__primary" type="button" (click)="activateSubscription()">
-        Simuler paiement et activation
+      <button
+        class="owner-step__primary"
+        type="button"
+        (click)="activateSubscription()"
+        [disabled]="isSubmitting"
+      >
+        {{ isSubmitting ? 'Activation...' : 'Activer l abonnement' }}
+      </button>
+      <button class="owner-step__primary" type="button" (click)="refreshStatus()">
+        Actualiser le statut
       </button>
     </div>
   </div>
