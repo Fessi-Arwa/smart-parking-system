@@ -86,6 +86,11 @@ export class SigninComponent implements OnInit, AfterViewInit {
   private redirectByRole(): void {
     const user = this.authService.getCurrentUser();
 
+    if (user?.role === 'admin') {
+      this.router.navigate(['/admin']);
+      return;
+    }
+
     if (user?.role === 'owner') {
       this.router.navigate(['/owner/dashboard']);
       return;

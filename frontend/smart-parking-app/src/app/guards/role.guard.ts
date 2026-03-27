@@ -25,6 +25,8 @@ export class RoleGuard implements CanActivate {
         this.router.navigate(['/dashboard']);
       } else if (user.role === 'owner') {
         this.router.navigate(['/owner/dashboard']);
+      } else if (user.role === 'admin') {
+        this.router.navigate(['/admin']);
       } else {
         this.router.navigate(['/pages/auth/signin/form']);
       }

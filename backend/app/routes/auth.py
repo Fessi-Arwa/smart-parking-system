@@ -59,6 +59,9 @@ def register():
     except ValueError:
         return jsonify({"msg": "Role invalide"}), 400
 
+    if role == RoleCompte.admin:
+        return jsonify({"msg": "La creation d un compte admin n est pas autorisee via l inscription publique"}), 403
+
     hashed_password = generate_password_hash(mot_passe)
     user = Compte(
         nom=nom,

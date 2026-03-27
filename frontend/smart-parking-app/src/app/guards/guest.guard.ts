@@ -17,7 +17,9 @@ export class GuestGuard implements CanActivate {
     }
 
     const user = this.authService.getCurrentUser();
-    if (user?.role === 'owner') {
+    if (user?.role === 'admin') {
+      this.router.navigate(['/admin']);
+    } else if (user?.role === 'owner') {
       this.router.navigate(['/owner/dashboard']);
     } else {
       this.router.navigate(['/dashboard']);
