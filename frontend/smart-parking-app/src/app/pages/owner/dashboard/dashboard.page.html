@@ -115,6 +115,50 @@
         </ion-list>
       </ion-card-content>
     </ion-card>
+    <ion-card class="section-card">
+      <ion-card-header>
+        <div class="section-heading-group">
+          <p class="section-kicker">Configuration IA</p>
+          <ion-card-title>Sources deja ajoutees</ion-card-title>
+        </div>
+        <ion-button fill="clear" slot="end" routerLink="/owner/ai-setup">
+          Gerer
+          <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
+        </ion-button>
+      </ion-card-header>
+
+      <ion-card-content>
+        <div class="ai-sources-grid" *ngIf="aiSources.length > 0; else emptyAiSources">
+          <article class="ai-source-card" *ngFor="let source of aiSources">
+            <div class="ai-source-card__preview" *ngIf="isImageSource(source) && source.preview_url">
+              <img [src]="source.preview_url" [alt]="source.label || source.original_name || 'Image IA'" />
+            </div>
+
+            <div class="ai-source-card__preview ai-source-card__preview--video" *ngIf="isVideoSource(source) && source.preview_url">
+              <video [src]="source.preview_url" controls preload="metadata"></video>
+            </div>
+
+            <div class="ai-source-card__preview ai-source-card__preview--camera" *ngIf="isCameraSource(source)">
+              <ion-icon name="videocam-outline"></ion-icon>
+            </div>
+
+            <div class="ai-source-card__body">
+              <span class="ai-source-card__type">{{ source.source_type | uppercase }}</span>
+              <strong>{{ source.label || source.original_name || 'Source IA' }}</strong>
+              <p *ngIf="source.stream_url">{{ source.stream_url }}</p>
+              <p *ngIf="!source.stream_url">{{ source.original_name || source.mime_type }}</p>
+            </div>
+          </article>
+        </div>
+
+        <ng-template #emptyAiSources>
+          <div class="empty-ai-state">
+            <ion-icon name="sparkles-outline"></ion-icon>
+            <p>Aucune video, image ou camera n a encore ete ajoutee pour ce parking.</p>
+          </div>
+        </ng-template>
+      </ion-card-content>
+    </ion-card>
   </div>
 
   <app-navbar></app-navbar>

@@ -46,6 +46,69 @@ def _get_owner_parking(user, parking_id=None):
     return parking
 
 
+def _get_subscription_status_for_parking(parking):
+    if not parking:
+        return "non_souscrit"
+
+    abonnement_app_link = (
+        AbonnementApp.query.filter_by(parking_id=parking.id_park)
+        .order_by(AbonnementApp.id_abon.desc())
+        .first()
+    )
+    if not abonnement_app_link:
+        return "non_souscrit"
+
+    abonnement = Abonnement.query.get(abonnement_app_link.id_abon)
+    if not abonnement:
+        return "non_souscrit"
+
+    if abonnement.statut == StatutAbonnement.actif:
+        return "actif"
+    if abonnement.statut == StatutAbonnement.en_attente:
+        return "en_attente_paiement"
+    return abonnement.statut.value
+
+
+def _get_workflow_rank(parking, subscription_status):
+    if not parking:
+        return 0
+
+    if parking.validation_status != StatutValidationParking.valide:
+        return 1
+    if subscription_status != "actif":
+        return 2
+    if parking.setup_status != StatutConfigurationParking.terminee:
+        return 3
+    if parking.ai_setup_status != StatutConfigurationIA.active:
+        return 4
+    return 5
+
+
+def _select_workflow_parking(user):
+    parkings = (
+        Parking.query.filter_by(owner_id=user.id_compte)
+        .order_by(Parking.created_at.desc(), Parking.id_park.desc())
+        .all()
+    )
+    if not parkings:
+        return None, "non_souscrit"
+
+    selected_parking = None
+    selected_subscription_status = "non_souscrit"
+    selected_rank = -1
+
+    for parking in parkings:
+        subscription_status = _get_subscription_status_for_parking(parking)
+        rank = _get_workflow_rank(parking, subscription_status)
+
+        if rank > selected_rank:
+            selected_parking = parking
+            selected_subscription_status = subscription_status
+            selected_rank = rank
+
+    return selected_parking, selected_subscription_status
+
+
 def _source_to_dict(source):
     data = source.to_dict()
     data["preview_url"] = f"/api/owner/ai-sources/{source.id_source}/file" if source.file_path else None
@@ -59,27 +122,7 @@ def get_owner_workflow_status():
     if error_response:
         return error_response
 
-    parking = _get_owner_parking(user)
-
-    abonnement_app_link = None
-    abonnement = None
-    if parking:
-        abonnement_app_link = (
-            AbonnementApp.query.filter_by(parking_id=parking.id_park)
-            .order_by(AbonnementApp.id_abon.desc())
-            .first()
-        )
-        if abonnement_app_link:
-            abonnement = Abonnement.query.get(abonnement_app_link.id_abon)
-
-    subscription_status = "non_souscrit"
-    if abonnement:
-        if abonnement.statut == StatutAbonnement.actif:
-            subscription_status = "actif"
-        elif abonnement.statut == StatutAbonnement.en_attente:
-            subscription_status = "en_attente_paiement"
-        else:
-            subscription_status = abonnement.statut.value
+    parking, subscription_status = _select_workflow_parking(user)
 
     return jsonify(
         {

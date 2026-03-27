@@ -1,7 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
+import { OwnerWorkflowState } from '../../../models/owner-workflow.model';
 import { AuthService } from '../../../services/auth.service';
+import {
+  ParkingAISource,
+  ParkingAiSourceService,
+} from '../../../services/parking-ai-source.service';
+import { OwnerWorkflowService } from '../../../services/owner-workflow.service';
 import { ParkingDto, ParkingService } from '../../../services/parking.service';
 import { PlaceDto, PlaceService } from '../../../services/place.service';
 import { ReservationHistoryDto, ReservationService } from '../../../services/reservation';
@@ -49,10 +55,14 @@ export class DashboardPage implements OnInit {
   parkings: OwnerParking[] = [];
   reservations: ReservationHistoryDto[] = [];
   subscriptions: SubscriptionDto[] = [];
+  workflowState: OwnerWorkflowState | null = null;
+  aiSources: ParkingAISource[] = [];
   isLoading = false;
 
   constructor(
     private authService: AuthService,
+    private ownerWorkflowService: OwnerWorkflowService,
+    private parkingAiSourceService: ParkingAiSourceService,
     private parkingService: ParkingService,
     private placeService: PlaceService,
     private reservationService: ReservationService,
@@ -137,12 +147,25 @@ export class DashboardPage implements OnInit {
     return this.notificationItems.length;
   }
 
+  isImageSource(source: ParkingAISource): boolean {
+    return source.source_type === 'image';
+  }
+
+  isVideoSource(source: ParkingAISource): boolean {
+    return source.source_type === 'video';
+  }
+
+  isCameraSource(source: ParkingAISource): boolean {
+    return source.source_type === 'camera';
+  }
+
   private async loadOwnerData(): Promise<void> {
     this.isLoading = true;
     try {
       const currentUser = this.authService.getCurrentUser();
       const ownerId = currentUser?.id;
-      const [parkings, places, reservations, subscriptions] = await Promise.all([
+      const [workflowState, parkings, places, reservations, subscriptions] = await Promise.all([
+        this.ownerWorkflowService.refresh(),
         firstValueFrom(this.parkingService.getParkings()),
         firstValueFrom(this.placeService.getPlaces()),
         firstValueFrom(this.reservationService.getOwnerReservations()),
@@ -153,9 +176,13 @@ export class DashboardPage implements OnInit {
         ? parkings.filter((parking) => parking.owner_id === ownerId)
         : [];
 
+      this.workflowState = workflowState;
       this.parkings = ownerParkings.map((parking, index) => this.mapParking(parking, places, index));
       this.reservations = reservations;
       this.subscriptions = subscriptions;
+      this.aiSources = workflowState.parkingId
+        ? await this.parkingAiSourceService.getSources(workflowState.parkingId)
+        : [];
     } finally {
       this.isLoading = false;
     }

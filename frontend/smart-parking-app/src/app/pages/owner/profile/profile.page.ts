@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from '../../../services/auth.service';
@@ -93,7 +94,8 @@ export class ProfilePage implements OnInit {
     private authService: AuthService,
     private parkingService: ParkingService,
     private placeService: PlaceService,
-    private toastService: ToastService
+    private toastService: ToastService,
+    private router: Router
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -277,7 +279,8 @@ export class ProfilePage implements OnInit {
 
     await firstValueFrom(this.parkingService.createParking(payload));
     this.showAddParking = false;
-    await this.loadOwnerParkings();
+    this.toastService.show('Parking ajoute. Il devra etre valide par l admin puis configure.', 'success');
+    await this.router.navigate(['/owner/dashboard']);
   }
 
   getStatusColor(status: string): string {
