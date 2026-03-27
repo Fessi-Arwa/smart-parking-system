@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -10,6 +10,12 @@ export interface User {
   email: string;
   telephone?: string;
   role?: 'conducteur' | 'owner' | 'admin';
+}
+
+export interface UpdateProfilePayload {
+  nom: string;
+  email: string;
+  telephone?: string;
 }
 
 @Injectable({
@@ -78,6 +84,19 @@ export class AuthService {
     });
   }
 
+  updateProfile(payload: UpdateProfilePayload): Observable<User> {
+    return this.http.put<User>(`${this.apiUrl}/profile`, payload, {
+      headers: this.buildAuthHeaders(),
+    }).pipe(
+      tap((user) => {
+        const currentToken = this.getToken();
+        if (currentToken) {
+          this.saveSession(currentToken, user);
+        }
+      })
+    );
+  }
+
   logout() {
     localStorage.removeItem(this.tokenKey);
     localStorage.removeItem(this.userKey);
@@ -101,5 +120,10 @@ export class AuthService {
 
   getToken(): string | null {
     return localStorage.getItem(this.tokenKey);
+  }
+
+  private buildAuthHeaders(): HttpHeaders | undefined {
+    const token = this.getToken();
+    return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
   }
 }

@@ -13,7 +13,7 @@ import { DashboardPage } from './dashboard.page';
     FormsModule,
     IonicModule,
     DashboardPageRoutingModule,
-    SharedModule  // ✅ déjà présent
+    SharedModule  
   ],
   declarations: [DashboardPage]
 })

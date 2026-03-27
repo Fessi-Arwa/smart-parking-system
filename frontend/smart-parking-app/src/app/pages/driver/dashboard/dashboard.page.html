@@ -243,10 +243,6 @@
               <span class="info-label">Téléphone</span>
               <span class="info-value">{{ driverProfile.telephone }}</span>
             </div>
-            <div class="info-item">
-              <span class="info-label">Adresse</span>
-              <span class="info-value">{{ driverProfile.adresse }}</span>
-            </div>
           </div>
         </div>
 
@@ -432,12 +428,9 @@
       <span>Téléphone</span>
       <input formControlName="telephone" type="text" placeholder="Votre téléphone">
     </label>
-    <label>
-      <span>Adresse</span>
-      <input formControlName="adresse" type="text" placeholder="Votre adresse">
-    </label>
-
-    <button class="primary-btn full-width" type="submit">Enregistrer</button>
+    <button class="primary-btn full-width" type="submit" [disabled]="isProfileSubmitting">
+      {{ isProfileSubmitting ? 'Enregistrement...' : 'Enregistrer' }}
+    </button>
   </form>
 </section>
 

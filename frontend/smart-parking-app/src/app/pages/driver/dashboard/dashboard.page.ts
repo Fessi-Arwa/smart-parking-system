@@ -18,7 +18,6 @@ interface DriverProfile {
   nom: string;
   email: string;
   telephone: string;
-  adresse: string;
   avatar: string;
 }
 
@@ -92,6 +91,7 @@ export class DashboardPage implements OnInit {
   isLoadingReservations = false;
   isLoadingSubscriptions = false;
   isSubscriptionSubmitting = false;
+  isProfileSubmitting = false;
 
   isReservationModalOpen = false;
   isVehicleModalOpen = false;
@@ -104,7 +104,6 @@ export class DashboardPage implements OnInit {
     nom: 'Nadia Benali',
     email: 'nadia.benali@parkini.com',
     telephone: '+213 555 20 10 15',
-    adresse: 'Cité 120 logements, Alger',
     avatar: 'NB',
   };
 
@@ -235,7 +234,6 @@ export class DashboardPage implements OnInit {
       nom: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
       telephone: ['', Validators.required],
-      adresse: ['', Validators.required],
     });
 
     this.reservationForm = this.fb.group({
@@ -273,6 +271,7 @@ export class DashboardPage implements OnInit {
         nom: currentUser.nom || this.driverProfile.nom,
         email: currentUser.email || this.driverProfile.email,
         telephone: currentUser.telephone || this.driverProfile.telephone,
+        avatar: this.buildAvatar(currentUser.nom || this.driverProfile.nom),
       };
     }
 
@@ -670,19 +669,32 @@ export class DashboardPage implements OnInit {
     }));
   }
 
-  saveProfile(): void {
+  async saveProfile(): Promise<void> {
     if (this.profileForm.invalid) {
       this.profileForm.markAllAsTouched();
       return;
     }
 
-    this.driverProfile = {
-      ...this.driverProfile,
-      ...this.profileForm.value,
-      avatar: this.buildAvatar(this.profileForm.value.nom),
-    };
-
-    this.closeProfileModal();
+    this.isProfileSubmitting = true;
+    try {
+      const updatedUser = await firstValueFrom(this.authService.updateProfile(this.profileForm.value));
+      this.driverProfile = {
+        ...this.driverProfile,
+        nom: updatedUser.nom,
+        email: updatedUser.email,
+        telephone: updatedUser.telephone || '',
+        avatar: this.buildAvatar(updatedUser.nom),
+      };
+      this.closeProfileModal();
+      this.toastService.show('Profil mis a jour avec succes', 'success');
+    } catch (error: any) {
+      this.toastService.show(
+        error?.error?.msg || error?.error?.error || 'Impossible de mettre a jour le profil',
+        'error'
+      );
+    } finally {
+      this.isProfileSubmitting = false;
+    }
   }
 
   openProfileModal(): void {

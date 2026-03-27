@@ -166,7 +166,9 @@
     </div>
     <div class="sheet-footer">
       <button class="btn-secondary" (click)="cancelEditProfile()">Annuler</button>
-      <button class="btn-primary" (click)="saveProfile()">Enregistrer</button>
+      <button class="btn-primary" (click)="saveProfile()" [disabled]="isSavingProfile">
+        {{ isSavingProfile ? 'Enregistrement...' : 'Enregistrer' }}
+      </button>
     </div>
   </div>
 

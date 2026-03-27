@@ -9,6 +9,7 @@ import {
   UpdateParkingPayload,
 } from '../../../services/parking.service';
 import { PlaceDto, PlaceService } from '../../../services/place.service';
+import { ToastService } from '../../../services/toast.service';
 import { HeaderNotificationItem } from '../../../shared/components/header/header.component';
 
 export interface OwnerProfile {
@@ -58,6 +59,7 @@ export class ProfilePage implements OnInit {
   isEditingParking = false;
   showDeleteConfirm = false;
   parkingToDelete: ParkingInfo | null = null;
+  isSavingProfile = false;
 
   editProfileData = {
     nom: '',
@@ -90,7 +92,8 @@ export class ProfilePage implements OnInit {
   constructor(
     private authService: AuthService,
     private parkingService: ParkingService,
-    private placeService: PlaceService
+    private placeService: PlaceService,
+    private toastService: ToastService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -151,11 +154,34 @@ export class ProfilePage implements OnInit {
     this.isEditingProfile = true;
   }
 
-  saveProfile(): void {
-    this.owner.nom = this.editProfileData.nom;
-    this.owner.email = this.editProfileData.email;
-    this.owner.telephone = this.editProfileData.telephone;
-    this.isEditingProfile = false;
+  async saveProfile(): Promise<void> {
+    this.isSavingProfile = true;
+    try {
+      const updatedUser = await firstValueFrom(
+        this.authService.updateProfile({
+          nom: this.editProfileData.nom,
+          email: this.editProfileData.email,
+          telephone: this.editProfileData.telephone,
+        })
+      );
+
+      this.owner = {
+        ...this.owner,
+        id_compte: updatedUser.id,
+        nom: updatedUser.nom,
+        email: updatedUser.email,
+        telephone: updatedUser.telephone || '',
+      };
+      this.isEditingProfile = false;
+      this.toastService.show('Profil mis a jour avec succes', 'success');
+    } catch (error: any) {
+      this.toastService.show(
+        error?.error?.msg || error?.error?.error || 'Impossible de mettre a jour le profil',
+        'error'
+      );
+    } finally {
+      this.isSavingProfile = false;
+    }
   }
 
   cancelEditProfile(): void {
