@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from 'src/environments/environment';
 import { AuthService } from './auth.service';
 
 export interface ParkingDto {
@@ -32,7 +33,7 @@ export interface UpdateParkingPayload {
   providedIn: 'root',
 })
 export class ParkingService {
-  private apiUrl = 'http://localhost:5000/api/parkings';
+  private apiUrl = `${environment.apiBaseUrl}/parkings`;
 
   constructor(private http: HttpClient, private authService: AuthService) {}
 

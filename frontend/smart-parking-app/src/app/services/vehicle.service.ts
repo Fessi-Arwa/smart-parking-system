@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from 'src/environments/environment';
 import { AuthService } from './auth.service';
 
 export interface VehicleDto {
@@ -22,7 +23,7 @@ export interface CreateVehiclePayload {
   providedIn: 'root',
 })
 export class VehicleService {
-  private apiUrl = 'http://localhost:5000/api/vehicules';
+  private apiUrl = `${environment.apiBaseUrl}/vehicules`;
 
   constructor(private http: HttpClient, private authService: AuthService) {}
 

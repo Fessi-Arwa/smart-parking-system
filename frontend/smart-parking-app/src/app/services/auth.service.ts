@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { environment } from 'src/environments/environment';
 
 export interface User {
   id: number;
@@ -22,7 +23,7 @@ export interface UpdateProfilePayload {
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:5000/api/auth';
+  private apiUrl = `${environment.apiBaseUrl}/auth`;
   private tokenKey = 'access_token';
   private userKey = 'auth_user';
   private userSubject = new BehaviorSubject<User | null>(null);
