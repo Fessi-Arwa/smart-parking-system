@@ -7,9 +7,10 @@
 
 .dashboard-content {
   padding: 20px 16px 96px;
-  font-family: 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   font-feature-settings: 'liga' 1, 'kern' 1, 'tnum' 1, 'cv11' 1;
   color: #142132;
+  text-rendering: optimizeLegibility;
 }
 
 .overview-shell,
@@ -34,28 +35,29 @@
 .section-kicker {
   margin: 0 0 6px;
   text-transform: none;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   font-size: 11px;
   font-weight: 500;
-  color: #8090a3;
+  color: #7b8798;
 }
 
 .overview-header h1 {
   margin: 0;
   color: #0f172a;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: clamp(30px, 4vw, 40px);
-  line-height: 1.02;
-  letter-spacing: -0.04em;
-  font-weight: 650;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: clamp(29px, 4vw, 38px);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  font-weight: 620;
 }
 
 .overview-subtitle,
 .section-copy {
   margin: 8px 0 0;
-  color: #5f7286;
+  color: #617284;
   font-size: 14px;
-  line-height: 1.62;
+  line-height: 1.68;
+  font-weight: 400;
 }
 
 .period-filter {
@@ -73,7 +75,7 @@
   background: transparent;
   color: #475569;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   padding: 10px 14px;
   border-radius: 999px;
 }
@@ -81,12 +83,13 @@
 .period-filter button.is-active {
   background: #111827;
   color: #f8fafc;
+  font-weight: 600;
 }
 
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .overview-card,
@@ -98,11 +101,11 @@
 }
 
 .overview-card {
-  min-height: 214px;
-  padding: 20px;
+  min-height: 176px;
+  padding: 16px;
   border-radius: 24px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .overview-card__top {
@@ -114,38 +117,41 @@
 
 .overview-card__label {
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: #243244;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
 .overview-card strong {
   display: block;
   color: #0f172a;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: clamp(28px, 3vw, 36px);
-  line-height: 1;
-  letter-spacing: -0.05em;
-  font-weight: 650;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: clamp(27px, 3vw, 34px);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  font-weight: 520;
 }
 
 .overview-card__subtitle {
   margin: 0;
   color: #647587;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.58;
+  font-weight: 400;
 }
 
 .delta-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 62px;
-  padding: 7px 12px;
+  min-width: 56px;
+  padding: 6px 10px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 550;
+  letter-spacing: 0.01em;
 }
 
 .delta-badge[data-tone='positive'] {
@@ -165,7 +171,7 @@
 
 .sparkline {
   width: 100%;
-  height: 56px;
+  height: 40px;
   overflow: visible;
 }
 
@@ -175,7 +181,7 @@
 
 .sparkline__line {
   fill: none;
-  stroke-width: 2.6;
+  stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -235,7 +241,8 @@
   --background-hover: #1f2937;
   --border-radius: 14px;
   --box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
-  font-weight: 700;
+  min-height: 38px;
+  font-weight: 600;
 }
 
 .analytics-grid {
@@ -270,10 +277,10 @@
 
 .section-card ion-card-title {
   color: #0f172a;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 20px;
-  letter-spacing: -0.03em;
-  font-weight: 650;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: 19px;
+  letter-spacing: -0.025em;
+  font-weight: 620;
 }
 
 .section-heading-group {
@@ -289,15 +296,16 @@
 .section-heading-metric strong {
   display: block;
   color: #0f172a;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 24px;
-  letter-spacing: -0.04em;
-  font-weight: 650;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: 23px;
+  letter-spacing: -0.035em;
+  font-weight: 620;
 }
 
 .section-heading-metric span {
   color: #667789;
   font-size: 12px;
+  font-weight: 400;
 }
 
 .section-badge {
@@ -310,7 +318,7 @@
   background: #eff6ff;
   color: #1d4ed8;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .section-card ion-button {
@@ -328,7 +336,7 @@
   margin-bottom: 14px;
   color: #64748b;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .trend-legend span,
@@ -417,7 +425,7 @@
   display: block;
   color: #0f172a;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .trend-label span {
@@ -472,7 +480,7 @@
 .bar-stack strong {
   color: #0f172a;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .bar-stack small {
@@ -553,8 +561,8 @@
 .reservation-card strong,
 .ai-source-card__body strong {
   color: #0f172a;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 560;
+  letter-spacing: -0.015em;
 }
 
 .workflow-step__content p,
@@ -564,7 +572,8 @@
   margin: 4px 0 0;
   color: #667789;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.62;
+  font-weight: 400;
 }
 
 .parking-card__top,
@@ -592,16 +601,16 @@
   display: block;
   color: #6c7a89;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 450;
 }
 
 .parking-card__metrics strong {
   display: block;
   margin-top: 6px;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 22px;
-  letter-spacing: -0.04em;
-  font-weight: 650;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: 21px;
+  letter-spacing: -0.035em;
+  font-weight: 600;
 }
 
 .parking-card__progress {
@@ -627,7 +636,7 @@
   background: #dcfce7;
   color: #166534;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .status-pill--maintenance {
@@ -640,6 +649,7 @@
   margin-top: 4px;
   color: #68788b;
   font-size: 12px;
+  font-weight: 400;
 }
 
 .reservation-card__amount {
@@ -654,16 +664,17 @@
 }
 
 .ai-summary strong {
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 28px;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: 27px;
   color: #0f172a;
-  letter-spacing: -0.05em;
-  font-weight: 650;
+  letter-spacing: -0.04em;
+  font-weight: 610;
 }
 
 .ai-summary span {
   color: #667789;
   font-size: 13px;
+  font-weight: 400;
 }
 
 .ai-parking-tabs {
@@ -690,7 +701,7 @@
 .ai-parking-tabs button span {
   display: block;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .ai-parking-tabs button small {
@@ -818,7 +829,7 @@
   background: #dbeafe;
   color: #1d4ed8;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 550;
   letter-spacing: 0.04em;
 }
 
@@ -896,7 +907,7 @@
 
   .overview-card {
     min-height: auto;
-    padding: 16px;
+    padding: 14px;
   }
 
   .overview-card strong {
