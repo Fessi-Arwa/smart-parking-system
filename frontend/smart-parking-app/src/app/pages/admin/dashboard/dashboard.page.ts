@@ -1,5 +1,4 @@
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
 
 import { AuthService } from '../../../services/auth.service';
 import {
@@ -38,7 +37,6 @@ export class AdminDashboardPage implements OnInit {
   parkingStatusFilter: 'all' | 'en_attente_validation' | 'valide' | 'rejete' = 'all';
 
   constructor(
-    private router: Router,
     private authService: AuthService,
     private adminWorkflowService: AdminWorkflowService,
     private toastService: ToastService
@@ -283,7 +281,6 @@ export class AdminDashboardPage implements OnInit {
   logout(): void {
     this.authService.logout();
     this.toastService.show('Deconnexion reussie', 'success');
-    this.router.navigate(['/pages/auth/signin']);
   }
 
   private async loadDashboardData(): Promise<void> {

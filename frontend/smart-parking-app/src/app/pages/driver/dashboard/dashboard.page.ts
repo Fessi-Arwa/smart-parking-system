@@ -424,7 +424,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   private mapParkingToCard(parking: ParkingDto, places: PlaceDto[], index: number): ParkingCard {
-    const availablePlaces = places.filter((place) => place.etat === 'libre').length;
+    const availablePlaces = places.filter((place) => this.isSpotAvailable(place.etat)).length;
     const coordinates = this.getFallbackCoordinates(index);
 
     return {
@@ -446,7 +446,7 @@ export class DashboardPage implements OnInit, OnDestroy {
       id_place: place.id_place,
       parking_id: place.parking_id,
       num_place: place.num_place,
-      etat: place.etat,
+      etat: this.normalizePlaceStatus(place.etat),
       zone: place.zone || 'A',
       etage: place.etage || 'RDC',
     };
@@ -531,19 +531,21 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   get availableReservationSpots(): ParkingSpot[] {
     const parkingId = Number(this.reservationForm.get('parking_id')?.value);
-    return this.spots.filter((spot) => spot.parking_id === parkingId && spot.etat === 'libre');
+    return this.spots.filter((spot) => spot.parking_id === parkingId && this.isSpotAvailable(spot.etat));
   }
 
   get availableSubscriptionSpots(): ParkingSpot[] {
     const parkingId = Number(this.subscriptionForm.get('parking_id')?.value);
-    return this.spots.filter((spot) => spot.parking_id === parkingId && spot.etat === 'libre');
+    return this.spots.filter((spot) => spot.parking_id === parkingId && this.isSpotAvailable(spot.etat));
   }
 
   openReservation(parking?: ParkingCard): void {
     this.selectedParking = parking ?? null;
     const preferredParkingId = parking?.id_park ?? this.parkings[0]?.id_park ?? '';
     const defaultVehicleId = this.defaultVehicle?.id ?? '';
-    const availableSpot = this.spots.find((spot) => spot.parking_id === preferredParkingId && spot.etat === 'libre');
+    const availableSpot = this.spots.find(
+      (spot) => spot.parking_id === preferredParkingId && this.isSpotAvailable(spot.etat)
+    );
 
     this.reservationForm.reset({
       parking_id: preferredParkingId,
@@ -721,9 +723,13 @@ export class DashboardPage implements OnInit, OnDestroy {
     this.isProfileModalOpen = false;
   }
 
-  openSubscriptionModal(): void {
+  async openSubscriptionModal(): Promise<void> {
+    await this.loadParkingsAndPlaces();
+
     const defaultParking = this.parkings[0]?.id_park ?? '';
-    const firstSpot = this.spots.find((spot) => spot.parking_id === defaultParking && spot.etat === 'libre');
+    const firstSpot = this.spots.find(
+      (spot) => spot.parking_id === defaultParking && this.isSpotAvailable(spot.etat)
+    );
 
     this.subscriptionForm.reset({
       parking_id: defaultParking,
@@ -1047,6 +1053,18 @@ private showLocationToast(latitude: number, longitude: number): void {
   private buildAvatar(name: string): string {
     const parts = name.trim().split(/\s+/).slice(0, 2);
     return parts.map((part) => part.charAt(0).toUpperCase()).join('');
+  }
+
+  private normalizePlaceStatus(status?: string): ParkingSpot['etat'] {
+    const normalizedStatus = (status || '').trim().toLowerCase();
+    if (normalizedStatus === 'reservee' || normalizedStatus === 'occupee') {
+      return normalizedStatus;
+    }
+    return 'libre';
+  }
+
+  private isSpotAvailable(status?: string): boolean {
+    return this.normalizePlaceStatus(status) === 'libre';
   }
 
 }

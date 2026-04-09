@@ -66,11 +66,36 @@ interface OccupancyChartPoint {
 
 type DashboardPeriod = '7d' | '30d' | '90d';
 
+interface OverviewCard {
+  title: string;
+  value: string;
+  subtitle: string;
+  deltaLabel: string;
+  deltaTone: 'positive' | 'negative' | 'neutral';
+  points: string;
+  fillPath: string;
+  accent: 'emerald' | 'blue' | 'amber' | 'slate';
+}
+
 interface ParkingAiGallery {
   parkingId: number;
   parkingName: string;
   parkingAddress: string;
   sources: ParkingAISource[];
+}
+
+interface TrendChartPoint {
+  label: string;
+  reservations: number;
+  revenue: number;
+}
+
+interface RevenueBar {
+  label: string;
+  reservationRevenue: number;
+  subscriptionRevenue: number;
+  reservationHeight: number;
+  subscriptionHeight: number;
 }
 
 @Component({
@@ -80,6 +105,7 @@ interface ParkingAiGallery {
   standalone: false,
 })
 export class DashboardPage implements OnInit {
+  private readonly dashboardParkingLimit = 3;
   parkings: OwnerParking[] = [];
   reservations: ReservationHistoryDto[] = [];
   subscriptions: SubscriptionDto[] = [];
@@ -128,6 +154,14 @@ export class DashboardPage implements OnInit {
     );
   }
 
+  get visibleParkings(): OwnerParking[] {
+    return this.parkings.slice(0, this.dashboardParkingLimit);
+  }
+
+  get hiddenParkingsCount(): number {
+    return Math.max(this.parkings.length - this.visibleParkings.length, 0);
+  }
+
   get stats(): OwnerStats {
     const totalParkings = this.parkings.length;
     const totalSpaces = this.parkings.reduce((sum, parking) => sum + parking.totalSpaces, 0);
@@ -156,7 +190,7 @@ export class DashboardPage implements OnInit {
   }
 
   get monthlyRevenueLabel(): string {
-    return `${this.stats.monthlyRevenue} EUR ce mois`;
+    return `${this.formatCurrency(this.stats.monthlyRevenue)} ce mois`;
   }
 
   get selectedPeriodLabel(): string {
@@ -171,6 +205,60 @@ export class DashboardPage implements OnInit {
 
   get occupancySummary(): string {
     return `${this.stats.occupiedSpaces}/${this.stats.totalSpaces} places occupees`;
+  }
+
+  get occupancyDeltaLabel(): string {
+    return this.formatDelta(this.selectedPeriodOccupancyDelta);
+  }
+
+  get overviewCards(): OverviewCard[] {
+    const cards = [
+      {
+        title: 'Parkings',
+        value: String(this.stats.totalParkings),
+        subtitle: 'parcs actifs et suivis',
+        deltaValue: this.periodReservationDelta,
+        series: this.trendChartData.map((point) => point.reservations + 1),
+        accent: 'emerald' as const,
+      },
+      {
+        title: 'Reservations',
+        value: this.formatCompactNumber(this.filteredReservations.length),
+        subtitle: this.selectedPeriodLabel,
+        deltaValue: this.periodReservationDelta,
+        series: this.trendChartData.map((point) => point.reservations),
+        accent: 'blue' as const,
+      },
+      {
+        title: 'Occupation',
+        value: `${this.stats.occupancyRate}%`,
+        subtitle: this.occupancySummary,
+        deltaValue: this.selectedPeriodOccupancyDelta,
+        series: this.occupancyChartData.map((point) => point.occupancyRate),
+        accent: 'amber' as const,
+      },
+      {
+        title: 'Revenu',
+        value: this.formatCompactCurrency(this.stats.monthlyRevenue),
+        subtitle: 'revenu mensuel',
+        deltaValue: this.monthlyRevenueDelta,
+        series: this.monthlyBusinessBars.map(
+          (bar) => bar.reservationRevenue + bar.subscriptionRevenue
+        ),
+        accent: 'slate' as const,
+      },
+    ];
+
+    return cards.map((card) => ({
+      title: card.title,
+      value: card.value,
+      subtitle: card.subtitle,
+      deltaLabel: this.formatDelta(card.deltaValue),
+      deltaTone: this.getDeltaTone(card.deltaValue),
+      points: this.buildSparklinePoints(card.series),
+      fillPath: this.buildSparklineFillPath(card.series),
+      accent: card.accent,
+    }));
   }
 
   get workflowCompletion(): number {
@@ -297,30 +385,7 @@ export class DashboardPage implements OnInit {
   }
 
   get occupancyChartData(): OccupancyChartPoint[] {
-    const buckets =
-      this.selectedPeriod === '7d'
-        ? [
-            { label: 'Lun', daysAgoStart: 6, daysAgoEnd: 6 },
-            { label: 'Mar', daysAgoStart: 5, daysAgoEnd: 5 },
-            { label: 'Mer', daysAgoStart: 4, daysAgoEnd: 4 },
-            { label: 'Jeu', daysAgoStart: 3, daysAgoEnd: 3 },
-            { label: 'Ven', daysAgoStart: 2, daysAgoEnd: 2 },
-            { label: 'Sam', daysAgoStart: 1, daysAgoEnd: 1 },
-            { label: 'Dim', daysAgoStart: 0, daysAgoEnd: 0 },
-          ]
-        : this.selectedPeriod === '30d'
-          ? [
-              { label: 'S1', daysAgoStart: 29, daysAgoEnd: 23 },
-              { label: 'S2', daysAgoStart: 22, daysAgoEnd: 16 },
-              { label: 'S3', daysAgoStart: 15, daysAgoEnd: 9 },
-              { label: 'S4', daysAgoStart: 8, daysAgoEnd: 0 },
-            ]
-          : [
-              { label: 'M-3', daysAgoStart: 89, daysAgoEnd: 67 },
-              { label: 'M-2', daysAgoStart: 66, daysAgoEnd: 44 },
-              { label: 'M-1', daysAgoStart: 43, daysAgoEnd: 21 },
-              { label: 'Act.', daysAgoStart: 20, daysAgoEnd: 0 },
-            ];
+    const buckets = this.getPeriodBuckets(this.selectedPeriod);
 
     const baseline = Math.max(this.stats.occupancyRate, 12);
 
@@ -341,6 +406,24 @@ export class DashboardPage implements OnInit {
     });
   }
 
+  get trendChartData(): TrendChartPoint[] {
+    return this.getPeriodBuckets(this.selectedPeriod).map((bucket) => {
+      const bucketReservations = this.reservations.filter((reservation) => {
+        const diffDays = this.daysAgo(reservation.date_debut);
+        return diffDays >= bucket.daysAgoEnd && diffDays <= bucket.daysAgoStart;
+      });
+
+      return {
+        label: bucket.label,
+        reservations: bucketReservations.length,
+        revenue: bucketReservations.reduce(
+          (sum, reservation) => sum + Number(reservation.prix_total),
+          0
+        ),
+      };
+    });
+  }
+
   get occupancyPolylinePoints(): string {
     const data = this.occupancyChartData;
     if (!data.length) {
@@ -354,6 +437,91 @@ export class DashboardPage implements OnInit {
         return `${x},${y}`;
       })
       .join(' ');
+  }
+
+  get reservationTrendPoints(): string {
+    return this.buildChartPolyline(
+      this.trendChartData.map((point) => point.reservations),
+      160
+    );
+  }
+
+  get reservationTrendAreaPath(): string {
+    return this.buildAreaPath(
+      this.trendChartData.map((point) => point.reservations),
+      160
+    );
+  }
+
+  get revenueTrendPoints(): string {
+    return this.buildChartPolyline(
+      this.trendChartData.map((point) => point.revenue),
+      160
+    );
+  }
+
+  get monthlyBusinessBars(): RevenueBar[] {
+    const months = this.getLastMonths(6);
+    const bars = months.map(({ label, month, year }) => {
+      const reservationRevenue = this.reservations
+        .filter((reservation) => {
+          const date = new Date(reservation.date_debut);
+          return date.getMonth() === month && date.getFullYear() === year;
+        })
+        .reduce((sum, reservation) => sum + Number(reservation.prix_total), 0);
+
+      const subscriptionRevenue = this.subscriptions
+        .filter((subscription) => {
+          const date = new Date(subscription.date_debut);
+          return date.getMonth() === month && date.getFullYear() === year;
+        })
+        .reduce((sum, subscription) => sum + Number(subscription.tarif), 0);
+
+      return {
+        label,
+        reservationRevenue,
+        subscriptionRevenue,
+        reservationHeight: 0,
+        subscriptionHeight: 0,
+      };
+    });
+
+    const maxTotal = Math.max(
+      ...bars.map((bar) => bar.reservationRevenue + bar.subscriptionRevenue),
+      1
+    );
+
+    return bars.map((bar) => ({
+      ...bar,
+      reservationHeight: Math.max((bar.reservationRevenue / maxTotal) * 100, bar.reservationRevenue > 0 ? 8 : 0),
+      subscriptionHeight: Math.max((bar.subscriptionRevenue / maxTotal) * 100, bar.subscriptionRevenue > 0 ? 8 : 0),
+    }));
+  }
+
+  get dashboardInsightText(): string {
+    if (!this.parkings.length) {
+      return 'Ajoutez votre premier parking pour commencer le suivi owner.';
+    }
+
+    if (this.workflowCompletion < 100) {
+      return `${this.workflowCompletion}% du workflow est termine. ${this.nextAction.description}`;
+    }
+
+    if (this.stats.occupancyRate >= 80) {
+      return 'L occupation est elevee. Ouvrez de nouvelles places ou ajustez les tarifs.';
+    }
+
+    if (this.stats.activeSubscriptions > 0) {
+      return `${this.stats.activeSubscriptions} abonnement(s) actif(s) generent un revenu recurrent.`;
+    }
+
+    return 'Le tableau de bord consolide reservations, revenus et configuration IA.';
+  }
+
+  get selectedPeriodRevenue(): number {
+    return Math.round(
+      this.filteredReservations.reduce((sum, reservation) => sum + Number(reservation.prix_total), 0)
+    );
   }
 
   get notificationItems(): HeaderNotificationItem[] {
@@ -592,5 +760,225 @@ export class DashboardPage implements OnInit {
     const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const normalizedNow = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     return Math.floor((normalizedNow.getTime() - normalizedDate.getTime()) / 86400000);
+  }
+
+  getParkingOccupancyRate(parking: OwnerParking): number {
+    if (!parking.totalSpaces) {
+      return 0;
+    }
+
+    return Math.round(((parking.totalSpaces - parking.availableSpaces) / parking.totalSpaces) * 100);
+  }
+
+  private get periodReservationDelta(): number {
+    return this.calculatePeriodDelta(
+      () => this.filteredReservations.length,
+      (period) => this.countReservationsForPeriod(period)
+    );
+  }
+
+  private get monthlyRevenueDelta(): number {
+    const current = this.sumReservationRevenueForMonthOffset(0);
+    const previous = this.sumReservationRevenueForMonthOffset(1);
+    return this.calculateDelta(current, previous);
+  }
+
+  private get selectedPeriodOccupancyDelta(): number {
+    const currentAverage = this.averageTrendReservations(this.selectedPeriod, 0);
+    const previousAverage = this.averageTrendReservations(this.selectedPeriod, 1);
+    return this.calculateDelta(currentAverage, previousAverage);
+  }
+
+  private calculatePeriodDelta(
+    currentFactory: () => number,
+    previousFactory: (period: DashboardPeriod) => number
+  ): number {
+    return this.calculateDelta(currentFactory(), previousFactory(this.selectedPeriod));
+  }
+
+  private countReservationsForPeriod(period: DashboardPeriod, periodOffset = 1): number {
+    const rangeDays = period === '90d' ? 90 : period === '30d' ? 30 : 7;
+    const start = periodOffset * rangeDays;
+    const end = start + rangeDays - 1;
+
+    return this.reservations.filter((reservation) => {
+      const diffDays = this.daysAgo(reservation.date_debut);
+      return diffDays >= start && diffDays <= end;
+    }).length;
+  }
+
+  private averageTrendReservations(period: DashboardPeriod, periodOffset = 0): number {
+    const rangeDays = period === '90d' ? 90 : period === '30d' ? 30 : 7;
+    const start = periodOffset * rangeDays;
+    const end = start + rangeDays - 1;
+    const reservations = this.reservations.filter((reservation) => {
+      const diffDays = this.daysAgo(reservation.date_debut);
+      return diffDays >= start && diffDays <= end;
+    }).length;
+
+    return reservations / rangeDays;
+  }
+
+  private sumReservationRevenueForMonthOffset(monthOffset: number): number {
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1);
+
+    return this.reservations
+      .filter((reservation) => {
+        const date = new Date(reservation.date_debut);
+        return (
+          date.getFullYear() === target.getFullYear() &&
+          date.getMonth() === target.getMonth()
+        );
+      })
+      .reduce((sum, reservation) => sum + Number(reservation.prix_total), 0);
+  }
+
+  private calculateDelta(current: number, previous: number): number {
+    if (current === 0 && previous === 0) {
+      return 0;
+    }
+
+    if (previous === 0) {
+      return 100;
+    }
+
+    return Math.round(((current - previous) / previous) * 100);
+  }
+
+  private getDeltaTone(delta: number): 'positive' | 'negative' | 'neutral' {
+    if (delta > 0) {
+      return 'positive';
+    }
+
+    if (delta < 0) {
+      return 'negative';
+    }
+
+    return 'neutral';
+  }
+
+  private formatDelta(delta: number): string {
+    if (delta > 0) {
+      return `+${delta}%`;
+    }
+
+    if (delta < 0) {
+      return `${delta}%`;
+    }
+
+    return '0%';
+  }
+
+  private formatCompactNumber(value: number): string {
+    const absoluteValue = Math.abs(value);
+
+    if (absoluteValue >= 1_000_000) {
+      return `${(value / 1_000_000).toFixed(1).replace('.0', '')}M`;
+    }
+
+    if (absoluteValue >= 1_000) {
+      return `${(value / 1_000).toFixed(1).replace('.0', '')}k`;
+    }
+
+    return Math.round(value).toString();
+  }
+
+  private formatCurrency(value: number): string {
+    return `${Math.round(value).toLocaleString('fr-FR')} TND`;
+  }
+
+  private formatCompactCurrency(value: number): string {
+    return `${this.formatCompactNumber(value)} TND`;
+  }
+
+  private buildSparklinePoints(values: number[]): string {
+    const max = Math.max(...values, 1);
+    return values
+      .map((value, index) => {
+        const x = (index / Math.max(values.length - 1, 1)) * 100;
+        const y = 34 - (value / max) * 24;
+        return `${x},${y}`;
+      })
+      .join(' ');
+  }
+
+  private buildSparklineFillPath(values: number[]): string {
+    const points = this.buildSparklinePoints(values);
+    if (!points) {
+      return '';
+    }
+
+    return `M 0 34 L ${points.replace(/ /g, ' L ')} L 100 34 Z`;
+  }
+
+  private buildChartPolyline(values: number[], height: number): string {
+    const max = Math.max(...values, 1);
+    return values
+      .map((value, index) => {
+        const x = (index / Math.max(values.length - 1, 1)) * 100;
+        const y = height - (value / max) * (height - 18) - 10;
+        return `${x},${y}`;
+      })
+      .join(' ');
+  }
+
+  private buildAreaPath(values: number[], height: number): string {
+    const points = this.buildChartPolyline(values, height);
+    if (!points) {
+      return '';
+    }
+
+    return `M 0 ${height} L ${points.replace(/ /g, ' L ')} L 100 ${height} Z`;
+  }
+
+  private getPeriodBuckets(period: DashboardPeriod): Array<{
+    label: string;
+    daysAgoStart: number;
+    daysAgoEnd: number;
+  }> {
+    if (period === '7d') {
+      return [
+        { label: 'Lun', daysAgoStart: 6, daysAgoEnd: 6 },
+        { label: 'Mar', daysAgoStart: 5, daysAgoEnd: 5 },
+        { label: 'Mer', daysAgoStart: 4, daysAgoEnd: 4 },
+        { label: 'Jeu', daysAgoStart: 3, daysAgoEnd: 3 },
+        { label: 'Ven', daysAgoStart: 2, daysAgoEnd: 2 },
+        { label: 'Sam', daysAgoStart: 1, daysAgoEnd: 1 },
+        { label: 'Dim', daysAgoStart: 0, daysAgoEnd: 0 },
+      ];
+    }
+
+    if (period === '30d') {
+      return [
+        { label: 'S1', daysAgoStart: 29, daysAgoEnd: 23 },
+        { label: 'S2', daysAgoStart: 22, daysAgoEnd: 16 },
+        { label: 'S3', daysAgoStart: 15, daysAgoEnd: 9 },
+        { label: 'S4', daysAgoStart: 8, daysAgoEnd: 0 },
+      ];
+    }
+
+    return [
+      { label: 'M-3', daysAgoStart: 89, daysAgoEnd: 67 },
+      { label: 'M-2', daysAgoStart: 66, daysAgoEnd: 44 },
+      { label: 'M-1', daysAgoStart: 43, daysAgoEnd: 21 },
+      { label: 'Act.', daysAgoStart: 20, daysAgoEnd: 0 },
+    ];
+  }
+
+  private getLastMonths(count: number): Array<{ label: string; month: number; year: number }> {
+    const months = [];
+    const now = new Date();
+
+    for (let index = count - 1; index >= 0; index -= 1) {
+      const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
+      months.push({
+        label: date.toLocaleDateString('fr-FR', { month: 'short' }),
+        month: date.getMonth(),
+        year: date.getFullYear(),
+      });
+    }
+
+    return months;
   }
 }
