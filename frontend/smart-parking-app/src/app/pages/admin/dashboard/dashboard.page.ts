@@ -15,6 +15,7 @@ import { ToastService } from '../../../services/toast.service';
   standalone: false,
 })
 export class AdminDashboardPage implements OnInit {
+  activeSection: 'users' | 'parkings' = 'users';
   stats = {
     totalUsers: 0,
     totalDrivers: 0,
@@ -278,10 +279,36 @@ export class AdminDashboardPage implements OnInit {
     await this.loadDashboardData();
   }
 
+  setActiveSection(section: 'users' | 'parkings'): void {
+    this.activeSection = section;
+  }
+
+  onSectionTouchStart(event: TouchEvent): void {
+    this.touchStartX = event.changedTouches[0]?.clientX ?? null;
+  }
+
+  onSectionTouchEnd(event: TouchEvent): void {
+    if (this.touchStartX == null) {
+      return;
+    }
+
+    const endX = event.changedTouches[0]?.clientX ?? this.touchStartX;
+    const deltaX = endX - this.touchStartX;
+    this.touchStartX = null;
+
+    if (Math.abs(deltaX) < 50) {
+      return;
+    }
+
+    this.activeSection = deltaX < 0 ? 'parkings' : 'users';
+  }
+
   logout(): void {
     this.authService.logout();
     this.toastService.show('Deconnexion reussie', 'success');
   }
+
+  private touchStartX: number | null = null;
 
   private async loadDashboardData(): Promise<void> {
     this.isLoading = true;

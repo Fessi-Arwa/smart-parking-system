@@ -7,8 +7,9 @@
 
 .profile-content {
   padding: 20px 16px 96px;
-  font-family: 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   color: #142132;
+  text-rendering: optimizeLegibility;
   transition: filter 0.3s ease;
   animation: fadeInUp 0.45s ease-out;
 
@@ -27,6 +28,7 @@
 
 .overview-shell {
   margin-bottom: 18px;
+  width: 100%;
 }
 
 .overview-header {
@@ -41,27 +43,28 @@
 .section-kicker {
   margin: 0 0 6px;
   text-transform: none;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   font-size: 11px;
   font-weight: 500;
-  color: #8090a3;
+  color: #7b8798;
 }
 
 .overview-header h1 {
   margin: 0;
   color: #0f172a;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: clamp(30px, 4vw, 40px);
-  line-height: 1.02;
-  letter-spacing: -0.04em;
-  font-weight: 650;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: clamp(29px, 4vw, 38px);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  font-weight: 620;
 }
 
 .overview-subtitle {
   margin: 8px 0 0;
-  color: #5f7286;
+  color: #617284;
   font-size: 14px;
-  line-height: 1.62;
+  line-height: 1.68;
+  font-weight: 400;
 }
 
 .logout-btn {
@@ -75,7 +78,7 @@
   background: rgba(255, 255, 255, 0.88);
   color: #475569;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
@@ -88,6 +91,7 @@
 }
 
 .hero-card {
+  width: 100%;
   padding: 22px;
   border-radius: 24px;
   display: grid;
@@ -109,30 +113,32 @@
   background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
   color: #2563eb;
   font-size: 24px;
-  font-weight: 650;
+  font-weight: 620;
 }
 
 .hero-card__eyebrow {
   margin: 0 0 6px;
-  color: #8090a3;
+  color: #7b8798;
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
 }
 
 .hero-card h2 {
   margin: 0;
   color: #0f172a;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 24px;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: 23px;
   letter-spacing: -0.03em;
-  font-weight: 650;
+  font-weight: 620;
 }
 
 .hero-card p {
   margin: 6px 0 0;
   color: #647587;
   font-size: 14px;
+  line-height: 1.62;
+  font-weight: 400;
 }
 
 .hero-card__metrics {
@@ -152,17 +158,17 @@
   display: block;
   color: #6c7a89;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 450;
 }
 
 .hero-card__metrics strong {
   display: block;
   margin-top: 6px;
   color: #0f172a;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 22px;
-  letter-spacing: -0.04em;
-  font-weight: 650;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: 21px;
+  letter-spacing: -0.035em;
+  font-weight: 600;
 }
 
 .profile-grid {
@@ -190,10 +196,10 @@
 
 .section-card ion-card-title {
   color: #0f172a;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 20px;
-  letter-spacing: -0.03em;
-  font-weight: 650;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: 19px;
+  letter-spacing: -0.025em;
+  font-weight: 620;
 }
 
 .section-heading-group {
@@ -229,7 +235,7 @@
   background: #111827;
   color: #ffffff;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .info-list {
@@ -252,12 +258,13 @@
 .info-label {
   color: #64748b;
   font-size: 14px;
+  font-weight: 400;
 }
 
 .info-value {
   color: #0f172a;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 550;
   text-align: right;
 }
 
@@ -308,7 +315,7 @@
   background: transparent;
   color: #64748b;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   padding: 8px 12px;
   border-radius: 999px;
 }
@@ -316,6 +323,7 @@
 .parking-filters button.is-active {
   background: #0f172a;
   color: #ffffff;
+  font-weight: 600;
 }
 
 .parking-list {
@@ -377,13 +385,15 @@
   margin: 0;
   color: #0f172a;
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 560;
 }
 
 .parking-details p {
   margin: 6px 0 0;
   color: #64748b;
   font-size: 13px;
+  line-height: 1.58;
+  font-weight: 400;
 }
 
 .status-pill,
@@ -394,7 +404,7 @@
   padding: 6px 10px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .status-pill {
@@ -425,6 +435,7 @@
   gap: 6px;
   color: #64748b;
   font-size: 12px;
+  font-weight: 400;
 }
 
 .parking-progress {
@@ -462,7 +473,7 @@
   background: transparent;
   color: #2563eb;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .action-buttons {
@@ -499,10 +510,10 @@
   display: block;
   margin-top: 6px;
   color: #0f172a;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 22px;
-  letter-spacing: -0.04em;
-  font-weight: 650;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: 21px;
+  letter-spacing: -0.035em;
+  font-weight: 600;
 }
 
 .detail-info {
@@ -529,6 +540,8 @@
 .info-row span {
   color: #334155;
   font-size: 14px;
+  line-height: 1.58;
+  font-weight: 400;
 }
 
 .detail-media {
@@ -546,10 +559,10 @@
 
 .detail-media__header strong {
   color: #0f172a;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 22px;
-  letter-spacing: -0.04em;
-  font-weight: 650;
+  font-family: 'Inter', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  font-size: 21px;
+  letter-spacing: -0.035em;
+  font-weight: 600;
 }
 
 .video-grid {
@@ -599,7 +612,7 @@
   display: block;
   color: #0f172a;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .video-card__body p {
@@ -607,6 +620,7 @@
   color: #64748b;
   font-size: 12px;
   line-height: 1.5;
+  font-weight: 400;
 }
 
 .empty-state--compact {
@@ -660,7 +674,7 @@
   margin: 0;
   color: #0f172a;
   font-size: 20px;
-  font-weight: 650;
+  font-weight: 620;
 }
 
 .close-btn {
@@ -688,7 +702,7 @@
   margin-bottom: 8px;
   color: #475569;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 450;
 }
 
 .input-group input,
@@ -737,7 +751,7 @@
   background: #f8fafc;
   color: #475569;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 450;
 }
 
 .status-option.active {
@@ -781,13 +795,15 @@
   margin: 0 0 8px;
   color: #0f172a;
   font-size: 18px;
-  font-weight: 650;
+  font-weight: 620;
 }
 
 .confirm-body p {
   margin: 0;
   color: #64748b;
   font-size: 14px;
+  line-height: 1.58;
+  font-weight: 400;
 }
 
 .confirm-footer {
@@ -803,7 +819,7 @@
   border: none;
   border-radius: 999px;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .btn-primary {
@@ -835,7 +851,7 @@
   background: transparent;
   color: #2563eb;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .empty-state {
