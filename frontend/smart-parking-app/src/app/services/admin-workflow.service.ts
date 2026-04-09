@@ -27,6 +27,32 @@ export interface AdminParkingRecord {
   created_at: string;
 }
 
+export interface AdminAppSubscriptionRecord {
+  id_abon: number;
+  type: 'mensuel' | 'trimestriel' | 'annuel';
+  date_debut: string;
+  date_fin: string;
+  statut: 'actif' | 'expire' | 'suspendu' | 'en_attente';
+  tarif: number;
+  parking_id: number;
+  parking?: {
+    id_park: number;
+    owner_id: number;
+    nom: string;
+    adresse: string;
+    prix_heure: number;
+    statut: string;
+    validation_status: string;
+  } | null;
+  owner?: {
+    id_compte: number;
+    nom: string;
+    email: string;
+    telephone?: string;
+    role: 'conducteur' | 'owner' | 'admin';
+  } | null;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -54,6 +80,14 @@ export class AdminWorkflowService {
     );
   }
 
+  getAppSubscriptions(): Promise<AdminAppSubscriptionRecord[]> {
+    return firstValueFrom(
+      this.http.get<AdminAppSubscriptionRecord[]>(`${this.apiUrl}/app-subscriptions`, {
+        headers: this.buildAuthHeaders(),
+      })
+    );
+  }
+
   updateOwnerStatus(
     userId: number,
     ownerStatus: 'en_attente' | 'accepte' | 'refuse' | 'suspendu'
@@ -75,6 +109,19 @@ export class AdminWorkflowService {
       this.http.put<AdminParkingRecord>(
         `${this.apiUrl}/parkings/${parkingId}/validation-status`,
         { validation_status: validationStatus },
+        { headers: this.buildAuthHeaders() }
+      )
+    );
+  }
+
+  updateAppSubscriptionStatus(
+    abonnementId: number,
+    statut: 'actif' | 'expire' | 'suspendu' | 'en_attente'
+  ): Promise<AdminAppSubscriptionRecord> {
+    return firstValueFrom(
+      this.http.put<AdminAppSubscriptionRecord>(
+        `${this.apiUrl}/app-subscriptions/${abonnementId}/status`,
+        { statut },
         { headers: this.buildAuthHeaders() }
       )
     );

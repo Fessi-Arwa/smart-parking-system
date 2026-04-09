@@ -65,10 +65,18 @@ export class OwnerWorkflowService {
   }
 
   async activateAppSubscription(): Promise<OwnerWorkflowState> {
+    return this.activateAppSubscriptionRequest({});
+  }
+
+  async activateAppSubscriptionRequest(payload: {
+    parking_id?: number | null;
+    type?: 'mensuel' | 'trimestriel' | 'annuel';
+    payment_mode?: 'en_ligne' | 'sur_place';
+  }): Promise<OwnerWorkflowState> {
     await firstValueFrom(
       this.http.post(
         `${this.apiUrl}/app-subscription`,
-        {},
+        payload,
         { headers: this.buildAuthHeaders() }
       )
     );

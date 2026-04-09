@@ -22,6 +22,13 @@ from ..models.parking import (
 owner_workflow_bp = Blueprint("owner_workflow", __name__)
 
 
+SUBSCRIPTION_PRICING = {
+    TypeAbonnement.mensuel: {"days": 30, "price": 49},
+    TypeAbonnement.trimestriel: {"days": 90, "price": 135},
+    TypeAbonnement.annuel: {"days": 365, "price": 490},
+}
+
+
 def _get_owner_user():
     user_id = get_jwt_identity()
     user = Compte.query.get(int(user_id))
@@ -69,6 +76,22 @@ def _get_subscription_status_for_parking(parking):
     return abonnement.statut.value
 
 
+def _get_latest_app_subscription_for_parking(parking):
+    if not parking:
+        return None, None
+
+    abonnement_app_link = (
+        AbonnementApp.query.filter_by(parking_id=parking.id_park)
+        .order_by(AbonnementApp.id_abon.desc())
+        .first()
+    )
+    if not abonnement_app_link:
+        return None, None
+
+    abonnement = Abonnement.query.get(abonnement_app_link.id_abon)
+    return abonnement_app_link, abonnement
+
+
 def _get_workflow_rank(parking, subscription_status):
     if not parking:
         return 0
@@ -93,19 +116,27 @@ def _select_workflow_parking(user):
     if not parkings:
         return None, "non_souscrit"
 
-    selected_parking = None
-    selected_subscription_status = "non_souscrit"
-    selected_rank = -1
+    workflow_candidates = []
+    completed_candidates = []
 
     for parking in parkings:
         subscription_status = _get_subscription_status_for_parking(parking)
         rank = _get_workflow_rank(parking, subscription_status)
+        item = (parking, subscription_status, rank)
 
-        if rank > selected_rank:
-            selected_parking = parking
-            selected_subscription_status = subscription_status
-            selected_rank = rank
+        if rank < 5:
+            workflow_candidates.append(item)
+        else:
+            completed_candidates.append(item)
 
+    if workflow_candidates:
+        selected_parking, selected_subscription_status, _ = min(
+            workflow_candidates,
+            key=lambda item: item[2],
+        )
+        return selected_parking, selected_subscription_status
+
+    selected_parking, selected_subscription_status, _ = completed_candidates[0]
     return selected_parking, selected_subscription_status
 
 
@@ -144,6 +175,7 @@ def get_owner_workflow_status():
                 else StatutConfigurationIA.non_configuree.value
             ),
             "parkingId": parking.id_park if parking else None,
+            "parkingName": parking.nom if parking else None,
             "hasParking": parking is not None,
         }
     ), 200
@@ -156,41 +188,62 @@ def activate_app_subscription():
     if error_response:
         return error_response
 
-    parking = _get_owner_parking(user)
+    data = request.get_json() or {}
+    parking_id = data.get("parking_id")
+    raw_type = data.get("type", TypeAbonnement.mensuel.value)
+
+    try:
+        subscription_type = TypeAbonnement(raw_type)
+    except ValueError:
+        return jsonify({"msg": "Type d abonnement invalide"}), 400
+
+    if subscription_type not in SUBSCRIPTION_PRICING:
+        return jsonify({"msg": "Type d abonnement non pris en charge"}), 400
+
+    parking = _get_owner_parking(user, parking_id)
     if not parking:
         return jsonify({"msg": "Aucun parking owner trouve"}), 404
 
-    abonnement_app_link = (
-        AbonnementApp.query.filter_by(parking_id=parking.id_park)
-        .order_by(AbonnementApp.id_abon.desc())
-        .first()
-    )
+    pricing = SUBSCRIPTION_PRICING[subscription_type]
+    start_date = date.today()
+    end_date = start_date + timedelta(days=pricing["days"])
+    _, abonnement = _get_latest_app_subscription_for_parking(parking)
 
-    if abonnement_app_link:
-        abonnement = Abonnement.query.get(abonnement_app_link.id_abon)
-        if not abonnement:
-            return jsonify({"msg": "Abonnement app introuvable"}), 404
-
-        abonnement.statut = StatutAbonnement.actif
+    if abonnement and abonnement.statut in (StatutAbonnement.en_attente, StatutAbonnement.suspendu):
+        abonnement.type = subscription_type
+        abonnement.date_debut = start_date
+        abonnement.date_fin = end_date
+        abonnement.tarif = pricing["price"]
+        abonnement.statut = StatutAbonnement.en_attente
+    elif abonnement and abonnement.statut == StatutAbonnement.actif:
+        return jsonify({"msg": "Un abonnement actif existe deja pour ce parking"}), 400
     else:
         abonnement = Abonnement(
-            type=TypeAbonnement.mensuel,
-            date_debut=date.today(),
-            date_fin=date.today() + timedelta(days=30),
-            statut=StatutAbonnement.actif,
-            tarif=49,
+            type=subscription_type,
+            date_debut=start_date,
+            date_fin=end_date,
+            statut=StatutAbonnement.en_attente,
+            tarif=pricing["price"],
         )
         db.session.add(abonnement)
         db.session.flush()
 
-        abonnement_app_link = AbonnementApp(
-            id_abon=abonnement.id_abon,
-            parking_id=parking.id_park,
+        db.session.add(
+            AbonnementApp(
+                id_abon=abonnement.id_abon,
+                parking_id=parking.id_park,
+            )
         )
-        db.session.add(abonnement_app_link)
 
     db.session.commit()
-    return jsonify({"msg": "Abonnement application active avec succes"}), 200
+    return jsonify(
+        {
+            "msg": "Abonnement application soumis. En attente de validation admin.",
+            "abonnement": abonnement.to_dict(),
+            "parkingId": parking.id_park,
+            "parkingName": parking.nom,
+        }
+    ), 200
 
 
 @owner_workflow_bp.route("/parkings/<int:parking_id>/setup-status", methods=["PUT"])

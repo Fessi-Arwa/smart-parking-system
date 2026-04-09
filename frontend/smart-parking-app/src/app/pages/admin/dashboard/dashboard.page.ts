@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 
 import { AuthService } from '../../../services/auth.service';
 import {
+  AdminAppSubscriptionRecord,
   AdminParkingRecord,
   AdminUserRecord,
   AdminWorkflowService,
@@ -15,7 +16,7 @@ import { ToastService } from '../../../services/toast.service';
   standalone: false,
 })
 export class AdminDashboardPage implements OnInit {
-  activeSection: 'users' | 'parkings' = 'users';
+  activeSection: 'users' | 'parkings' | 'subscriptions' = 'users';
   stats = {
     totalUsers: 0,
     totalDrivers: 0,
@@ -23,12 +24,15 @@ export class AdminDashboardPage implements OnInit {
     totalParkings: 0,
     activeParkings: 0,
     pendingParkings: 0,
+    pendingSubscriptions: 0,
+    activeSubscriptions: 0,
     totalReservations: 0,
     totalRevenue: 0,
   };
 
   users: AdminUserRecord[] = [];
   parkings: AdminParkingRecord[] = [];
+  subscriptions: AdminAppSubscriptionRecord[] = [];
   isLoading = false;
 
   userSearchTerm = '';
@@ -36,6 +40,8 @@ export class AdminDashboardPage implements OnInit {
 
   parkingSearchTerm = '';
   parkingStatusFilter: 'all' | 'en_attente_validation' | 'valide' | 'rejete' = 'all';
+  subscriptionSearchTerm = '';
+  subscriptionStatusFilter: 'all' | 'en_attente' | 'actif' | 'suspendu' | 'expire' = 'all';
 
   constructor(
     private authService: AuthService,
@@ -79,6 +85,25 @@ export class AdminDashboardPage implements OnInit {
         parking.nom.toLowerCase().includes(term) ||
         parking.adresse.toLowerCase().includes(term) ||
         this.getParkingOwnerName(parking.owner_id).toLowerCase().includes(term)
+      );
+    }
+
+    return filtered;
+  }
+
+  get filteredSubscriptions(): AdminAppSubscriptionRecord[] {
+    let filtered = this.subscriptions;
+
+    if (this.subscriptionStatusFilter !== 'all') {
+      filtered = filtered.filter((subscription) => subscription.statut === this.subscriptionStatusFilter);
+    }
+
+    if (this.subscriptionSearchTerm.trim()) {
+      const term = this.subscriptionSearchTerm.toLowerCase();
+      filtered = filtered.filter((subscription) =>
+        (subscription.parking?.nom || '').toLowerCase().includes(term) ||
+        (subscription.owner?.nom || '').toLowerCase().includes(term) ||
+        String(subscription.id_abon).includes(term)
       );
     }
 
@@ -176,6 +201,31 @@ export class AdminDashboardPage implements OnInit {
     }
   }
 
+  async activateSubscription(abonnementId: number): Promise<void> {
+    try {
+      const updated = await this.adminWorkflowService.updateAppSubscriptionStatus(abonnementId, 'actif');
+      this.replaceSubscription(updated);
+      this.toastService.show('Abonnement parking active avec succes.', 'success');
+    } catch (error) {
+      console.error('Erreur activation abonnement parking', error);
+      this.toastService.show('Impossible d activer cet abonnement.', 'error');
+    }
+  }
+
+  async suspendSubscription(abonnementId: number): Promise<void> {
+    try {
+      const updated = await this.adminWorkflowService.updateAppSubscriptionStatus(
+        abonnementId,
+        'suspendu'
+      );
+      this.replaceSubscription(updated);
+      this.toastService.show('Abonnement suspendu.', 'info');
+    } catch (error) {
+      console.error('Erreur suspension abonnement parking', error);
+      this.toastService.show('Impossible de suspendre cet abonnement.', 'error');
+    }
+  }
+
   updateStats(): void {
     this.stats.totalUsers = this.users.filter((user) => user.role !== 'admin').length;
     this.stats.totalDrivers = this.users.filter((user) => user.role === 'conducteur').length;
@@ -185,6 +235,15 @@ export class AdminDashboardPage implements OnInit {
     this.stats.pendingParkings = this.parkings.filter(
       (parking) => parking.validation_status === 'en_attente_validation'
     ).length;
+    this.stats.pendingSubscriptions = this.subscriptions.filter(
+      (subscription) => subscription.statut === 'en_attente'
+    ).length;
+    this.stats.activeSubscriptions = this.subscriptions.filter(
+      (subscription) => subscription.statut === 'actif'
+    ).length;
+    this.stats.totalRevenue = this.subscriptions
+      .filter((subscription) => subscription.statut === 'actif')
+      .reduce((sum, subscription) => sum + Number(subscription.tarif || 0), 0);
   }
 
   getRoleLabel(role: string): string {
@@ -241,6 +300,36 @@ export class AdminDashboardPage implements OnInit {
     }
   }
 
+  getSubscriptionBadgeClass(status: string): string {
+    switch (status) {
+      case 'actif':
+        return 'badge-success';
+      case 'en_attente':
+        return 'badge-warning';
+      case 'suspendu':
+        return 'badge-danger';
+      case 'expire':
+        return 'badge-secondary';
+      default:
+        return 'badge-secondary';
+    }
+  }
+
+  getSubscriptionStatusLabel(status: string): string {
+    switch (status) {
+      case 'actif':
+        return 'Actif';
+      case 'en_attente':
+        return 'En attente admin';
+      case 'suspendu':
+        return 'Suspendu';
+      case 'expire':
+        return 'Expire';
+      default:
+        return status;
+    }
+  }
+
   getOwnerStatusLabel(status?: string): string {
     switch (status) {
       case 'accepte':
@@ -279,7 +368,7 @@ export class AdminDashboardPage implements OnInit {
     await this.loadDashboardData();
   }
 
-  setActiveSection(section: 'users' | 'parkings'): void {
+  setActiveSection(section: 'users' | 'parkings' | 'subscriptions'): void {
     this.activeSection = section;
   }
 
@@ -300,7 +389,10 @@ export class AdminDashboardPage implements OnInit {
       return;
     }
 
-    this.activeSection = deltaX < 0 ? 'parkings' : 'users';
+    const sections: Array<'users' | 'parkings' | 'subscriptions'> = ['users', 'parkings', 'subscriptions'];
+    const currentIndex = sections.indexOf(this.activeSection);
+    const nextIndex = deltaX < 0 ? Math.min(currentIndex + 1, sections.length - 1) : Math.max(currentIndex - 1, 0);
+    this.activeSection = sections[nextIndex];
   }
 
   logout(): void {
@@ -314,13 +406,15 @@ export class AdminDashboardPage implements OnInit {
     this.isLoading = true;
 
     try {
-      const [users, parkings] = await Promise.all([
+      const [users, parkings, subscriptions] = await Promise.all([
         this.adminWorkflowService.getUsers(),
         this.adminWorkflowService.getParkings(),
+        this.adminWorkflowService.getAppSubscriptions(),
       ]);
 
       this.users = users;
       this.parkings = parkings;
+      this.subscriptions = subscriptions;
       this.updateStats();
     } catch (error) {
       console.error('Erreur chargement dashboard admin', error);
@@ -328,5 +422,17 @@ export class AdminDashboardPage implements OnInit {
     } finally {
       this.isLoading = false;
     }
+  }
+
+  private replaceSubscription(updated: AdminAppSubscriptionRecord): void {
+    this.subscriptions = this.subscriptions.map((subscription) =>
+      subscription.id_abon === updated.id_abon
+        ? {
+            ...subscription,
+            ...updated,
+          }
+        : subscription
+    );
+    this.updateStats();
   }
 }
