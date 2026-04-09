@@ -24,8 +24,12 @@
 
     <div *ngIf="notifications.length; else emptyNotifications" class="notification-list">
       <div *ngFor="let notification of notifications" class="notification-item">
-        <div class="notification-item__icon">
-          <ion-icon name="notifications-outline"></ion-icon>
+        <div
+          class="notification-item__icon"
+          [class.notification-item__icon--success]="notification.tone === 'success'"
+          [class.notification-item__icon--warning]="notification.tone === 'warning'"
+          [class.notification-item__icon--alert]="notification.tone === 'alert'">
+          <ion-icon [name]="notification.icon || 'notifications-outline'"></ion-icon>
         </div>
         <div class="notification-item__content">
           <strong>{{ notification.title }}</strong>

@@ -10,6 +10,10 @@ import {
   UpdateParkingPayload,
 } from '../../../services/parking.service';
 import { PlaceDto, PlaceService } from '../../../services/place.service';
+import {
+  ParkingAISource,
+  ParkingAiSourceService,
+} from '../../../services/parking-ai-source.service';
 import { ToastService } from '../../../services/toast.service';
 import { HeaderNotificationItem } from '../../../shared/components/header/header.component';
 
@@ -35,6 +39,14 @@ export interface ParkingInfo {
   activeSubscriptions: number;
 }
 
+interface OwnerPortfolioStats {
+  totalParkings: number;
+  totalSpaces: number;
+  availableSpaces: number;
+  occupancyRate: number;
+  activeParkings: number;
+}
+
 @Component({
   selector: 'app-profile',
   templateUrl: './profile.page.html',
@@ -53,14 +65,18 @@ export class ProfilePage implements OnInit {
   };
 
   parkings: ParkingInfo[] = [];
+  parkingSearch = '';
+  parkingStatusFilter: 'all' | 'actif' | 'maintenance' = 'all';
 
   isEditingProfile = false;
   showAddParking = false;
   selectedParking: ParkingInfo | null = null;
+  selectedParkingSources: ParkingAISource[] = [];
   isEditingParking = false;
   showDeleteConfirm = false;
   parkingToDelete: ParkingInfo | null = null;
   isSavingProfile = false;
+  private previewErrorIds = new Set<number>();
 
   editProfileData = {
     nom: '',
@@ -94,6 +110,7 @@ export class ProfilePage implements OnInit {
     private authService: AuthService,
     private parkingService: ParkingService,
     private placeService: PlaceService,
+    private parkingAiSourceService: ParkingAiSourceService,
     private toastService: ToastService,
     private router: Router
   ) {}
@@ -119,6 +136,37 @@ export class ProfilePage implements OnInit {
     return parts.map((part) => part.charAt(0).toUpperCase()).join('') || 'OW';
   }
 
+  get portfolioStats(): OwnerPortfolioStats {
+    const totalParkings = this.parkings.length;
+    const totalSpaces = this.parkings.reduce((sum, parking) => sum + parking.totalSpaces, 0);
+    const availableSpaces = this.parkings.reduce((sum, parking) => sum + parking.availableSpaces, 0);
+    const activeParkings = this.parkings.filter((parking) => parking.statut === 'actif').length;
+    const occupiedSpaces = Math.max(totalSpaces - availableSpaces, 0);
+
+    return {
+      totalParkings,
+      totalSpaces,
+      availableSpaces,
+      occupancyRate: totalSpaces > 0 ? Math.round((occupiedSpaces / totalSpaces) * 100) : 0,
+      activeParkings,
+    };
+  }
+
+  get filteredParkings(): ParkingInfo[] {
+    const search = this.parkingSearch.trim().toLowerCase();
+    return this.parkings.filter((parking) => {
+      const matchesStatus =
+        this.parkingStatusFilter === 'all' || parking.statut === this.parkingStatusFilter;
+      const matchesSearch =
+        !search ||
+        parking.nom.toLowerCase().includes(search) ||
+        parking.adresse.toLowerCase().includes(search) ||
+        parking.ville.toLowerCase().includes(search);
+
+      return matchesStatus && matchesSearch;
+    });
+  }
+
   get notificationItems(): HeaderNotificationItem[] {
     const maintenanceNotifications = this.parkings
       .filter((parking) => parking.statut === 'maintenance')
@@ -126,6 +174,8 @@ export class ProfilePage implements OnInit {
         title: 'Parking en maintenance',
         description: `${parking.nom} est actuellement indisponible`,
         timestamp: 'Mise a jour recente',
+        icon: 'construct-outline',
+        tone: 'warning' as const,
       }));
 
     const lowCapacityNotifications = this.parkings
@@ -134,6 +184,8 @@ export class ProfilePage implements OnInit {
         title: 'Faible disponibilite',
         description: `${parking.nom} n a plus que ${parking.availableSpaces} places libres`,
         timestamp: 'Aujourd hui',
+        icon: 'alert-circle-outline',
+        tone: 'alert' as const,
       }));
 
     return [...maintenanceNotifications, ...lowCapacityNotifications].slice(0, 5);
@@ -141,6 +193,10 @@ export class ProfilePage implements OnInit {
 
   get notificationsCount(): number {
     return this.notificationItems.length;
+  }
+
+  get selectedParkingVideos(): ParkingAISource[] {
+    return this.selectedParkingSources.filter((source) => source.source_type === 'video');
   }
 
   logout(): void {
@@ -190,13 +246,24 @@ export class ProfilePage implements OnInit {
     this.isEditingProfile = false;
   }
 
-  selectParking(parking: ParkingInfo): void {
+  async selectParking(parking: ParkingInfo): Promise<void> {
     this.selectedParking = parking;
+    this.selectedParkingSources = [];
+    this.previewErrorIds.clear();
     this.isEditingParking = false;
+
+    try {
+      this.selectedParkingSources = await this.parkingAiSourceService.getSources(parking.id_park);
+    } catch (error) {
+      console.error('Erreur chargement sources IA parking', error);
+      this.toastService.show('Impossible de charger les videos de ce parking.', 'error');
+    }
   }
 
   backToList(): void {
     this.selectedParking = null;
+    this.selectedParkingSources = [];
+    this.previewErrorIds.clear();
     this.showAddParking = false;
   }
 
@@ -289,6 +356,26 @@ export class ProfilePage implements OnInit {
 
   getStatusLabel(status: string): string {
     return status === 'actif' ? 'Actif' : 'Maintenance';
+  }
+
+  getParkingOccupancy(parking: ParkingInfo): number {
+    if (parking.totalSpaces <= 0) {
+      return 0;
+    }
+
+    return Math.round(((parking.totalSpaces - parking.availableSpaces) / parking.totalSpaces) * 100);
+  }
+
+  setParkingStatusFilter(status: 'all' | 'actif' | 'maintenance'): void {
+    this.parkingStatusFilter = status;
+  }
+
+  showPreview(source: ParkingAISource): boolean {
+    return !!source.preview_url && !this.previewErrorIds.has(source.id_source);
+  }
+
+  markPreviewError(source: ParkingAISource): void {
+    this.previewErrorIds.add(source.id_source);
   }
 
   private async loadOwnerParkings(selectedParkingId?: number): Promise<void> {

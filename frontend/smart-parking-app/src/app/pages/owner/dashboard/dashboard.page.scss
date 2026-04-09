@@ -1,90 +1,279 @@
 .dashboard-container {
-  --background: #f8fafc;
+  --background:
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.1), transparent 24%),
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 26%),
+    linear-gradient(180deg, #f7fafc 0%, #eef4f8 100%);
 }
 
 .dashboard-content {
-  padding: 20px 16px;
-  padding-bottom: 90px;
+  padding: 20px 16px 96px;
+  font-family: 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-feature-settings: 'liga' 1, 'kern' 1, 'tnum' 1, 'cv11' 1;
+  color: #142132;
 }
 
-.welcome-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1e293b;
-  margin-bottom: 4px;
+.overview-shell,
+.section-card {
+  animation: fadeInUp 0.42s ease-out;
+  animation-fill-mode: both;
 }
 
-.welcome-subtitle {
+.overview-shell {
+  margin-bottom: 18px;
+}
+
+.overview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.overview-kicker,
+.section-kicker {
+  margin: 0 0 6px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 11px;
+  font-weight: 500;
+  color: #8090a3;
+}
+
+.overview-header h1 {
+  margin: 0;
+  color: #0f172a;
+  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
+  font-size: clamp(30px, 4vw, 40px);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  font-weight: 650;
+}
+
+.overview-subtitle,
+.section-copy {
+  margin: 8px 0 0;
+  color: #5f7286;
   font-size: 14px;
-  color: #64748b;
-  margin-bottom: 24px;
+  line-height: 1.62;
 }
 
-/* 2 lignes de 3 éléments */
-.stats-grid {
+.period-filter {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.period-filter button {
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: 999px;
+}
+
+.period-filter button.is-active {
+  background: #111827;
+  color: #f8fafc;
+}
+
+.overview-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.stat-card {
-  background: #ffffff;
-  border-radius: 20px;
-  padding: 16px 12px;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid #e2e8f0;
-  
-  .stat-icon {
-    font-size: 28px;
-    color: #3b82f6;
-    margin-bottom: 8px;
-  }
-  
-  .stat-value {
-    font-size: 26px;
-    font-weight: 700;
-    color: #0f172a;
-  }
-  
-  .stat-label {
-    font-size: 12px;
-    color: #64748b;
-    margin-top: 6px;
-    font-weight: 500;
-  }
+.overview-card,
+.section-card {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(12px);
+}
+
+.overview-card {
+  min-height: 214px;
+  padding: 20px;
+  border-radius: 24px;
+  display: grid;
+  gap: 12px;
+}
+
+.overview-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.overview-card__label {
+  display: block;
+  margin-bottom: 10px;
+  color: #243244;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.overview-card strong {
+  display: block;
+  color: #0f172a;
+  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
+  font-size: clamp(28px, 3vw, 36px);
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-weight: 650;
+}
+
+.overview-card__subtitle {
+  margin: 0;
+  color: #647587;
+  font-size: 13px;
+  line-height: 1.58;
+}
+
+.delta-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.delta-badge[data-tone='positive'] {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.delta-badge[data-tone='negative'] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.delta-badge[data-tone='neutral'] {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.sparkline {
+  width: 100%;
+  height: 56px;
+  overflow: visible;
+}
+
+.sparkline__fill {
+  fill: rgba(148, 163, 184, 0.16);
+}
+
+.sparkline__line {
+  fill: none;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.overview-card[data-accent='emerald'] .sparkline__line {
+  stroke: #22c55e;
+}
+
+.overview-card[data-accent='emerald'] .sparkline__fill {
+  fill: rgba(34, 197, 94, 0.14);
+}
+
+.overview-card[data-accent='blue'] .sparkline__line {
+  stroke: #ef4444;
+}
+
+.overview-card[data-accent='blue'] .sparkline__fill {
+  fill: rgba(239, 68, 68, 0.14);
+}
+
+.overview-card[data-accent='amber'] .sparkline__line {
+  stroke: #94a3b8;
+}
+
+.overview-card[data-accent='amber'] .sparkline__fill {
+  fill: rgba(148, 163, 184, 0.16);
+}
+
+.overview-card[data-accent='slate'] .sparkline__line {
+  stroke: #2563eb;
+}
+
+.overview-card[data-accent='slate'] .sparkline__fill {
+  fill: rgba(37, 99, 235, 0.14);
+}
+
+.overview-card--insight {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.insight-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.insight-icon ion-icon {
+  font-size: 22px;
+  color: #0f172a;
+}
+
+.overview-card--insight ion-button {
+  --background: #111827;
+  --background-hover: #1f2937;
+  --border-radius: 14px;
+  --box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+  font-weight: 700;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(340px, 0.85fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 16px;
 }
 
 .section-card {
-  margin-bottom: 20px;
-  border-radius: 20px;
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid #e2e8f0;
-  
-  ion-card-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    padding-bottom: 8px;
-    
-    ion-card-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: #0f172a;
-    }
-    
-    ion-button {
-      --color: #3b82f6;
-      --color-hover: #2563eb;
-    }
-  }
-  
-  ion-card-content {
-    padding-top: 8px;
-  }
+  margin: 0;
+  border-radius: 24px;
+}
+
+.section-card ion-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 10px;
+}
+
+.section-card ion-card-content {
+  padding-top: 0;
+}
+
+.section-card ion-card-title {
+  color: #0f172a;
+  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 20px;
+  letter-spacing: -0.03em;
+  font-weight: 650;
 }
 
 .section-heading-group {
@@ -93,100 +282,483 @@
   gap: 4px;
 }
 
-.section-kicker {
-  margin: 0;
+.section-heading-metric {
+  text-align: right;
+}
+
+.section-heading-metric strong {
+  display: block;
+  color: #0f172a;
+  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+  font-weight: 650;
+}
+
+.section-heading-metric span {
+  color: #667789;
   font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+}
+
+.section-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.section-card ion-button {
+  --color: #0f172a;
+  --background: rgba(15, 23, 42, 0.04);
+  --border-radius: 14px;
+  font-weight: 600;
+}
+
+.trend-legend,
+.bar-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
   color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trend-legend span,
+.bar-chart__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trend-legend__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.trend-legend__dot--blue {
+  background: #2563eb;
+}
+
+.trend-legend__dot--teal {
+  background: #14b8a6;
+}
+
+.trend-legend__dot--dark {
+  background: #1d4ed8;
+}
+
+.trend-legend__dot--light {
+  background: #93c5fd;
+}
+
+.trend-chart {
+  position: relative;
+  height: 260px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f4f8fb 100%);
+  overflow: hidden;
+}
+
+.trend-chart__grid {
+  position: absolute;
+  inset: 18px 16px 20px;
+  display: grid;
+  grid-template-rows: repeat(4, 1fr);
+}
+
+.trend-chart__grid span {
+  border-top: 1px dashed rgba(148, 163, 184, 0.4);
+}
+
+.trend-chart__svg {
+  position: absolute;
+  inset: 18px 16px 20px;
+  width: calc(100% - 32px);
+  height: calc(100% - 38px);
+}
+
+.trend-chart__line {
+  fill: none;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trend-chart__line--blue {
+  stroke: #2563eb;
+}
+
+.trend-chart__line--teal {
+  stroke: #14b8a6;
+}
+
+.trend-labels {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.trend-label {
+  text-align: center;
+}
+
+.trend-label strong {
+  display: block;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trend-label span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.bar-chart {
+  display: grid;
+  gap: 14px;
+}
+
+.bar-chart__columns {
+  height: 260px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  padding-top: 10px;
+}
+
+.bar-stack {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.bar-stack__bars {
+  width: 100%;
+  max-width: 56px;
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.bar-stack__segment {
+  display: block;
+  width: 100%;
+  border-radius: 14px;
+}
+
+.bar-stack__segment--dark {
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.bar-stack__segment--light {
+  background: linear-gradient(180deg, #93c5fd 0%, #60a5fa 100%);
+}
+
+.bar-stack strong {
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bar-stack small {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.progress-bar {
+  height: 10px;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f766e, #14b8a6);
+}
+
+.workflow-steps,
+.parking-list,
+.reservation-list {
+  display: grid;
+  gap: 12px;
+}
+
+.parking-list__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  margin-top: 2px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.workflow-step,
+.parking-card,
+.reservation-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.workflow-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.workflow-step__dot {
+  width: 12px;
+  height: 12px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  box-shadow: 0 0 0 6px rgba(203, 213, 225, 0.25);
+}
+
+.workflow-step__dot.is-current {
+  background: #f59e0b;
+  box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.18);
+}
+
+.workflow-step__dot.is-done {
+  background: #22c55e;
+  box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.16);
+}
+
+.workflow-step__content strong,
+.parking-card strong,
+.reservation-card strong,
+.ai-source-card__body strong {
+  color: #0f172a;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.workflow-step__content p,
+.parking-card p,
+.reservation-card p,
+.ai-source-card__body p {
+  margin: 4px 0 0;
+  color: #667789;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.parking-card__top,
+.reservation-card__meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.parking-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.parking-card__metrics div {
+  padding: 12px;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.parking-card__metrics span {
+  display: block;
+  color: #6c7a89;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.parking-card__metrics strong {
+  display: block;
+  margin-top: 6px;
+  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 22px;
+  letter-spacing: -0.04em;
+  font-weight: 650;
+}
+
+.parking-card__progress {
+  height: 10px;
+  margin-top: 14px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.parking-card__progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1d4ed8, #38bdf8);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-pill--maintenance {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.reservation-card__meta span {
+  display: block;
+  margin-top: 4px;
+  color: #68788b;
+  font-size: 12px;
+}
+
+.reservation-card__amount {
+  color: #0f766e;
+}
+
+.ai-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ai-summary strong {
+  font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 28px;
+  color: #0f172a;
+  letter-spacing: -0.05em;
+  font-weight: 650;
+}
+
+.ai-summary span {
+  color: #667789;
+  font-size: 13px;
+}
+
+.ai-parking-tabs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 14px;
+  scroll-snap-type: x proximity;
+}
+
+.ai-parking-tabs button {
+  flex: 0 0 auto;
+  min-width: 150px;
+  text-align: left;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  border-radius: 16px;
+  padding: 12px 14px;
+  scroll-snap-align: start;
+}
+
+.ai-parking-tabs button span {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ai-parking-tabs button small {
+  display: block;
+  margin-top: 4px;
+  color: #6a7787;
+  font-size: 11px;
+}
+
+.ai-parking-tabs button.is-active {
+  background: #0f172a;
+  color: #f8fafc;
+  border-color: #0f172a;
+}
+
+.ai-parking-tabs button.is-active small {
+  color: rgba(226, 232, 240, 0.8);
+}
+
+.ai-swipe-shell {
+  overflow: hidden;
+}
+
+.ai-swipe-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 14px;
+}
+
+.ai-swipe-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.ai-swipe-card__header strong {
+  display: block;
+  color: #0f172a;
+}
+
+.ai-swipe-card__header p {
+  margin: 4px 0 0;
+  color: #667789;
+  font-size: 12px;
+}
+
+.ai-swipe-card__header span {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
   font-weight: 700;
 }
 
-/* Liste des parkings et réservations */
-ion-list {
-  background: transparent;
-}
-
-.parking-item, .reservation-item {
-  --padding-start: 0;
-  --inner-padding-end: 0;
-  --background: transparent;
-  margin-bottom: 16px;
-  
-  ion-thumbnail {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
-    background: #f1f5f9;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    
-    .parking-placeholder {
-      ion-icon {
-        font-size: 28px;
-        color: #3b82f6;
-      }
-    }
-  }
-  
-  h3 {
-    color: #0f172a;
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 4px;
-  }
-  
-  p {
-    color: #475569;
-    font-size: 13px;
-    margin: 2px 0;
-  }
-  
-  .parking-stats {
-    font-size: 12px;
-    margin-top: 6px;
-    
-    .available {
-      color: #22c55e;
-      font-weight: 500;
-    }
-    
-    .total {
-      color: #94a3b8;
-    }
-  }
-  
-  .car-icon {
-    font-size: 24px;
-    color: #3b82f6;
-    margin-right: 12px;
-  }
-  
-  .time {
-    font-size: 12px;
-    color: #94a3b8;
-    margin-top: 4px;
-  }
-  
-  ion-note {
-    color: #3b82f6;
-    font-weight: 600;
-    font-size: 14px;
-  }
-  
-  ion-badge {
-    padding: 6px 10px;
-    border-radius: 20px;
-    font-weight: 500;
-    font-size: 11px;
-  }
-}
-
-.ai-sources-grid {
+.ai-swipe-track {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(240px, 82%);
   gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 6px;
 }
 
 .ai-source-card {
@@ -194,46 +766,48 @@ ion-list {
   border-radius: 18px;
   overflow: hidden;
   background: #f8fafc;
+  scroll-snap-align: start;
 }
 
 .ai-source-card__preview {
-  height: 140px;
-  background: #e2e8f0;
+  height: 148px;
+  background: linear-gradient(135deg, #dbeafe, #e2e8f0);
   display: flex;
   align-items: center;
   justify-content: center;
-
-  img,
-  video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
 }
 
-.ai-source-card__preview--camera {
-  ion-icon {
-    font-size: 42px;
-    color: #3b82f6;
-  }
+.ai-source-card__preview img,
+.ai-source-card__preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ai-source-card__preview--camera ion-icon {
+  font-size: 42px;
+  color: #1d4ed8;
+}
+
+.ai-source-card__preview--fallback {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-source-card__preview--fallback ion-icon {
+  font-size: 34px;
+  color: #64748b;
+}
+
+.ai-source-card__preview--fallback span {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .ai-source-card__body {
   padding: 14px;
-
-  strong {
-    display: block;
-    color: #0f172a;
-    margin-bottom: 6px;
-  }
-
-  p {
-    margin: 0;
-    font-size: 12px;
-    color: #64748b;
-    word-break: break-word;
-  }
 }
 
 .ai-source-card__type {
@@ -244,120 +818,123 @@ ion-list {
   background: #dbeafe;
   color: #1d4ed8;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
-.empty-ai-state {
-  padding: 12px 0;
+.empty-state {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  min-height: 140px;
   text-align: center;
   color: #64748b;
+}
 
-  ion-icon {
-    font-size: 28px;
-    color: #3b82f6;
-    margin-bottom: 8px;
+.empty-state ion-icon {
+  font-size: 28px;
+  color: #0ea5e9;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
   }
-
-  p {
-    margin: 0;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-/* Badges personnalisés */
-ion-badge {
-  &.success {
-    --background: #22c55e;
-    --color: #ffffff;
+@media (max-width: 1180px) {
+  .overview-grid,
+  .analytics-grid,
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  
-  &.warning {
-    --background: #f97316;
-    --color: #ffffff;
-  }
-  
-  &.danger {
-    --background: #ef4444;
-    --color: #ffffff;
-  }
-  
-  &.primary {
-    --background: #3b82f6;
-    --color: #ffffff;
+
+  .overview-card--insight,
+  .section-card--trend,
+  .section-card--ai {
+    grid-column: 1 / -1;
   }
 }
 
-/* Séparateur entre les éléments */
-ion-item {
-  --border-color: #e2e8f0;
-  --inner-border-width: 0 0 1px 0;
-}
+@media (max-width: 760px) {
+  .dashboard-content {
+    padding: 14px 12px 92px;
+  }
 
-/* Ajustement du dernier élément */
-.parking-item:last-child, .reservation-item:last-child {
-  margin-bottom: 0;
-}
+  .overview-header,
+  .overview-grid,
+  .analytics-grid,
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
 
-/* Responsive pour petits écrans */
-@media (max-width: 480px) {
-  .stats-grid {
+  .overview-header {
+    gap: 12px;
+  }
+
+  .period-filter {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .period-filter button {
+    flex: 1;
+    padding: 9px 8px;
+    font-size: 11px;
+  }
+
+  .overview-card,
+  .section-card {
+    border-radius: 20px;
+  }
+
+  .overview-card {
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .overview-card strong {
+    font-size: 30px;
+  }
+
+  .trend-labels {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .bar-chart__columns {
     gap: 8px;
   }
-  
-  .stat-card {
-    padding: 12px 8px;
-    
-    .stat-icon {
-      font-size: 24px;
-    }
-    
-    .stat-value {
-      font-size: 20px;
-    }
-    
-    .stat-label {
-      font-size: 10px;
-    }
-  }
-  
-  .parking-item, .reservation-item {
-    h3 {
-      font-size: 14px;
-    }
-    
-    p {
-      font-size: 12px;
-    }
-  }
-}
-.dashboard-container {
-  --background: var(--bg-primary, #f8fafc);
-  
-  .dashboard-content {
-    animation: fadeInUp 0.5s ease-out;
-  }
-}
 
-// Animation des cartes stats
-.stat-card {
-  animation: fadeInUp 0.4s ease-out;
-  animation-fill-mode: both;
-  
-  @for $i from 1 through 6 {
-    &:nth-child(#{$i}) {
-      animation-delay: #{$i * 0.05}s;
-    }
+  .bar-stack__bars {
+    max-width: 44px;
   }
-}
 
-// Animation des items
-.parking-item, .reservation-item {
-  animation: fadeInUp 0.3s ease-out;
-  animation-fill-mode: both;
-  
-  @for $i from 1 through 10 {
-    &:nth-child(#{$i}) {
-      animation-delay: #{0.1 + $i * 0.03}s;
-    }
+  .section-card ion-card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .section-heading-metric {
+    text-align: left;
+  }
+
+  .parking-card__top,
+  .reservation-card__meta,
+  .ai-swipe-card__header {
+    flex-direction: column;
+  }
+
+  .parking-card__metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-swipe-track {
+    grid-auto-columns: 92%;
   }
 }

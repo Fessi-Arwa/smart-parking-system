@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { environment } from 'src/environments/environment';
 
 import { AuthService } from './auth.service';
 
@@ -30,7 +31,7 @@ export interface AdminParkingRecord {
   providedIn: 'root',
 })
 export class AdminWorkflowService {
-  private readonly apiUrl = 'http://localhost:5000/api/admin';
+  private readonly apiUrl = `${environment.apiBaseUrl}/admin`;
 
   constructor(
     private http: HttpClient,

@@ -14,9 +14,9 @@ import { DriverOnboardingComponent } from './auth/driver-onboarding/driver-onboa
 import { OwnerOnboardingComponent } from './auth/owner-onboarding/owner-onboarding.component';
 
 const routes: Routes = [
-  { path: 'signin', component: SigninComponent, canActivate: [GuestGuard] },
+  { path: 'signin', redirectTo: 'signin/intro', pathMatch: 'full' },
   { path: 'signin/intro', component: SigninIntroComponent, canActivate: [GuestGuard] },
-  { path: 'signin/form', redirectTo: 'signin', pathMatch: 'full' },
+  { path: 'signin/form', component: SigninComponent, canActivate: [GuestGuard] },
   { path: 'forgot-password', component: ForgotPasswordComponent },
   { path: 'reset-password', component: ResetPasswordComponent },
   { path: 'signup', component: SignupComponent, canActivate: [GuestGuard] },

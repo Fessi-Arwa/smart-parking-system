@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
+import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 
 export type ParkingAISourceType = 'image' | 'video' | 'camera';
@@ -23,8 +24,8 @@ export interface ParkingAISource {
   providedIn: 'root',
 })
 export class ParkingAiSourceService {
-  private readonly apiUrl = 'http://localhost:5000/api/owner';
-  private readonly backendOrigin = 'http://localhost:5000';
+  private readonly apiUrl = `${environment.apiBaseUrl}/owner`;
+  private readonly backendOrigin = environment.backendOrigin;
 
   constructor(
     private http: HttpClient,
@@ -39,10 +40,7 @@ export class ParkingAiSourceService {
       )
     );
 
-    return sources.map((source) => ({
-      ...source,
-      preview_url: source.preview_url ? `${this.backendOrigin}${source.preview_url}` : null,
-    }));
+    return sources.map((source) => this.normalizeSource(source));
   }
 
   async uploadSource(
@@ -66,10 +64,7 @@ export class ParkingAiSourceService {
       )
     );
 
-    return {
-      ...source,
-      preview_url: source.preview_url ? `${this.backendOrigin}${source.preview_url}` : null,
-    };
+    return this.normalizeSource(source);
   }
 
   async createCameraSource(
@@ -96,5 +91,24 @@ export class ParkingAiSourceService {
   private buildAuthHeaders(): HttpHeaders | undefined {
     const token = this.authService.getToken();
     return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+  }
+
+  private normalizeSource(source: ParkingAISource): ParkingAISource {
+    return {
+      ...source,
+      preview_url: this.normalizePreviewUrl(source.preview_url),
+    };
+  }
+
+  private normalizePreviewUrl(previewUrl?: string | null): string | null {
+    if (!previewUrl) {
+      return null;
+    }
+
+    if (/^https?:\/\//i.test(previewUrl)) {
+      return previewUrl;
+    }
+
+    return `${this.backendOrigin}${previewUrl}`;
   }
 }

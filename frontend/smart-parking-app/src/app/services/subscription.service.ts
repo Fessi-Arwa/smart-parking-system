@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from 'src/environments/environment';
 
 import { AuthService } from './auth.service';
 
@@ -44,7 +45,7 @@ export interface CreateSubscriptionPayload {
   providedIn: 'root',
 })
 export class SubscriptionService {
-  private apiUrl = 'http://localhost:5000/api/abonnements';
+  private apiUrl = `${environment.apiBaseUrl}/abonnements`;
 
   constructor(private http: HttpClient, private authService: AuthService) {}
 

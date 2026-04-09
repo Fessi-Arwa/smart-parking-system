@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
+import { environment } from 'src/environments/environment';
 
 import {
   AiSetupStatus,
@@ -14,7 +15,7 @@ import { AuthService } from './auth.service';
   providedIn: 'root',
 })
 export class OwnerWorkflowService {
-  private readonly apiUrl = 'http://localhost:5000/api/owner';
+  private readonly apiUrl = `${environment.apiBaseUrl}/owner`;
   private readonly stateSubject = new BehaviorSubject<OwnerWorkflowState>(DEFAULT_OWNER_WORKFLOW_STATE);
 
   readonly state$ = this.stateSubject.asObservable();

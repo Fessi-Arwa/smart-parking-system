@@ -516,6 +516,7 @@
     <label>
       <span>Place</span>
       <select formControlName="place_id">
+        <option value="" disabled *ngIf="availableSubscriptionSpots.length === 0">Aucune place libre disponible</option>
         <option *ngFor="let spot of availableSubscriptionSpots" [value]="spot.id_place">{{ buildSpotLabel(spot) }}</option>
       </select>
     </label>
