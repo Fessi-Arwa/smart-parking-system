@@ -29,7 +29,7 @@ class Place(ModelMixin, db.Model):
         Index("idx_place_parking_id", "parking_id"),
     )
 
-    id_place = db.Column(db.BigInteger, primary_key=True)
+    id_place = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     parking_id = db.Column(
         db.BigInteger,
         db.ForeignKey("parking.id_park", ondelete="CASCADE"),

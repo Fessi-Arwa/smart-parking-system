@@ -17,7 +17,7 @@ class Vehicule(ModelMixin, db.Model):
     )
     __table_args__ = (Index("idx_vehicule_conducteur_id", "conducteur_id"),)
 
-    id_veh = db.Column(db.BigInteger, primary_key=True)
+    id_veh = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     conducteur_id = db.Column(
         db.BigInteger,
         db.ForeignKey("comptes.id_compte", ondelete="CASCADE"),

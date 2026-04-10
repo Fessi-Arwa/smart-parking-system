@@ -57,6 +57,97 @@
       </article>
     </section>
 
+    <section class="payment-card">
+      <div class="payment-card__header">
+        <div>
+          <span class="payment-card__eyebrow">Paiement</span>
+          <h2>Confirmer l abonnement</h2>
+        </div>
+        <span class="payment-badge">{{ selectedPlanPrice }} TND</span>
+      </div>
+
+      <div class="payment-mode">
+        <button
+          type="button"
+          class="payment-mode__chip"
+          [class.is-active]="paymentMode === 'en_ligne'"
+          (click)="paymentMode = 'en_ligne'"
+        >
+          Paiement en ligne
+        </button>
+        <button
+          type="button"
+          class="payment-mode__chip"
+          [class.is-active]="paymentMode === 'sur_place'"
+          (click)="paymentMode = 'sur_place'"
+        >
+          Paiement sur place
+        </button>
+      </div>
+
+      <div class="payment-form" *ngIf="paymentMode === 'en_ligne'">
+        <label>
+          Nom du porteur de la carte
+          <small>Entrez le nom ecrit sur la carte bancaire.</small>
+          <input
+            type="text"
+            [(ngModel)]="paymentData.cardHolder"
+            [class.is-invalid]="isFieldInvalid('cardHolder')"
+            placeholder="Exemple : Nadia Benali" />
+        </label>
+        <label>
+          Numero de carte
+          <small>Entrez uniquement les chiffres de la carte.</small>
+          <input
+            type="text"
+            [(ngModel)]="paymentData.cardNumber"
+            (input)="sanitizeCardNumber()"
+            [class.is-invalid]="isFieldInvalid('cardNumber')"
+            inputmode="numeric"
+            maxlength="19"
+            placeholder="Exemple : 1111222233334444" />
+        </label>
+        <div class="payment-form__row">
+          <label>
+            Mois d expiration
+            <small>Choisissez le mois.</small>
+            <select [(ngModel)]="paymentData.expiryMonth" [class.is-invalid]="isFieldInvalid('expiryMonth')">
+              <option value="">Mois</option>
+              <option *ngFor="let month of expiryMonths" [value]="month">{{ month }}</option>
+            </select>
+          </label>
+          <label>
+            Annee d expiration
+            <small>Choisissez l annee.</small>
+            <select [(ngModel)]="paymentData.expiryYear" [class.is-invalid]="isFieldInvalid('expiryYear')">
+              <option value="">Annee</option>
+              <option *ngFor="let year of expiryYears" [value]="year">{{ year }}</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          Code de securite
+          <small>Les 3 ou 4 chiffres de verification de la carte.</small>
+          <input
+            type="text"
+            [(ngModel)]="paymentData.cvv"
+            (input)="sanitizeCvv()"
+            [class.is-invalid]="isFieldInvalid('cvv')"
+            inputmode="numeric"
+            maxlength="4"
+            placeholder="Exemple : 123" />
+        </label>
+        <div class="payment-help">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <span>Exemple valide : carte `1111222233334444`, expiration `04 / 27`, code `123`.</span>
+        </div>
+      </div>
+
+      <div class="payment-note" *ngIf="paymentMode === 'sur_place'">
+        L abonnement sera cree en attente. L admin pourra verifier et activer votre plan apres validation.
+      </div>
+    </section>
+
     <div class="owner-step__actions">
       <button
         class="owner-step__primary"
@@ -64,7 +155,7 @@
         (click)="activateSubscription()"
         [disabled]="isSubmitting"
       >
-        {{ isSubmitting ? 'Activation...' : 'Activer l abonnement' }}
+        {{ isSubmitting ? 'Soumission...' : 'Payer et soumettre l abonnement' }}
       </button>
       <button class="owner-step__primary" type="button" (click)="refreshStatus()">
         Actualiser le statut

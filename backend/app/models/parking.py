@@ -53,7 +53,7 @@ class Parking(ModelMixin, db.Model):
         Index("idx_parking_owner_id", "owner_id"),
     )
 
-    id_park = db.Column(db.BigInteger, primary_key=True)
+    id_park = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     owner_id = db.Column(
         db.BigInteger,
         db.ForeignKey("comptes.id_compte", ondelete="CASCADE"),

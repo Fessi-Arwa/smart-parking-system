@@ -21,7 +21,7 @@ class DetectionIA(ModelMixin, db.Model):
         "created_at",
     )
 
-    id_detect = db.Column(db.BigInteger, primary_key=True)
+    id_detect = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     date_detect = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
     image_src = db.Column(db.Text)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())

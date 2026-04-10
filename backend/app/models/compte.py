@@ -32,7 +32,7 @@ class Compte(ModelMixin, db.Model):
         "updated_at",
     )
 
-    id_compte = db.Column(db.BigInteger, primary_key=True)
+    id_compte = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     nom = db.Column(db.String(150), nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
     mot_passe = db.Column(db.String(255), nullable=False)

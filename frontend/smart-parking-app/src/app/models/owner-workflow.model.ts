@@ -11,6 +11,7 @@ export interface OwnerWorkflowState {
   parkingSetupStatus: SetupStatus;
   aiSetupStatus: AiSetupStatus;
   parkingId?: number | null;
+  parkingName?: string | null;
   hasParking?: boolean;
 }
 

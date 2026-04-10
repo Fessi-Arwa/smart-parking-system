@@ -1312,6 +1312,44 @@
   padding: 4px 0;
 }
 
+.reservation-total-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+}
+
+.reservation-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reservation-total-row span {
+  color: #475569;
+  font-size: 13px;
+}
+
+.reservation-total-row strong {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.reservation-total-row--total {
+  padding-top: 10px;
+  border-top: 1px solid #dbeafe;
+}
+
+.reservation-total-row--total span,
+.reservation-total-row--total strong {
+  color: #1d4ed8;
+}
+
 .radio-card {
   display: flex;
   align-items: center;
@@ -1325,6 +1363,69 @@
 
 .radio-card small {
   color: #64748b;
+}
+
+.online-payment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.online-payment-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.online-payment-card__header h3 {
+  margin: 4px 0 0;
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.payment-amount-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.payment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.online-payment-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.online-payment-note ion-icon {
+  font-size: 18px;
+  flex: 0 0 auto;
+}
+
+.online-payment-note span {
+  font-size: 13px;
+  color: #1e3a8a;
 }
 
 .full-width {
@@ -1345,7 +1446,8 @@
 
   .form-grid,
   .history-grid,
-  .parking-meta {
+  .parking-meta,
+  .payment-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1885,8 +1987,10 @@
 .modal-form input,
 .modal-form select {
   color: var(--driver-text);
+  -webkit-text-fill-color: var(--driver-text);
   font-size: 15px;
   font-weight: 400;
+  caret-color: var(--driver-primary);
 }
 
 .modal-form select,
@@ -1898,12 +2002,39 @@
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   background: #ffffff;
+  color: #0f172a;
   transition: all 0.2s;
 }
 
 .modal-form input::placeholder,
 .form-grid input::placeholder {
   color: #94a3b8;
+  -webkit-text-fill-color: #94a3b8;
+  opacity: 1;
+}
+
+.modal-form select option,
+.form-grid select option {
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.modal-form input[type='date'],
+.modal-form input[type='datetime-local'] {
+  color-scheme: light;
+}
+
+.modal-form input[type='date']::-webkit-calendar-picker-indicator,
+.modal-form input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  opacity: 0.85;
+  filter: none;
+}
+
+.modal-form label strong,
+.modal-form label small,
+.modal-form label div,
+.payment-choice strong {
+  color: #0f172a;
 }
 
 .modal-form input:focus,

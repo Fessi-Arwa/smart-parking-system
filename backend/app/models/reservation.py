@@ -35,7 +35,7 @@ class Reservation(ModelMixin, db.Model):
         Index("idx_reservation_vehicule_id", "vehicule_id"),
     )
 
-    id_res = db.Column(db.BigInteger, primary_key=True)
+    id_res = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     conducteur_id = db.Column(
         db.BigInteger,
         db.ForeignKey("comptes.id_compte", ondelete="CASCADE"),

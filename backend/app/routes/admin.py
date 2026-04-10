@@ -2,6 +2,8 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from .. import db
+from ..models.abonnement import Abonnement, StatutAbonnement
+from ..models.abonnement_app import AbonnementApp
 from ..models.compte import Compte, RoleCompte, StatutValidationOwner
 from ..models.feedback import Feedback
 from ..models.paiement import Paiement
@@ -221,3 +223,73 @@ def update_parking_validation_status(parking_id):
 
     db.session.commit()
     return jsonify(_parking_to_admin_dict(parking)), 200
+
+
+
+@admin_bp.route("/app-subscriptions", methods=["GET"])
+@jwt_required()
+def get_app_subscriptions():
+    _, error_response = _require_admin()
+    if error_response:
+        return error_response
+
+    links = AbonnementApp.query.order_by(AbonnementApp.id_abon.desc()).all()
+    abonnement_ids = [link.id_abon for link in links]
+    parking_ids = [link.parking_id for link in links]
+
+    abonnements = {
+        abonnement.id_abon: abonnement
+        for abonnement in Abonnement.query.filter(Abonnement.id_abon.in_(abonnement_ids)).all()
+    } if abonnement_ids else {}
+    parkings = {
+        parking.id_park: parking
+        for parking in Parking.query.filter(Parking.id_park.in_(parking_ids)).all()
+    } if parking_ids else {}
+    owner_ids = [parking.owner_id for parking in parkings.values()]
+    owners = {
+        owner.id_compte: owner
+        for owner in Compte.query.filter(Compte.id_compte.in_(owner_ids)).all()
+    } if owner_ids else {}
+
+    data = []
+    for link in links:
+        abonnement = abonnements.get(link.id_abon)
+        parking = parkings.get(link.parking_id)
+        owner = owners.get(parking.owner_id) if parking else None
+
+        if not abonnement:
+            continue
+
+        data.append(
+            {
+                **abonnement.to_dict(),
+                "parking_id": link.parking_id,
+                "parking": parking.to_dict() if parking else None,
+                "owner": owner.to_dict() if owner else None,
+            }
+        )
+
+    return jsonify(data), 200
+
+
+@admin_bp.route("/app-subscriptions/<int:abonnement_id>/status", methods=["PUT"])
+@jwt_required()
+def update_app_subscription_status(abonnement_id):
+    _, error_response = _require_admin()
+    if error_response:
+        return error_response
+
+    abonnement = Abonnement.query.get(abonnement_id)
+    if not abonnement:
+        return jsonify({"msg": "Abonnement introuvable"}), 404
+
+    data = request.get_json() or {}
+    status = data.get("statut")
+
+    try:
+        abonnement.statut = StatutAbonnement(status)
+    except ValueError:
+        return jsonify({"msg": "statut d abonnement invalide"}), 400
+
+    db.session.commit()
+    return jsonify(abonnement.to_dict()), 200

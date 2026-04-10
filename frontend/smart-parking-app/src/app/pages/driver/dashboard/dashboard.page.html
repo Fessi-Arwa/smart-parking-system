@@ -338,6 +338,7 @@
     <label>
       <span>Place</span>
       <select formControlName="place_id">
+        <option value="" disabled *ngIf="availableReservationSpots.length === 0">Aucune place disponible</option>
         <option *ngFor="let spot of availableReservationSpots" [value]="spot.id_place">{{ buildSpotLabel(spot) }}</option>
       </select>
     </label>
@@ -349,6 +350,25 @@
       <span>Date de fin</span>
       <input formControlName="date_fin" type="datetime-local">
     </label>
+
+    <div class="reservation-total-card">
+      <div class="reservation-total-row">
+        <span>Tarif horaire</span>
+        <strong>{{ selectedReservationParking?.prix_heure ?? 0 }} DA/h</strong>
+      </div>
+      <div class="reservation-total-row">
+        <span>Durée estimée</span>
+        <strong>
+          {{ reservationDurationHours !== null ? (reservationDurationHours + ' h') : 'Choisissez les dates' }}
+        </strong>
+      </div>
+      <div class="reservation-total-row reservation-total-row--total">
+        <span>Total avant paiement</span>
+        <strong>
+          {{ reservationEstimatedTotal !== null ? (reservationEstimatedTotal + ' DA') : '--' }}
+        </strong>
+      </div>
+    </div>
 
     <div class="payment-choice">
       <span>Mode de paiement</span>
@@ -368,7 +388,55 @@
       </label>
     </div>
 
-    <button class="primary-btn full-width" type="submit">Confirmer la réservation</button>
+    <div *ngIf="isOnlinePaymentSelected" class="online-payment-card">
+      <div class="online-payment-card__header">
+        <div>
+          <p class="eyebrow">Paiement en ligne</p>
+          <h3>Continuer la procédure de paiement</h3>
+        </div>
+        <span class="payment-amount-pill">
+          {{ reservationEstimatedTotal !== null ? (reservationEstimatedTotal + ' DA') : '--' }}
+        </span>
+      </div>
+
+      <label>
+        <span>Méthode de paiement</span>
+        <select formControlName="payment_method">
+          <option value="carte_bancaire">Carte bancaire</option>
+          <option value="carte_edahabia">Carte Edahabia</option>
+        </select>
+      </label>
+
+      <label>
+        <span>Nom du porteur</span>
+        <input formControlName="card_holder" type="text" placeholder="Nom indiqué sur la carte">
+      </label>
+
+      <label>
+        <span>Numéro de carte</span>
+        <input formControlName="card_number" type="text" inputmode="numeric" placeholder="0000 0000 0000 0000">
+      </label>
+
+      <div class="payment-grid">
+        <label>
+          <span>Expiration</span>
+          <input formControlName="card_expiry" type="text" placeholder="MM/AA">
+        </label>
+        <label>
+          <span>CVV</span>
+          <input formControlName="card_cvv" type="password" inputmode="numeric" placeholder="123">
+        </label>
+      </div>
+
+      <div class="online-payment-note">
+        <ion-icon name="shield-checkmark-outline"></ion-icon>
+        <span>Le conducteur vérifie le montant avant de confirmer le paiement sécurisé.</span>
+      </div>
+    </div>
+
+    <button class="primary-btn full-width" type="submit" [disabled]="isReservationSubmitting">
+      {{ reservationSubmitLabel }}
+    </button>
   </form>
 </section>
 
