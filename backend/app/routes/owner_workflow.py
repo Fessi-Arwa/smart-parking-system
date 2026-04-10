@@ -17,9 +17,15 @@ from ..models.parking import (
     StatutConfigurationParking,
     StatutValidationParking,
 )
+from ..models.place import Place
+from ..services.ai_service import ParkingSourceAIService
 
 
 owner_workflow_bp = Blueprint("owner_workflow", __name__)
+
+
+def _get_ai_source_service():
+    return ParkingSourceAIService(current_app.config["UPLOAD_FOLDER"])
 
 
 def _get_owner_user():
@@ -69,6 +75,32 @@ def _get_subscription_status_for_parking(parking):
     return abonnement.statut.value
 
 
+def _ensure_parking_validated(parking):
+    if parking.validation_status != StatutValidationParking.valide:
+        return jsonify({"msg": "Le parking doit etre valide par l admin avant cette etape"}), 400
+    return None
+
+
+def _ensure_subscription_active(parking):
+    subscription_status = _get_subscription_status_for_parking(parking)
+    if subscription_status != "actif":
+        return jsonify({"msg": "Activez d abord l abonnement de l application pour ce parking"}), 400
+    return None
+
+
+def _ensure_parking_ready_for_setup(parking):
+    return _ensure_parking_validated(parking) or _ensure_subscription_active(parking)
+
+
+def _ensure_parking_ready_for_ai(parking):
+    setup_error = _ensure_parking_ready_for_setup(parking)
+    if setup_error:
+        return setup_error
+    if parking.setup_status != StatutConfigurationParking.terminee:
+        return jsonify({"msg": "Terminez d abord la configuration parking avant d utiliser l IA"}), 400
+    return None
+
+
 def _get_workflow_rank(parking, subscription_status):
     if not parking:
         return 0
@@ -93,25 +125,45 @@ def _select_workflow_parking(user):
     if not parkings:
         return None, "non_souscrit"
 
-    selected_parking = None
-    selected_subscription_status = "non_souscrit"
-    selected_rank = -1
+    workflow_candidates: list[tuple[Parking, str, int]] = []
+    completed_candidates: list[tuple[Parking, str, int]] = []
 
     for parking in parkings:
         subscription_status = _get_subscription_status_for_parking(parking)
         rank = _get_workflow_rank(parking, subscription_status)
+        candidate = (parking, subscription_status, rank)
 
-        if rank > selected_rank:
-            selected_parking = parking
-            selected_subscription_status = subscription_status
-            selected_rank = rank
+        if rank < 5:
+            workflow_candidates.append(candidate)
+        else:
+            completed_candidates.append(candidate)
 
-    return selected_parking, selected_subscription_status
+    if workflow_candidates:
+        parking, subscription_status, _ = workflow_candidates[0]
+        return parking, subscription_status
+
+    parking, subscription_status, _ = completed_candidates[0]
+    return parking, subscription_status
 
 
-def _source_to_dict(source):
+def _source_to_dict(source, ai_service=None):
     data = source.to_dict()
     data["preview_url"] = f"/api/owner/ai-sources/{source.id_source}/file" if source.file_path else None
+    data["calibration_preview_url"] = None
+    try:
+        service = ai_service or _get_ai_source_service()
+        data["analysis"] = service.get_analysis(source.id_source)
+        calibration_path, _ = service.extract_calibration_frame(source)
+        if calibration_path:
+            data["calibration_preview_url"] = f"/api/owner/ai-sources/{source.id_source}/calibration-frame"
+    except Exception as exc:
+        data["analysis"] = {
+            "source_id": source.id_source,
+            "parking_id": source.parking_id,
+            "source_type": source.source_type.value,
+            "status": "error",
+            "error": str(exc),
+        }
     return data
 
 
@@ -206,6 +258,9 @@ def update_parking_setup_status(parking_id):
 
     if parking.owner_id != user.id_compte:
         return jsonify({"msg": "Vous ne pouvez modifier que votre parking"}), 403
+    setup_error = _ensure_parking_ready_for_setup(parking)
+    if setup_error:
+        return setup_error
 
     data = request.get_json() or {}
     status = data.get("setup_status")
@@ -232,6 +287,9 @@ def update_ai_setup_status(parking_id):
 
     if parking.owner_id != user.id_compte:
         return jsonify({"msg": "Vous ne pouvez modifier que votre parking"}), 403
+    ai_error = _ensure_parking_ready_for_ai(parking)
+    if ai_error:
+        return ai_error
 
     data = request.get_json() or {}
     status = data.get("ai_setup_status")
@@ -262,13 +320,20 @@ def get_ai_sources(parking_id):
     parking = _get_owner_parking(user, parking_id)
     if not parking:
         return jsonify({"msg": "Parking introuvable"}), 404
+    ai_error = _ensure_parking_ready_for_ai(parking)
+    if ai_error:
+        return ai_error
 
     sources = (
         ParkingAISource.query.filter_by(parking_id=parking.id_park)
         .order_by(ParkingAISource.created_at.desc(), ParkingAISource.id_source.desc())
         .all()
     )
-    return jsonify([_source_to_dict(source) for source in sources]), 200
+    try:
+        ai_service = _get_ai_source_service()
+    except Exception:
+        ai_service = None
+    return jsonify([_source_to_dict(source, ai_service=ai_service) for source in sources]), 200
 
 
 @owner_workflow_bp.route("/parkings/<int:parking_id>/ai-sources/camera", methods=["POST"])
@@ -281,6 +346,9 @@ def create_camera_source(parking_id):
     parking = _get_owner_parking(user, parking_id)
     if not parking:
         return jsonify({"msg": "Parking introuvable"}), 404
+    ai_error = _ensure_parking_ready_for_ai(parking)
+    if ai_error:
+        return ai_error
 
     data = request.get_json() or {}
     stream_url = (data.get("stream_url") or "").strip()
@@ -308,6 +376,9 @@ def upload_ai_source(parking_id):
     parking = _get_owner_parking(user, parking_id)
     if not parking:
         return jsonify({"msg": "Parking introuvable"}), 404
+    ai_error = _ensure_parking_ready_for_ai(parking)
+    if ai_error:
+        return ai_error
 
     file = request.files.get("file")
     if not file or not file.filename:
@@ -342,7 +413,112 @@ def upload_ai_source(parking_id):
     )
     db.session.add(source)
     db.session.commit()
-    return jsonify(_source_to_dict(source)), 201
+
+    analysis = None
+    if source_type == TypeSourceIA.image:
+        try:
+            analysis = _get_ai_source_service().analyze_source(source)
+        except Exception as exc:
+            analysis = {
+                "source_id": source.id_source,
+                "parking_id": source.parking_id,
+                "source_type": source.source_type.value,
+                "status": "error",
+                "error": str(exc),
+            }
+
+    payload = _source_to_dict(source)
+    if analysis is not None:
+        payload["analysis"] = analysis
+    return jsonify(payload), 201
+
+
+@owner_workflow_bp.route("/parkings/<int:parking_id>/ai-slots", methods=["GET"])
+@jwt_required()
+def get_ai_slots(parking_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    parking = _get_owner_parking(user, parking_id)
+    if not parking:
+        return jsonify({"msg": "Parking introuvable"}), 404
+    ai_error = _ensure_parking_ready_for_ai(parking)
+    if ai_error:
+        return ai_error
+
+    service = _get_ai_source_service().video_service
+    slots = service.get_saved_parking_slots(parking.id_park)
+    return jsonify(
+        {
+            "slots": slots,
+            "slots_path": str(service.get_slots_config_path(parking.id_park)),
+            "uses_custom_slots": bool(slots),
+        }
+    ), 200
+
+
+@owner_workflow_bp.route("/parkings/<int:parking_id>/ai-slots", methods=["PUT"])
+@jwt_required()
+def save_ai_slots(parking_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    parking = _get_owner_parking(user, parking_id)
+    if not parking:
+        return jsonify({"msg": "Parking introuvable"}), 404
+    ai_error = _ensure_parking_ready_for_ai(parking)
+    if ai_error:
+        return ai_error
+
+    payload = request.get_json() or {}
+    raw_slots = payload.get("slots")
+    if not isinstance(raw_slots, list) or not raw_slots:
+        return jsonify({"msg": "Ajoutez au moins un slot a sauvegarder"}), 400
+
+    valid_place_ids = {
+        place.id_place
+        for place in Place.query.filter_by(parking_id=parking.id_park).all()
+    }
+
+    normalized_slots = []
+    seen_place_ids = set()
+    for index, slot in enumerate(raw_slots, start=1):
+        if not isinstance(slot, dict):
+            return jsonify({"msg": f"Le slot #{index} est invalide"}), 400
+
+        try:
+            place_id = int(slot["place_id"])
+            x = int(slot["x"])
+            y = int(slot["y"])
+            w = int(slot["w"])
+            h = int(slot["h"])
+        except (KeyError, TypeError, ValueError):
+            return jsonify({"msg": f"Le slot #{index} doit contenir place_id, x, y, w et h"}), 400
+
+        if place_id not in valid_place_ids:
+            return jsonify({"msg": f"Le place_id {place_id} n appartient pas a ce parking"}), 400
+        if place_id in seen_place_ids:
+            return jsonify({"msg": f"Le place_id {place_id} est utilise plusieurs fois"}), 400
+        if w <= 0 or h <= 0:
+            return jsonify({"msg": f"Le slot #{index} doit avoir une largeur et une hauteur positives"}), 400
+
+        seen_place_ids.add(place_id)
+        normalized_slots.append(
+            {
+                "slot_index": index,
+                "place_id": place_id,
+                "x": x,
+                "y": y,
+                "w": w,
+                "h": h,
+            }
+        )
+
+    service = _get_ai_source_service().video_service
+    slots_path = service.save_parking_slots(parking.id_park, normalized_slots)
+    return jsonify({"slots": normalized_slots, "slots_path": str(slots_path)}), 200
 
 
 @owner_workflow_bp.route("/ai-sources/<int:source_id>", methods=["DELETE"])
@@ -365,9 +541,49 @@ def delete_ai_source(source_id):
         if path.exists():
             path.unlink()
 
+    try:
+        _get_ai_source_service().delete_analysis(source.id_source)
+    except Exception:
+        pass
+
     db.session.delete(source)
     db.session.commit()
     return jsonify({"msg": "Source IA supprimee"}), 200
+
+
+@owner_workflow_bp.route("/ai-sources/<int:source_id>/reanalyze", methods=["POST"])
+@jwt_required()
+def reanalyze_ai_source(source_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    source = ParkingAISource.query.get(source_id)
+    if not source:
+        return jsonify({"msg": "Source IA introuvable"}), 404
+
+    parking = _get_owner_parking(user, source.parking_id)
+    if not parking:
+        return jsonify({"msg": "Acces non autorise"}), 403
+
+    if source.source_type == TypeSourceIA.camera:
+        return jsonify({"msg": "Le retraitement n est pas disponible pour les cameras"}), 400
+
+    service = _get_ai_source_service()
+    try:
+        if source.source_type == TypeSourceIA.video:
+            analysis = service.enqueue_video_analysis(source)
+            payload = _source_to_dict(source, ai_service=service)
+            payload["analysis"] = analysis
+            return jsonify(payload), 202
+
+        analysis = service.analyze_source(source)
+    except Exception as exc:
+        return jsonify({"msg": str(exc)}), 400
+
+    payload = _source_to_dict(source, ai_service=service)
+    payload["analysis"] = analysis
+    return jsonify(payload), 200
 
 
 @owner_workflow_bp.route("/ai-sources/<int:source_id>/file", methods=["GET"])
@@ -381,3 +597,55 @@ def get_ai_source_file(source_id):
         return jsonify({"msg": "Fichier introuvable"}), 404
 
     return send_file(path, mimetype=source.mime_type or "application/octet-stream")
+
+
+@owner_workflow_bp.route("/ai-sources/<int:source_id>/analysis-file", methods=["GET"])
+def get_ai_source_analysis_file(source_id):
+    source = ParkingAISource.query.get(source_id)
+    if not source:
+        return jsonify({"msg": "Source IA introuvable"}), 404
+
+    try:
+        path, mimetype = _get_ai_source_service().resolve_output_path(source_id)
+    except Exception as exc:
+        return jsonify({"msg": str(exc)}), 500
+
+    if not path:
+        return jsonify({"msg": "Fichier d'analyse introuvable"}), 404
+
+    return send_file(path, mimetype=mimetype or "application/octet-stream")
+
+
+@owner_workflow_bp.route("/ai-sources/<int:source_id>/analysis-preview", methods=["GET"])
+def get_ai_source_analysis_preview(source_id):
+    source = ParkingAISource.query.get(source_id)
+    if not source:
+        return jsonify({"msg": "Source IA introuvable"}), 404
+
+    try:
+        path, mimetype = _get_ai_source_service().resolve_output_preview_path(source_id)
+    except Exception as exc:
+        return jsonify({"msg": str(exc)}), 500
+
+    if not path:
+        return jsonify({"msg": "Apercu d'analyse introuvable"}), 404
+
+    return send_file(path, mimetype=mimetype or "image/jpeg")
+
+
+@owner_workflow_bp.route("/ai-sources/<int:source_id>/calibration-frame", methods=["GET"])
+@jwt_required(optional=True)
+def get_ai_source_calibration_frame(source_id):
+    source = ParkingAISource.query.get(source_id)
+    if not source:
+        return jsonify({"msg": "Source IA introuvable"}), 404
+
+    try:
+        path, mimetype = _get_ai_source_service().extract_calibration_frame(source)
+    except Exception as exc:
+        return jsonify({"msg": str(exc)}), 500
+
+    if not path:
+        return jsonify({"msg": "Capture de calibration introuvable"}), 404
+
+    return send_file(path, mimetype=mimetype or "image/jpeg")

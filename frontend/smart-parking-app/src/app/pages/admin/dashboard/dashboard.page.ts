@@ -85,6 +85,38 @@ export class AdminDashboardPage implements OnInit {
     return filtered;
   }
 
+  get pendingOwnerApprovalsCount(): number {
+    return this.users.filter((user) => user.role === 'owner' && user.owner_status === 'en_attente').length;
+  }
+
+  get pendingParkingReviews(): AdminParkingRecord[] {
+    return this.parkings.filter((parking) => parking.validation_status === 'en_attente_validation');
+  }
+
+  get blockedPendingParkingReviewsCount(): number {
+    return this.pendingParkingReviews.filter((parking) => parking.owner_status !== 'accepte').length;
+  }
+
+  get nextAdminActionTitle(): string {
+    if (this.pendingOwnerApprovalsCount > 0) {
+      return 'Traiter les comptes owner en attente';
+    }
+    if (this.pendingParkingReviews.length > 0) {
+      return `Revoir ${this.pendingParkingReviews[0].nom}`;
+    }
+    return 'Toutes les validations sont a jour';
+  }
+
+  get nextAdminActionDescription(): string {
+    if (this.pendingOwnerApprovalsCount > 0) {
+      return 'Commencez par accepter les comptes owner pour debloquer la validation de leurs parkings.';
+    }
+    if (this.pendingParkingReviews.length > 0) {
+      return 'Le prochain dossier parking peut etre valide ou rejete directement depuis la file de revue.';
+    }
+    return 'Utilisez Actualiser pour verifier les nouvelles demandes.';
+  }
+
   async approveOwner(userId: number): Promise<void> {
     try {
       const updatedUser = await this.adminWorkflowService.updateOwnerStatus(userId, 'accepte');
@@ -241,7 +273,7 @@ export class AdminDashboardPage implements OnInit {
     }
   }
 
-  getOwnerStatusLabel(status?: string): string {
+  getOwnerStatusLabel(status?: string | null): string {
     switch (status) {
       case 'accepte':
         return 'Accepte';
@@ -256,7 +288,7 @@ export class AdminDashboardPage implements OnInit {
     }
   }
 
-  getOwnerStatusBadgeClass(status?: string): string {
+  getOwnerStatusBadgeClass(status?: string | null): string {
     switch (status) {
       case 'accepte':
         return 'badge-success';
@@ -273,6 +305,59 @@ export class AdminDashboardPage implements OnInit {
 
   getParkingOwnerName(ownerId: number): string {
     return this.users.find((user) => user.id_compte === ownerId)?.nom || `Owner #${ownerId}`;
+  }
+
+  canApproveParking(parking: AdminParkingRecord): boolean {
+    return parking.owner_status === 'accepte';
+  }
+
+  getParkingApprovalHint(parking: AdminParkingRecord): string | null {
+    if (parking.validation_status !== 'en_attente_validation') {
+      return null;
+    }
+
+    if (parking.owner_status !== 'accepte') {
+      return 'Le compte owner doit etre accepte avant validation du parking.';
+    }
+
+    return 'Verifier les informations avant approbation.';
+  }
+
+  getParkingReviewStepLabel(parking: AdminParkingRecord): string {
+    if (parking.validation_status === 'valide') {
+      return 'Validation admin terminee';
+    }
+    if (parking.validation_status === 'rejete') {
+      return 'Dossier retourne au proprietaire';
+    }
+    if (parking.owner_status !== 'accepte') {
+      return 'En attente de validation du compte owner';
+    }
+    return 'Pret pour revue admin du parking';
+  }
+
+  getSetupStatusLabel(status?: string): string {
+    switch (status) {
+      case 'terminee':
+        return 'Parking setup termine';
+      case 'en_cours':
+        return 'Parking setup en cours';
+      default:
+        return 'Parking setup non commence';
+    }
+  }
+
+  getAiSetupStatusLabel(status?: string): string {
+    switch (status) {
+      case 'active':
+        return 'IA active';
+      case 'testee':
+        return 'IA testee';
+      case 'en_cours':
+        return 'IA en cours';
+      default:
+        return 'IA non configuree';
+    }
   }
 
   async reloadData(): Promise<void> {

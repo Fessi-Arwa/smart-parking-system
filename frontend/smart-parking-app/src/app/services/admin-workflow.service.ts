@@ -18,12 +18,16 @@ export interface AdminUserRecord {
 export interface AdminParkingRecord {
   id_park: number;
   owner_id: number;
+  owner_name?: string;
+  owner_status?: 'en_attente' | 'accepte' | 'refuse' | 'suspendu' | null;
   nom: string;
   adresse: string;
   capacite?: number;
   prix_heure: number;
   statut: 'actif' | 'inactif';
   validation_status: 'brouillon' | 'en_attente_validation' | 'valide' | 'rejete';
+  setup_status?: 'non_commencee' | 'en_cours' | 'terminee';
+  ai_setup_status?: 'non_configuree' | 'en_cours' | 'testee' | 'active';
   created_at: string;
 }
 

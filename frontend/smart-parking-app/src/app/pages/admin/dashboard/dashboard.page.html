@@ -37,8 +37,15 @@
 
       <div class="hero-action-card">
         <p class="hero-action-card__label">Action rapide</p>
-        <strong>Synchroniser les donnees</strong>
-        <p>Rafraichissez les utilisateurs et les parkings pour travailler sur des informations a jour.</p>
+        <strong>{{ nextAdminActionTitle }}</strong>
+        <p>{{ nextAdminActionDescription }}</p>
+        <div class="hero-action-card__meta">
+          <span>{{ pendingOwnerApprovalsCount }} owner(s) en attente</span>
+          <span>{{ pendingParkingReviews.length }} parking(s) a revoir</span>
+          <span *ngIf="blockedPendingParkingReviewsCount > 0">
+            {{ blockedPendingParkingReviewsCount }} dossier(s) bloques par le compte owner
+          </span>
+        </div>
         <button class="primary-btn" type="button" (click)="reloadData()">
           Actualiser
           <ion-icon name="refresh-outline"></ion-icon>
@@ -228,6 +235,30 @@
         </div>
       </div>
 
+      <div class="review-queue" *ngIf="pendingParkingReviews.length > 0">
+        <div class="review-queue__header">
+          <div>
+            <p class="review-queue__kicker">File de revue</p>
+            <strong>{{ pendingParkingReviews.length }} dossier(s) parking en attente</strong>
+          </div>
+          <span class="review-queue__meta" *ngIf="blockedPendingParkingReviewsCount > 0">
+            {{ blockedPendingParkingReviewsCount }} bloque(s) par le compte owner
+          </span>
+        </div>
+
+        <div class="review-queue__list">
+          <article class="review-queue__item" *ngFor="let parking of pendingParkingReviews | slice:0:3">
+            <div>
+              <strong>{{ parking.nom }}</strong>
+              <p>{{ parking.owner_name || getParkingOwnerName(parking.owner_id) }}</p>
+            </div>
+            <span class="validation-badge" [class]="getOwnerStatusBadgeClass(parking.owner_status)">
+              {{ getParkingReviewStepLabel(parking) }}
+            </span>
+          </article>
+        </div>
+      </div>
+
       <div class="parkings-list">
         <article *ngFor="let parking of filteredParkings" class="parking-card">
           <div class="parking-header">
@@ -236,7 +267,7 @@
             </div>
             <div class="parking-title">
               <h3>{{ parking.nom }}</h3>
-              <p>{{ getParkingOwnerName(parking.owner_id) }}</p>
+              <p>{{ parking.owner_name || getParkingOwnerName(parking.owner_id) }}</p>
             </div>
             <div class="parking-price">{{ parking.prix_heure }} TND/h</div>
           </div>
@@ -247,6 +278,9 @@
           </div>
 
           <div class="parking-badges">
+            <span class="validation-badge" [class]="getOwnerStatusBadgeClass(parking.owner_status)">
+              Owner: {{ getOwnerStatusLabel(parking.owner_status) }}
+            </span>
             <span class="status-badge" [class]="parking.statut === 'actif' ? 'active' : 'inactive'">
               {{ parking.statut === 'actif' ? 'Actif' : 'Inactif' }}
             </span>
@@ -255,8 +289,23 @@
             </span>
           </div>
 
+          <div class="parking-address">
+            <ion-icon name="grid-outline"></ion-icon>
+            <span>{{ parking.capacite || 0 }} places • {{ getSetupStatusLabel(parking.setup_status) }} • {{ getAiSetupStatusLabel(parking.ai_setup_status) }}</span>
+          </div>
+
+          <div class="parking-address" *ngIf="getParkingApprovalHint(parking)">
+            <ion-icon name="information-circle-outline"></ion-icon>
+            <span>{{ getParkingApprovalHint(parking) }}</span>
+          </div>
+
+          <div class="parking-address parking-address--step">
+            <ion-icon name="trail-sign-outline"></ion-icon>
+            <span>{{ getParkingReviewStepLabel(parking) }}</span>
+          </div>
+
           <div class="parking-actions" *ngIf="parking.validation_status === 'en_attente_validation'">
-            <button class="action-btn approve" type="button" (click)="approveParking(parking.id_park)">
+            <button class="action-btn approve" type="button" (click)="approveParking(parking.id_park)" [disabled]="!canApproveParking(parking)">
               <ion-icon name="checkmark-outline"></ion-icon>
               Approuver
             </button>

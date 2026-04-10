@@ -5,7 +5,7 @@ from .. import db
 from ..models.compte import Compte, RoleCompte, StatutValidationOwner
 from ..models.feedback import Feedback
 from ..models.paiement import Paiement
-from ..models.parking import Parking, StatutValidationParking
+from ..models.parking import Parking, StatutConfigurationIA, StatutConfigurationParking, StatutValidationParking
 from ..models.place import Place
 from ..models.reservation import Reservation
 
@@ -24,6 +24,14 @@ def _require_admin():
         return None, (jsonify({"msg": "Acces reserve aux admins"}), 403)
 
     return user, None
+
+
+def _parking_to_admin_dict(parking):
+    owner = Compte.query.get(parking.owner_id)
+    data = parking.to_dict()
+    data["owner_name"] = owner.nom if owner else f"Owner #{parking.owner_id}"
+    data["owner_status"] = owner.owner_status.value if owner and owner.owner_status else None
+    return data
 
 
 @admin_bp.route("/stats", methods=["GET"])
@@ -114,7 +122,7 @@ def get_parkings():
         return error_response
 
     parkings = Parking.query.order_by(Parking.id_park.asc()).all()
-    return jsonify([parking.to_dict() for parking in parkings])
+    return jsonify([_parking_to_admin_dict(parking) for parking in parkings])
 
 
 @admin_bp.route("/parkings/<int:parking_id>", methods=["PUT"])
@@ -135,7 +143,7 @@ def update_parking(parking_id):
     )
 
     db.session.commit()
-    return jsonify(parking.to_dict())
+    return jsonify(_parking_to_admin_dict(parking))
 
 
 @admin_bp.route("/parkings/<int:parking_id>", methods=["DELETE"])
@@ -195,9 +203,21 @@ def update_parking_validation_status(parking_id):
     status = data.get("validation_status")
 
     try:
-        parking.validation_status = StatutValidationParking(status)
+        next_status = StatutValidationParking(status)
     except ValueError:
         return jsonify({"msg": "validation_status invalide"}), 400
 
+    owner = Compte.query.get(parking.owner_id)
+    if not owner or owner.role != RoleCompte.owner:
+        return jsonify({"msg": "Owner du parking introuvable"}), 404
+
+    if next_status == StatutValidationParking.valide and owner.owner_status != StatutValidationOwner.accepte:
+        return jsonify({"msg": "Le compte owner doit etre accepte avant de valider son parking"}), 400
+
+    parking.validation_status = next_status
+    if next_status != StatutValidationParking.valide:
+        parking.setup_status = StatutConfigurationParking.non_commencee
+        parking.ai_setup_status = StatutConfigurationIA.non_configuree
+
     db.session.commit()
-    return jsonify(parking.to_dict()), 200
+    return jsonify(_parking_to_admin_dict(parking)), 200

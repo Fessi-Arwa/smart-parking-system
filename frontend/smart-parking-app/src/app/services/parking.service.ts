@@ -12,6 +12,9 @@ export interface ParkingDto {
   capacite: number;
   prix_heure: number;
   statut: string;
+  validation_status?: string;
+  setup_status?: string;
+  ai_setup_status?: string;
   created_at?: string;
 }
 
@@ -20,6 +23,11 @@ export interface CreateParkingPayload {
   adresse: string;
   capacite: number;
   prix_heure: number;
+}
+
+export interface CreateParkingResponse {
+  msg: string;
+  parking: ParkingDto;
 }
 
 export interface UpdateParkingPayload {
@@ -38,20 +46,24 @@ export class ParkingService {
   constructor(private http: HttpClient, private authService: AuthService) {}
 
   getParkings(): Observable<ParkingDto[]> {
-    return this.http.get<ParkingDto[]>(`${this.apiUrl}/`);
+    return this.http.get<ParkingDto[]>(`${this.apiUrl}/`, {
+      headers: this.buildAuthHeaders(),
+    });
   }
 
   getParking(parkingId: number): Observable<ParkingDto> {
-    return this.http.get<ParkingDto>(`${this.apiUrl}/${parkingId}`);
+    return this.http.get<ParkingDto>(`${this.apiUrl}/${parkingId}`, {
+      headers: this.buildAuthHeaders(),
+    });
   }
 
-  createParking(payload: CreateParkingPayload): Observable<any> {
+  createParking(payload: CreateParkingPayload): Observable<CreateParkingResponse> {
     const token = this.authService.getToken();
     const headers = token
       ? new HttpHeaders({ Authorization: `Bearer ${token}` })
       : undefined;
 
-    return this.http.post(`${this.apiUrl}/`, payload, { headers });
+    return this.http.post<CreateParkingResponse>(`${this.apiUrl}/`, payload, { headers });
   }
 
   updateParking(parkingId: number, payload: UpdateParkingPayload): Observable<any> {
@@ -70,5 +82,10 @@ export class ParkingService {
       : undefined;
 
     return this.http.delete(`${this.apiUrl}/${parkingId}`, { headers });
+  }
+
+  private buildAuthHeaders(): HttpHeaders | undefined {
+    const token = this.authService.getToken();
+    return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
   }
 }

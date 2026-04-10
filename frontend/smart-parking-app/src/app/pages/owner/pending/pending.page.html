@@ -1,11 +1,41 @@
 <ion-content class="owner-step owner-step--pending">
   <div class="owner-step__wrap">
-    <span class="owner-step__eyebrow">Etape 1</span>
-    <h1>Validation administrative en attente</h1>
-    <p>
-      Votre compte owner et votre premier parking ont bien ete soumis. L admin doit maintenant
-      valider votre dossier avant de debloquer l abonnement de l application.
-    </p>
+    <div class="owner-progress">
+      <article class="owner-progress__step owner-progress__step--active">
+        <span>1</span>
+        <strong>Validation</strong>
+      </article>
+      <article class="owner-progress__step">
+        <span>2</span>
+        <strong>Abonnement</strong>
+      </article>
+      <article class="owner-progress__step">
+        <span>3</span>
+        <strong>Parking</strong>
+      </article>
+      <article class="owner-progress__step">
+        <span>4</span>
+        <strong>IA</strong>
+      </article>
+    </div>
+
+    <section class="owner-hero">
+      <div>
+        <span class="owner-step__eyebrow">Etape 1</span>
+        <h1>{{ pendingTitle }}</h1>
+        <p>{{ pendingDescription }}</p>
+        <p class="owner-step__active-parking" *ngIf="pendingParkingLabel">
+          Dossier en attente : {{ pendingParkingLabel }}
+        </p>
+      </div>
+
+      <article class="owner-hero__highlight">
+        <span>Workflow owner</span>
+        <strong *ngIf="waitingOnOwnerApproval">Compte en verification</strong>
+        <strong *ngIf="waitingOnParkingCreation">Parking a creer</strong>
+        <strong *ngIf="waitingOnParkingApproval">Parking en validation</strong>
+      </article>
+    </section>
 
     <div class="owner-step__status-grid">
       <article class="owner-step__status-card">
@@ -13,12 +43,27 @@
         <span>{{ workflowState.ownerStatus }}</span>
       </article>
       <article class="owner-step__status-card">
-        <strong>Premier parking</strong>
+        <strong>Parking</strong>
         <span>{{ workflowState.parkingStatus }}</span>
       </article>
       <article class="owner-step__status-card">
         <strong>Abonnement app</strong>
         <span>{{ workflowState.subscriptionStatus }}</span>
+      </article>
+    </div>
+
+    <div class="owner-step__status-grid owner-step__status-grid--next" *ngIf="waitingOnOwnerApproval || waitingOnParkingCreation || waitingOnParkingApproval">
+      <article class="owner-step__status-card owner-step__status-card--accent" *ngIf="waitingOnOwnerApproval">
+        <strong>Prochaine action</strong>
+        <span>Attendre la validation du compte owner par l admin</span>
+      </article>
+      <article class="owner-step__status-card owner-step__status-card--accent" *ngIf="waitingOnParkingCreation">
+        <strong>Prochaine action</strong>
+        <span>Creer le premier parking depuis le profil owner</span>
+      </article>
+      <article class="owner-step__status-card owner-step__status-card--accent" *ngIf="waitingOnParkingApproval">
+        <strong>Prochaine action</strong>
+        <span>Attendre la validation du parking par l admin</span>
       </article>
     </div>
 

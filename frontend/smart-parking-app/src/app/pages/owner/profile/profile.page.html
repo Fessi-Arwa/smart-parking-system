@@ -7,6 +7,16 @@
     class="profile-content"
     [class.blur-background]="isEditingProfile || showAddParking || isEditingParking || showDeleteConfirm">
     <section class="overview-shell">
+      <div class="owner-ribbon">
+        <span class="owner-ribbon__label">Workflow owner</span>
+        <div class="owner-ribbon__steps">
+          <span>1. Validation</span>
+          <span>2. Abonnement</span>
+          <span>3. Parking</span>
+          <span>4. IA</span>
+        </div>
+      </div>
+
       <div class="overview-header">
         <div>
           <p class="overview-kicker">Owner profile</p>
@@ -49,6 +59,11 @@
             <span>Actifs</span>
             <strong>{{ portfolioStats.activeParkings }}</strong>
           </article>
+        </div>
+
+        <div class="hero-card__next-action">
+          <span>Prochaine priorite</span>
+          <strong>{{ portfolioNextActionTitle }}</strong>
         </div>
       </div>
     </section>
@@ -93,13 +108,34 @@
             <p class="section-kicker">Gestion</p>
             <ion-card-title>Mes parkings</ion-card-title>
           </div>
-          <button class="add-btn" type="button" (click)="openAddParking()">
+          <button class="add-btn" type="button" (click)="openAddParking()" [disabled]="!canCreateParking">
             <ion-icon name="add-outline"></ion-icon>
             Ajouter
           </button>
         </ion-card-header>
 
         <ion-card-content>
+          <div class="workflow-banner" *ngIf="!canCreateParking">
+            <ion-icon name="time-outline"></ion-icon>
+            <p>La creation de parking sera disponible apres validation du compte owner par l admin.</p>
+          </div>
+
+          <div class="workflow-banner workflow-banner--info" *ngIf="canCreateParking && pendingReviewParking">
+            <ion-icon name="document-text-outline"></ion-icon>
+            <p>
+              Dossier en attente : <strong>{{ pendingReviewParking.nom }}</strong>.
+              {{ getParkingNextStep(pendingReviewParking) }}
+            </p>
+          </div>
+
+          <div class="workflow-banner workflow-banner--danger" *ngIf="canCreateParking && rejectedParking">
+            <ion-icon name="alert-circle-outline"></ion-icon>
+            <p>
+              Dossier a corriger : <strong>{{ rejectedParking.nom }}</strong>.
+              {{ getParkingNextStep(rejectedParking) }}
+            </p>
+          </div>
+
           <div class="parking-toolbar" *ngIf="!selectedParking && !showAddParking">
             <div class="parking-search">
               <ion-icon name="search-outline"></ion-icon>
@@ -133,6 +169,14 @@
                 </span>
               </div>
 
+              <p class="parking-validation-status">
+                Statut dossier : {{ getValidationStatusLabel(parking.validation_status) }}
+              </p>
+
+              <p class="parking-next-step">
+                {{ getParkingNextStep(parking) }}
+              </p>
+
               <div class="parking-meta">
                 <span>
                   <ion-icon name="location-outline"></ion-icon>
@@ -156,7 +200,9 @@
             <div *ngIf="filteredParkings.length === 0" class="empty-state">
               <ion-icon name="business-outline"></ion-icon>
               <p>Aucun parking ne correspond a ce filtre.</p>
-              <button class="btn-outline" type="button" (click)="openAddParking()">Ajouter un parking</button>
+              <button class="btn-outline" type="button" (click)="openAddParking()" [disabled]="!canCreateParking">
+                Ajouter un parking
+              </button>
             </div>
           </div>
 
@@ -186,7 +232,14 @@
                   {{ getStatusLabel(selectedParking.statut) }}
                 </span>
               </div>
+              <p class="parking-validation-status">
+                Statut dossier : {{ getValidationStatusLabel(selectedParking.validation_status) }}
+              </p>
             </div>
+
+            <p class="parking-next-step parking-next-step--detail">
+              {{ getParkingNextStep(selectedParking) }}
+            </p>
 
             <div class="detail-stats">
               <article>
@@ -222,9 +275,37 @@
               </div>
             </div>
 
+            <div class="ai-shortcut-card">
+              <div>
+                <p class="section-kicker">Module IA</p>
+                <strong>Ajouter des images, videos ou cameras pour ce parking</strong>
+                <p>
+                  L ajout de sources et leur traitement IA se font dans l ecran dedie a la configuration IA.
+                </p>
+              </div>
+              <button class="btn-primary ai-shortcut-card__action" type="button" (click)="openAiSetup()">
+                Ouvrir la configuration IA
+              </button>
+            </div>
+
+            <div class="detail-stats detail-stats--sources">
+              <article>
+                <span>Images IA</span>
+                <strong>{{ selectedParkingImages.length }}</strong>
+              </article>
+              <article>
+                <span>Videos IA</span>
+                <strong>{{ selectedParkingVideos.length }}</strong>
+              </article>
+              <article>
+                <span>Cameras IA</span>
+                <strong>{{ selectedParkingCameras.length }}</strong>
+              </article>
+            </div>
+
             <div class="detail-media">
               <div class="detail-media__header">
-                <p class="section-kicker">Videos du parking</p>
+                <p class="section-kicker">Sources video du parking</p>
                 <strong>{{ selectedParkingVideos.length }}</strong>
               </div>
 
@@ -302,6 +383,11 @@
       </button>
     </div>
     <div class="sheet-body">
+      <div class="workflow-banner workflow-banner--info">
+        <ion-icon name="map-outline"></ion-icon>
+        <p>{{ newParkingWorkflowHint }}</p>
+      </div>
+
       <div class="input-group">
         <label>Nom du parking *</label>
         <input type="text" [(ngModel)]="newParkingData.nom" placeholder="Ex: Parking Centre">
@@ -337,10 +423,31 @@
           </button>
         </div>
       </div>
+
+      <div class="form-checklist">
+        <div class="form-checklist__item" [class.is-valid]="!!newParkingData.nom?.trim()">
+          <ion-icon [name]="newParkingData.nom?.trim() ? 'checkmark-circle-outline' : 'ellipse-outline'"></ion-icon>
+          <span>Nom du parking renseigne</span>
+        </div>
+        <div class="form-checklist__item" [class.is-valid]="!!newParkingData.adresse?.trim()">
+          <ion-icon [name]="newParkingData.adresse?.trim() ? 'checkmark-circle-outline' : 'ellipse-outline'"></ion-icon>
+          <span>Adresse complete renseignee</span>
+        </div>
+        <div class="form-checklist__item" [class.is-valid]="!!newParkingData.totalSpaces && newParkingData.totalSpaces > 0">
+          <ion-icon [name]="newParkingData.totalSpaces && newParkingData.totalSpaces > 0 ? 'checkmark-circle-outline' : 'ellipse-outline'"></ion-icon>
+          <span>Capacite superieure a zero</span>
+        </div>
+        <div class="form-checklist__item" [class.is-valid]="newParkingData.prix_heure != null && newParkingData.prix_heure >= 0">
+          <ion-icon [name]="newParkingData.prix_heure != null && newParkingData.prix_heure >= 0 ? 'checkmark-circle-outline' : 'ellipse-outline'"></ion-icon>
+          <span>Prix horaire valide</span>
+        </div>
+      </div>
     </div>
     <div class="sheet-footer">
       <button class="btn-secondary" type="button" (click)="backToList()">Annuler</button>
-      <button class="btn-primary" type="button" (click)="addParking()">Ajouter</button>
+      <button class="btn-primary" type="button" (click)="addParking()" [disabled]="!canSubmitNewParking || isCreatingParking">
+        {{ isCreatingParking ? 'Creation...' : 'Ajouter' }}
+      </button>
     </div>
   </div>
 

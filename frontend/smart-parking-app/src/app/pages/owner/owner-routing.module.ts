@@ -6,17 +6,16 @@ import { AiSetupPage } from './ai-setup/ai-setup.page';
 import { ParkingSetupPage } from './parking-setup/parking-setup.page';
 import { PendingPage } from './pending/pending.page';
 import { SubscriptionPage } from './subscription/subscription.page';
-import { WorkflowPage } from './workflow/workflow.page';
 
 const routes: Routes = [
   {
     path: 'dashboard',
-    component: WorkflowPage,
+    loadChildren: () => import('./dashboard/dashboard.module').then(m => m.DashboardPageModule)
   },
   {
     path: 'overview',
-    canActivate: [OwnerWorkflowGuard],
-    loadChildren: () => import('./dashboard/dashboard.module').then(m => m.DashboardPageModule)
+    redirectTo: 'dashboard',
+    pathMatch: 'full',
   },
   {
     path: 'pending',
@@ -24,19 +23,21 @@ const routes: Routes = [
   },
   {
     path: 'subscription',
+    canActivate: [OwnerWorkflowGuard],
     component: SubscriptionPage,
   },
   {
     path: 'parking-setup',
+    canActivate: [OwnerWorkflowGuard],
     component: ParkingSetupPage,
   },
   {
     path: 'ai-setup',
+    canActivate: [OwnerWorkflowGuard],
     component: AiSetupPage,
   },
   {
     path: 'profile',
-    canActivate: [OwnerWorkflowGuard],
     loadChildren: () => import('./profile/profile.module').then(m => m.ProfilePageModule)
   },
   // Pour l'instant, commente les pages en construction

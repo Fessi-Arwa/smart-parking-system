@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { CanActivate, Router } from '@angular/router';
+import { CanActivate, Router, RouterStateSnapshot } from '@angular/router';
 
 import { OwnerWorkflowService } from '../services/owner-workflow.service';
 
@@ -12,12 +12,12 @@ export class OwnerWorkflowGuard implements CanActivate {
     private router: Router
   ) {}
 
-  async canActivate(): Promise<boolean> {
+  async canActivate(_: never, state: RouterStateSnapshot): Promise<boolean> {
     try {
-      const state = await this.ownerWorkflowService.refresh();
-      const nextRoute = this.ownerWorkflowService.getNextRoute(state);
+      const workflowState = await this.ownerWorkflowService.refresh();
+      const nextRoute = this.ownerWorkflowService.getNextRoute(workflowState);
 
-      if (nextRoute === '/owner/overview') {
+      if (state.url === nextRoute) {
         return true;
       }
 

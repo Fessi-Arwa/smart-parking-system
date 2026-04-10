@@ -1,8 +1,12 @@
 from datetime import datetime
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, send_file
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from .. import db
+from ..models.compte import Compte, RoleCompte
 from ..models.detection import DetectionIA, DetectionPlace, DetectionVehicule
+from ..models.parking import Parking
+from ..services.video_ai_service import ParkingVideoAIService
 
 
 ai_bp = Blueprint("ai", __name__)
@@ -36,6 +40,27 @@ def _parse_datetime(value):
     if value is None or isinstance(value, datetime):
         return value
     return datetime.fromisoformat(value)
+
+
+def _get_owner_user():
+    user_id = get_jwt_identity()
+    user = Compte.query.get(int(user_id))
+
+    if not user:
+        return None, (jsonify({"msg": "Utilisateur introuvable"}), 404)
+
+    if user.role != RoleCompte.owner:
+        return None, (jsonify({"msg": "Seuls les owners peuvent utiliser ce module IA"}), 403)
+
+    return user, None
+
+
+def _get_owner_parking(user, parking_id):
+    return Parking.query.filter_by(id_park=parking_id, owner_id=user.id_compte).first()
+
+
+def _get_video_service():
+    return ParkingVideoAIService(current_app.config["UPLOAD_FOLDER"], current_app._get_current_object())
 
 
 @ai_bp.route("/", methods=["GET"])
@@ -139,3 +164,81 @@ def delete_detection(detection_id):
     db.session.delete(detection)
     db.session.commit()
     return jsonify({"msg": "Detection deleted"})
+
+
+@ai_bp.route("/parkings/<int:parking_id>/video-batch/history", methods=["GET"])
+@jwt_required()
+def get_video_batch_history(parking_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    parking = _get_owner_parking(user, parking_id)
+    if not parking:
+        return jsonify({"msg": "Parking introuvable"}), 404
+
+    service = _get_video_service()
+    return jsonify(service.get_history(parking.id_park)), 200
+
+
+@ai_bp.route("/parkings/<int:parking_id>/video-batch/process", methods=["POST"])
+@jwt_required()
+def process_parking_videos(parking_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    parking = _get_owner_parking(user, parking_id)
+    if not parking:
+        return jsonify({"msg": "Parking introuvable"}), 404
+
+    files = [file for file in request.files.getlist("videos") if file and file.filename]
+    if not files:
+        return jsonify({"msg": "Ajoutez au moins une video a traiter"}), 400
+
+    service = _get_video_service()
+    try:
+        job = service.enqueue_batch_job(parking.id_park, files)
+    except ValueError as exc:
+        return jsonify({"msg": str(exc)}), 400
+
+    return jsonify(job), 202
+
+
+@ai_bp.route("/parkings/<int:parking_id>/video-batch/jobs/<job_id>", methods=["GET"])
+@jwt_required()
+def get_video_batch_job(parking_id, job_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    parking = _get_owner_parking(user, parking_id)
+    if not parking:
+        return jsonify({"msg": "Parking introuvable"}), 404
+
+    service = _get_video_service()
+    job = service.get_batch_job(parking.id_park, job_id)
+    if not job:
+        return jsonify({"msg": "Job batch introuvable"}), 404
+
+    return jsonify(job), 200
+
+
+@ai_bp.route("/parkings/<int:parking_id>/video-results/<result_id>/stream", methods=["GET"])
+def stream_video_result(parking_id, result_id):
+    service = _get_video_service()
+    output_path = service.resolve_output_path(parking_id, result_id)
+    if not output_path:
+        return jsonify({"msg": "Video resultat introuvable"}), 404
+
+    return send_file(output_path, mimetype="video/mp4")
+
+
+@ai_bp.route("/parkings/<int:parking_id>/video-results/<result_id>/download", methods=["GET"])
+def download_video_result(parking_id, result_id):
+    service = _get_video_service()
+    output_path = service.resolve_output_path(parking_id, result_id)
+    if not output_path:
+        return jsonify({"msg": "Video resultat introuvable"}), 404
+
+    return send_file(output_path, mimetype="video/mp4", as_attachment=True, download_name=output_path.name)

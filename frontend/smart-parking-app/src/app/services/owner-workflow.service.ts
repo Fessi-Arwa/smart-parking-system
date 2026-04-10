@@ -45,7 +45,15 @@ export class OwnerWorkflowService {
   }
 
   getNextRoute(state: OwnerWorkflowState = this.getSnapshot()): string {
-    if (state.ownerStatus !== 'accepte' || state.parkingStatus !== 'valide') {
+    if (state.ownerStatus !== 'accepte') {
+      return '/owner/pending';
+    }
+
+    if (!state.hasParking) {
+      return '/owner/profile';
+    }
+
+    if (state.parkingStatus !== 'valide') {
       return '/owner/pending';
     }
 

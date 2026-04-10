@@ -1,19 +1,61 @@
 <ion-content class="owner-step owner-step--subscription">
   <div class="owner-step__wrap">
-    <span class="owner-step__eyebrow">Etape 2</span>
-    <h1>Activer l abonnement de l application</h1>
-    <p>
-      Votre dossier a ete valide. Il ne reste plus qu a activer l abonnement applicatif pour
-      debloquer la configuration complete du parking.
-    </p>
+    <div class="owner-progress">
+      <article class="owner-progress__step owner-progress__step--done">
+        <span>1</span>
+        <strong>Validation</strong>
+      </article>
+      <article class="owner-progress__step owner-progress__step--active">
+        <span>2</span>
+        <strong>Abonnement</strong>
+      </article>
+      <article class="owner-progress__step">
+        <span>3</span>
+        <strong>Parking</strong>
+      </article>
+      <article class="owner-progress__step">
+        <span>4</span>
+        <strong>IA</strong>
+      </article>
+    </div>
 
-    <article class="plan-card">
+    <section class="owner-hero">
       <div>
-        <strong>Pack Smart Parking</strong>
-        <p>Dashboard owner, gestion des places, reservations, abonnement app et preparation IA.</p>
+        <span class="owner-step__eyebrow">Etape 2</span>
+        <h1>Activer l abonnement de l application</h1>
+        <p>
+          Votre dossier a ete valide. Il ne reste plus qu a activer l abonnement applicatif pour
+          debloquer la configuration complete du parking.
+        </p>
+        <p class="owner-step__active-parking" *ngIf="workflowState?.parkingId">
+          Parking actif : #{{ workflowState.parkingId }}
+        </p>
       </div>
-      <span>49 TND / mois</span>
-    </article>
+
+      <article class="owner-hero__highlight">
+        <span>Activation rapide</span>
+        <strong>1 pack pour debloquer le workflow owner</strong>
+      </article>
+    </section>
+
+    <section class="subscription-grid">
+      <article class="plan-card">
+        <div>
+          <strong>Pack Smart Parking</strong>
+          <p>Dashboard owner, gestion des places, reservations, abonnement app et preparation IA.</p>
+        </div>
+        <span>49 TND / mois</span>
+      </article>
+
+      <article class="feature-card">
+        <strong>Inclus dans cette etape</strong>
+        <ul>
+          <li>Deblocage du parametrage parking</li>
+          <li>Acces a la gestion des places</li>
+          <li>Preparation du module IA</li>
+        </ul>
+      </article>
+    </section>
 
     <div class="owner-step__actions">
       <button

@@ -3,7 +3,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from .. import db
 from ..models.compte import Compte, RoleCompte
-from ..models.parking import Parking
+from ..models.parking import Parking, StatutValidationParking
 from ..models.place import Place
 
 
@@ -21,6 +21,14 @@ def _can_manage_parking(user, parking):
     if not user or not parking:
         return False
     return user.role == RoleCompte.admin or parking.owner_id == user.id_compte
+
+
+def _ensure_parking_validated(parking):
+    if not parking:
+        return jsonify({"error": "Parking not found"}), 404
+    if parking.validation_status != StatutValidationParking.valide:
+        return jsonify({"error": "Le parking doit etre valide avant de manipuler ses places"}), 400
+    return None
 
 
 @place_bp.route("/", methods=["GET"])
@@ -58,6 +66,9 @@ def create_place():
     parking = Parking.query.get(data["parking_id"])
     if not parking:
         return jsonify({"error": "Parking not found"}), 404
+    validation_error = _ensure_parking_validated(parking)
+    if validation_error:
+        return validation_error
 
     user = _get_actor()
     if not user:
@@ -88,6 +99,9 @@ def update_place(place_id):
         return jsonify({"error": "Place not found"}), 404
 
     parking = Parking.query.get(place.parking_id)
+    validation_error = _ensure_parking_validated(parking)
+    if validation_error:
+        return validation_error
     user = _get_actor()
 
     if not user:
@@ -112,6 +126,9 @@ def delete_place(place_id):
         return jsonify({"error": "Place not found"}), 404
 
     parking = Parking.query.get(place.parking_id)
+    validation_error = _ensure_parking_validated(parking)
+    if validation_error:
+        return validation_error
     user = _get_actor()
 
     if not user:

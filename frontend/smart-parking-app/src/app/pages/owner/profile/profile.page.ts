@@ -12,8 +12,11 @@ import {
 import { PlaceDto, PlaceService } from '../../../services/place.service';
 import {
   ParkingAISource,
+  ParkingAiAuthError,
   ParkingAiSourceService,
 } from '../../../services/parking-ai-source.service';
+import { OwnerWorkflowState } from '../../../models/owner-workflow.model';
+import { OwnerWorkflowService } from '../../../services/owner-workflow.service';
 import { ToastService } from '../../../services/toast.service';
 import { HeaderNotificationItem } from '../../../shared/components/header/header.component';
 
@@ -34,6 +37,7 @@ export interface ParkingInfo {
   ville: string;
   prix_heure: number;
   statut: string;
+  validation_status?: string;
   totalSpaces: number;
   availableSpaces: number;
   activeSubscriptions: number;
@@ -76,6 +80,8 @@ export class ProfilePage implements OnInit {
   showDeleteConfirm = false;
   parkingToDelete: ParkingInfo | null = null;
   isSavingProfile = false;
+  isCreatingParking = false;
+  workflowState: OwnerWorkflowState | null = null;
   private previewErrorIds = new Set<number>();
 
   editProfileData = {
@@ -111,6 +117,7 @@ export class ProfilePage implements OnInit {
     private parkingService: ParkingService,
     private placeService: PlaceService,
     private parkingAiSourceService: ParkingAiSourceService,
+    private ownerWorkflowService: OwnerWorkflowService,
     private toastService: ToastService,
     private router: Router
   ) {}
@@ -128,6 +135,7 @@ export class ProfilePage implements OnInit {
     }
 
     await this.loadOwnerParkings();
+    this.workflowState = await this.ownerWorkflowService.refresh();
   }
 
   get ownerInitials(): string {
@@ -168,6 +176,21 @@ export class ProfilePage implements OnInit {
   }
 
   get notificationItems(): HeaderNotificationItem[] {
+    const parkingValidatedNotification =
+      this.workflowState?.ownerStatus === 'accepte' &&
+      this.workflowState?.parkingStatus === 'valide' &&
+      this.workflowState?.subscriptionStatus !== 'actif'
+        ? [
+            {
+              title: 'Parking valide par l admin',
+              description: 'Votre parking est valide. Activez maintenant l abonnement pour poursuivre le workflow.',
+              timestamp: this.workflowState?.parkingId ? `Parking #${this.workflowState.parkingId}` : 'Mise a jour recente',
+              icon: 'checkmark-circle-outline',
+              tone: 'success' as const,
+            },
+          ]
+        : [];
+
     const maintenanceNotifications = this.parkings
       .filter((parking) => parking.statut === 'maintenance')
       .map((parking) => ({
@@ -188,7 +211,7 @@ export class ProfilePage implements OnInit {
         tone: 'alert' as const,
       }));
 
-    return [...maintenanceNotifications, ...lowCapacityNotifications].slice(0, 5);
+    return [...parkingValidatedNotification, ...maintenanceNotifications, ...lowCapacityNotifications].slice(0, 5);
   }
 
   get notificationsCount(): number {
@@ -197,6 +220,69 @@ export class ProfilePage implements OnInit {
 
   get selectedParkingVideos(): ParkingAISource[] {
     return this.selectedParkingSources.filter((source) => source.source_type === 'video');
+  }
+
+  get selectedParkingImages(): ParkingAISource[] {
+    return this.selectedParkingSources.filter((source) => source.source_type === 'image');
+  }
+
+  get selectedParkingCameras(): ParkingAISource[] {
+    return this.selectedParkingSources.filter((source) => source.source_type === 'camera');
+  }
+
+  get canCreateParking(): boolean {
+    return this.workflowState?.ownerStatus === 'accepte';
+  }
+
+  get pendingReviewParking(): ParkingInfo | null {
+    return (
+      [...this.parkings]
+        .reverse()
+        .find((parking) => parking.validation_status === 'en_attente_validation') ?? null
+    );
+  }
+
+  get rejectedParking(): ParkingInfo | null {
+    return (
+      [...this.parkings]
+        .reverse()
+        .find((parking) => parking.validation_status === 'rejete') ?? null
+    );
+  }
+
+  get canSubmitNewParking(): boolean {
+    return !this.getNewParkingValidationMessage();
+  }
+
+  get newParkingWorkflowHint(): string {
+    if (!this.canCreateParking) {
+      return 'Le compte owner doit etre valide avant toute creation de parking.';
+    }
+
+    if (this.pendingReviewParking) {
+      return `Un dossier est deja en attente de validation admin pour ${this.pendingReviewParking.nom}. Vous pouvez ajouter un autre parking, mais il suivra le meme workflow.`;
+    }
+
+    return 'Apres creation, le parking passera en attente de validation admin, puis vous devrez activer l abonnement et terminer la configuration.';
+  }
+
+  get portfolioNextActionTitle(): string {
+    if (!this.canCreateParking) {
+      return 'Attendre la validation du compte owner';
+    }
+    if (this.pendingReviewParking) {
+      return `Suivre la validation admin de ${this.pendingReviewParking.nom}`;
+    }
+    if (this.rejectedParking) {
+      return `Corriger ou mettre a jour ${this.rejectedParking.nom}`;
+    }
+    if (this.workflowState?.parkingStatus === 'valide' && this.workflowState?.subscriptionStatus !== 'actif') {
+      return 'Activer l abonnement du parking valide';
+    }
+    if (this.canCreateParking && this.parkings.length === 0) {
+      return 'Creer le premier parking';
+    }
+    return 'Completer la configuration du portefeuille';
   }
 
   logout(): void {
@@ -256,7 +342,7 @@ export class ProfilePage implements OnInit {
       this.selectedParkingSources = await this.parkingAiSourceService.getSources(parking.id_park);
     } catch (error) {
       console.error('Erreur chargement sources IA parking', error);
-      this.toastService.show('Impossible de charger les videos de ce parking.', 'error');
+      this.toastService.show(this.getErrorMessage(error, 'Impossible de charger les videos de ce parking.'), 'error');
     }
   }
 
@@ -265,6 +351,10 @@ export class ProfilePage implements OnInit {
     this.selectedParkingSources = [];
     this.previewErrorIds.clear();
     this.showAddParking = false;
+  }
+
+  async openAiSetup(): Promise<void> {
+    await this.router.navigateByUrl('/owner/ai-setup');
   }
 
   startEditParking(): void {
@@ -279,16 +369,34 @@ export class ProfilePage implements OnInit {
       return;
     }
 
+    const validationMessage = this.getEditParkingValidationMessage();
+    if (validationMessage) {
+      this.toastService.show(validationMessage, 'error');
+      return;
+    }
+
     const payload: UpdateParkingPayload = {
-      nom: this.editParkingData.nom,
-      adresse: this.editParkingData.adresse,
+      nom: this.editParkingData.nom.trim(),
+      adresse: this.buildAddress(this.editParkingData.adresse, this.editParkingData.ville),
       capacite: this.editParkingData.totalSpaces,
       prix_heure: this.editParkingData.prix_heure,
     };
 
-    await firstValueFrom(this.parkingService.updateParking(this.selectedParking.id_park, payload));
-    await this.loadOwnerParkings(this.selectedParking.id_park);
-    this.isEditingParking = false;
+    try {
+      await firstValueFrom(this.parkingService.updateParking(this.selectedParking.id_park, payload));
+      await this.loadOwnerParkings(this.selectedParking.id_park);
+      this.workflowState = await this.ownerWorkflowService.refresh();
+      this.isEditingParking = false;
+      this.toastService.show(
+        'Parking mis a jour. Toute modification structurelle repasse en validation admin.',
+        'success'
+      );
+    } catch (error: any) {
+      this.toastService.show(
+        error?.error?.msg || error?.error?.error || 'Impossible de mettre a jour ce parking.',
+        'error'
+      );
+    }
   }
 
   cancelEditParking(): void {
@@ -319,6 +427,14 @@ export class ProfilePage implements OnInit {
   }
 
   openAddParking(): void {
+    if (!this.canCreateParking) {
+      this.toastService.show(
+        'Le compte owner doit etre accepte avant de creer un parking.',
+        'error'
+      );
+      return;
+    }
+
     this.showAddParking = true;
     this.selectedParking = null;
     this.newParkingData = {
@@ -333,21 +449,45 @@ export class ProfilePage implements OnInit {
   }
 
   async addParking(): Promise<void> {
-    if (!this.newParkingData.nom || !this.newParkingData.adresse) {
+    if (!this.canCreateParking) {
+      this.toastService.show(
+        'Le compte owner doit etre accepte avant de creer un parking.',
+        'error'
+      );
+      return;
+    }
+
+    const validationMessage = this.getNewParkingValidationMessage();
+    if (validationMessage) {
+      this.toastService.show(validationMessage, 'error');
       return;
     }
 
     const payload: CreateParkingPayload = {
-      nom: this.newParkingData.nom,
+      nom: this.newParkingData.nom!.trim(),
       adresse: this.buildAddress(this.newParkingData.adresse, this.newParkingData.ville),
       capacite: this.newParkingData.totalSpaces || 20,
       prix_heure: this.newParkingData.prix_heure || 2.5,
     };
 
-    await firstValueFrom(this.parkingService.createParking(payload));
-    this.showAddParking = false;
-    this.toastService.show('Parking ajoute. Il devra etre valide par l admin puis configure.', 'success');
-    await this.router.navigate(['/owner/dashboard']);
+    try {
+      this.isCreatingParking = true;
+      const response = await firstValueFrom(this.parkingService.createParking(payload));
+      this.showAddParking = false;
+      this.selectedParking = null;
+      await this.loadOwnerParkings(response.parking.id_park);
+      this.workflowState = await this.ownerWorkflowService.refresh();
+      this.toastService.show('Parking ajoute. Il devra etre valide par l admin puis configure.', 'success');
+      await this.router.navigateByUrl(this.ownerWorkflowService.getNextRoute(this.workflowState));
+    } catch (error: any) {
+      console.error('Erreur creation parking', error);
+      this.toastService.show(
+        error?.error?.msg || error?.error?.error || 'Impossible de creer ce parking.',
+        'error'
+      );
+    } finally {
+      this.isCreatingParking = false;
+    }
   }
 
   getStatusColor(status: string): string {
@@ -356,6 +496,40 @@ export class ProfilePage implements OnInit {
 
   getStatusLabel(status: string): string {
     return status === 'actif' ? 'Actif' : 'Maintenance';
+  }
+
+  getValidationStatusLabel(status?: string): string {
+    switch (status) {
+      case 'en_attente_validation':
+        return 'En attente';
+      case 'valide':
+        return 'Valide';
+      case 'rejete':
+        return 'Rejete';
+      case 'brouillon':
+        return 'Brouillon';
+      default:
+        return status || 'Inconnu';
+    }
+  }
+
+  getParkingNextStep(parking: ParkingInfo): string {
+    switch (parking.validation_status) {
+      case 'en_attente_validation':
+        return 'En attente de revue admin avant abonnement.';
+      case 'valide':
+        if (
+          this.workflowState?.parkingId === parking.id_park &&
+          this.workflowState?.subscriptionStatus !== 'actif'
+        ) {
+          return 'Parking valide. Passez a l abonnement.';
+        }
+        return 'Parking valide. La configuration peut continuer.';
+      case 'rejete':
+        return 'Le dossier a ete rejete. Mettez a jour les informations avant une nouvelle soumission.';
+      default:
+        return 'Completez les informations pour lancer le workflow.';
+    }
   }
 
   getParkingOccupancy(parking: ParkingInfo): number {
@@ -407,6 +581,7 @@ export class ProfilePage implements OnInit {
       ville: this.extractCity(parking.adresse),
       prix_heure: Number(parking.prix_heure),
       statut: parking.statut,
+      validation_status: parking.validation_status || 'brouillon',
       totalSpaces: parking.capacite,
       availableSpaces,
       activeSubscriptions: 0,
@@ -421,9 +596,56 @@ export class ProfilePage implements OnInit {
     return segments[segments.length - 1] || 'Ville';
   }
 
-  private buildAddress(address: string, city?: string): string {
-    const trimmedAddress = address.trim();
+  private buildAddress(address?: string, city?: string): string {
+    const trimmedAddress = (address || '').trim();
     const trimmedCity = (city || '').trim();
     return trimmedCity ? `${trimmedAddress}, ${trimmedCity}` : trimmedAddress;
+  }
+
+  private getNewParkingValidationMessage(): string | null {
+    const nom = this.newParkingData.nom?.trim() || '';
+    const adresse = this.newParkingData.adresse?.trim() || '';
+
+    if (!nom || !adresse) {
+      return 'Le nom et l adresse du parking sont obligatoires.';
+    }
+
+    if (!this.newParkingData.totalSpaces || this.newParkingData.totalSpaces <= 0) {
+      return 'Le parking doit contenir au moins une place.';
+    }
+
+    if (this.newParkingData.prix_heure == null || this.newParkingData.prix_heure < 0) {
+      return 'Le prix horaire doit etre positif ou nul.';
+    }
+
+    return null;
+  }
+
+  private getEditParkingValidationMessage(): string | null {
+    const nom = this.editParkingData.nom?.trim() || '';
+    const adresse = this.editParkingData.adresse?.trim() || '';
+
+    if (!nom || !adresse) {
+      return 'Le nom et l adresse du parking sont obligatoires.';
+    }
+
+    if (!this.editParkingData.totalSpaces || this.editParkingData.totalSpaces <= 0) {
+      return 'Le parking doit contenir au moins une place.';
+    }
+
+    if (this.editParkingData.prix_heure == null || this.editParkingData.prix_heure < 0) {
+      return 'Le prix horaire doit etre positif ou nul.';
+    }
+
+    return null;
+  }
+
+  private getErrorMessage(error: unknown, fallback: string): string {
+    if (error instanceof ParkingAiAuthError) {
+      return error.message;
+    }
+
+    const payload = (error as { error?: { msg?: string; error?: string } })?.error;
+    return payload?.msg || payload?.error || fallback;
   }
 }

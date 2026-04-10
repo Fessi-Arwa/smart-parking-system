@@ -1,11 +1,48 @@
 <ion-content class="owner-step owner-step--setup">
   <div class="owner-step__wrap">
-    <span class="owner-step__eyebrow">Etape 3</span>
-    <h1>Finaliser la configuration du parking</h1>
-    <p>
-      Le premier parking a deja ete cree pendant l onboarding. Cette etape sert a verifier et
-      ajuster ses informations avant la structuration avancee et l integration du module IA.
-    </p>
+    <div class="owner-progress">
+      <article class="owner-progress__step owner-progress__step--done">
+        <span>1</span>
+        <strong>Validation</strong>
+      </article>
+      <article class="owner-progress__step owner-progress__step--done">
+        <span>2</span>
+        <strong>Abonnement</strong>
+      </article>
+      <article class="owner-progress__step owner-progress__step--active">
+        <span>3</span>
+        <strong>Parking</strong>
+      </article>
+      <article class="owner-progress__step">
+        <span>4</span>
+        <strong>IA</strong>
+      </article>
+    </div>
+
+    <section class="owner-hero">
+      <div>
+        <span class="owner-step__eyebrow">Etape 3</span>
+        <h1>Finaliser la configuration du parking</h1>
+        <p>
+          Le premier parking a deja ete cree pendant l onboarding. Cette etape sert a verifier et
+          ajuster ses informations avant la structuration avancee et l integration du module IA.
+        </p>
+        <p class="owner-step__active-parking" *ngIf="workflowState?.parkingId">
+          Parking actif : #{{ workflowState.parkingId }}
+        </p>
+      </div>
+
+      <div class="owner-hero__stats">
+        <article>
+          <span>Capacite cible</span>
+          <strong>{{ parkingDraft.capacite }}</strong>
+        </article>
+        <article>
+          <span>Places creees</span>
+          <strong>{{ places.length }}</strong>
+        </article>
+      </div>
+    </section>
 
     <section class="parking-panel parking-panel--loading" *ngIf="isLoadingParking">
       <p>Chargement du parking owner...</p>

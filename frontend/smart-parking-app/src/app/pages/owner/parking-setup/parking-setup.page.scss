@@ -4,9 +4,100 @@
 }
 
 .owner-step__wrap {
-  max-width: 760px;
+  max-width: 980px;
   margin: 0 auto;
   padding: 3rem 1.5rem 5rem;
+}
+
+.owner-progress {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.owner-progress__step {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(16, 42, 67, 0.08);
+  color: #64748b;
+}
+
+.owner-progress__step span {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.owner-progress__step strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.owner-progress__step--done,
+.owner-progress__step--active {
+  border-color: rgba(37, 99, 235, 0.18);
+}
+
+.owner-progress__step--done {
+  background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+  color: #1d4ed8;
+}
+
+.owner-progress__step--done span,
+.owner-progress__step--active span {
+  background: #2563eb;
+  color: #fff;
+}
+
+.owner-progress__step--active {
+  background: linear-gradient(135deg, #bfdbfe 0%, #dbeafe 100%);
+  color: #1d4ed8;
+}
+
+.owner-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.2rem;
+  align-items: flex-start;
+}
+
+.owner-hero__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 0.8rem;
+}
+
+.owner-hero__stats article {
+  padding: 1rem 1.1rem;
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+}
+
+.owner-hero__stats span {
+  display: block;
+  color: #486581;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.owner-hero__stats strong {
+  display: block;
+  margin-top: 0.35rem;
+  color: #102a43;
+  font-size: 1.35rem;
 }
 
 .owner-step__eyebrow {
@@ -31,6 +122,16 @@
   max-width: 44rem;
   color: #486581;
   line-height: 1.7;
+}
+
+.owner-step__active-parking {
+  margin-top: 0.85rem !important;
+  width: fit-content;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  font-weight: 700;
 }
 
 .parking-panel {
@@ -329,6 +430,7 @@
 }
 
 @media (max-width: 680px) {
+  .owner-progress,
   .parking-grid {
     grid-template-columns: 1fr;
   }
@@ -339,6 +441,15 @@
 
   .parking-panel__header {
     flex-direction: column;
+  }
+
+  .owner-hero {
+    flex-direction: column;
+  }
+
+  .owner-hero__stats {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
   }
 
   .places-summary {
