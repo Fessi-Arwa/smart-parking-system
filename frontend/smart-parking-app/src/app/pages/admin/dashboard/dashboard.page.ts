@@ -1,5 +1,4 @@
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
 
 import { AuthService } from '../../../services/auth.service';
 import {
@@ -16,6 +15,7 @@ import { ToastService } from '../../../services/toast.service';
   standalone: false,
 })
 export class AdminDashboardPage implements OnInit {
+  activeSection: 'users' | 'parkings' = 'users';
   stats = {
     totalUsers: 0,
     totalDrivers: 0,
@@ -38,7 +38,6 @@ export class AdminDashboardPage implements OnInit {
   parkingStatusFilter: 'all' | 'en_attente_validation' | 'valide' | 'rejete' = 'all';
 
   constructor(
-    private router: Router,
     private authService: AuthService,
     private adminWorkflowService: AdminWorkflowService,
     private toastService: ToastService
@@ -280,11 +279,36 @@ export class AdminDashboardPage implements OnInit {
     await this.loadDashboardData();
   }
 
+  setActiveSection(section: 'users' | 'parkings'): void {
+    this.activeSection = section;
+  }
+
+  onSectionTouchStart(event: TouchEvent): void {
+    this.touchStartX = event.changedTouches[0]?.clientX ?? null;
+  }
+
+  onSectionTouchEnd(event: TouchEvent): void {
+    if (this.touchStartX == null) {
+      return;
+    }
+
+    const endX = event.changedTouches[0]?.clientX ?? this.touchStartX;
+    const deltaX = endX - this.touchStartX;
+    this.touchStartX = null;
+
+    if (Math.abs(deltaX) < 50) {
+      return;
+    }
+
+    this.activeSection = deltaX < 0 ? 'parkings' : 'users';
+  }
+
   logout(): void {
     this.authService.logout();
     this.toastService.show('Deconnexion reussie', 'success');
-    this.router.navigate(['/pages/auth/signin']);
   }
+
+  private touchStartX: number | null = null;
 
   private async loadDashboardData(): Promise<void> {
     this.isLoading = true;

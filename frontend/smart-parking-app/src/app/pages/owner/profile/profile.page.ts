@@ -10,6 +10,10 @@ import {
   UpdateParkingPayload,
 } from '../../../services/parking.service';
 import { PlaceDto, PlaceService } from '../../../services/place.service';
+import {
+  ParkingAISource,
+  ParkingAiSourceService,
+} from '../../../services/parking-ai-source.service';
 import { ToastService } from '../../../services/toast.service';
 import { HeaderNotificationItem } from '../../../shared/components/header/header.component';
 
@@ -67,10 +71,12 @@ export class ProfilePage implements OnInit {
   isEditingProfile = false;
   showAddParking = false;
   selectedParking: ParkingInfo | null = null;
+  selectedParkingSources: ParkingAISource[] = [];
   isEditingParking = false;
   showDeleteConfirm = false;
   parkingToDelete: ParkingInfo | null = null;
   isSavingProfile = false;
+  private previewErrorIds = new Set<number>();
 
   editProfileData = {
     nom: '',
@@ -104,6 +110,7 @@ export class ProfilePage implements OnInit {
     private authService: AuthService,
     private parkingService: ParkingService,
     private placeService: PlaceService,
+    private parkingAiSourceService: ParkingAiSourceService,
     private toastService: ToastService,
     private router: Router
   ) {}
@@ -188,6 +195,10 @@ export class ProfilePage implements OnInit {
     return this.notificationItems.length;
   }
 
+  get selectedParkingVideos(): ParkingAISource[] {
+    return this.selectedParkingSources.filter((source) => source.source_type === 'video');
+  }
+
   logout(): void {
     this.authService.logout();
   }
@@ -235,13 +246,24 @@ export class ProfilePage implements OnInit {
     this.isEditingProfile = false;
   }
 
-  selectParking(parking: ParkingInfo): void {
+  async selectParking(parking: ParkingInfo): Promise<void> {
     this.selectedParking = parking;
+    this.selectedParkingSources = [];
+    this.previewErrorIds.clear();
     this.isEditingParking = false;
+
+    try {
+      this.selectedParkingSources = await this.parkingAiSourceService.getSources(parking.id_park);
+    } catch (error) {
+      console.error('Erreur chargement sources IA parking', error);
+      this.toastService.show('Impossible de charger les videos de ce parking.', 'error');
+    }
   }
 
   backToList(): void {
     this.selectedParking = null;
+    this.selectedParkingSources = [];
+    this.previewErrorIds.clear();
     this.showAddParking = false;
   }
 
@@ -346,6 +368,14 @@ export class ProfilePage implements OnInit {
 
   setParkingStatusFilter(status: 'all' | 'actif' | 'maintenance'): void {
     this.parkingStatusFilter = status;
+  }
+
+  showPreview(source: ParkingAISource): boolean {
+    return !!source.preview_url && !this.previewErrorIds.has(source.id_source);
+  }
+
+  markPreviewError(source: ParkingAISource): void {
+    this.previewErrorIds.add(source.id_source);
   }
 
   private async loadOwnerParkings(selectedParkingId?: number): Promise<void> {

@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from 'src/environments/environment';
 import { AuthService } from './auth.service';
 
 export interface PlaceDto {
@@ -32,7 +33,7 @@ export interface UpdatePlacePayload {
   providedIn: 'root',
 })
 export class PlaceService {
-  private apiUrl = 'http://localhost:5000/api/places';
+  private apiUrl = `${environment.apiBaseUrl}/places`;
 
   constructor(
     private http: HttpClient,
