@@ -35,7 +35,7 @@
       <div class="owner-hero__stats">
         <article>
           <span>Capacite cible</span>
-          <strong>{{ parkingDraft.capacite }}</strong>
+          <strong>{{ generatedCapacity || parkingDraft.capacite }}</strong>
         </article>
         <article>
           <span>Places creees</span>
@@ -83,69 +83,96 @@
     <section class="parking-panel" *ngIf="!isLoadingParking && parking">
       <div class="parking-panel__header">
         <div>
-          <h2>Gestion des places</h2>
-          <p>Ajoutez les places reelles du parking avant de passer a l etape IA.</p>
+          <h2>Structure du parking</h2>
+          <p>
+            Renseignez les etages, les zones et le nombre de places par zone. L application
+            generera ensuite automatiquement le plan et toutes les places du parking.
+          </p>
         </div>
         <span class="parking-panel__tag">
-          {{ places.length }} / {{ parkingDraft.capacite }} places
+          {{ generatedCapacity }} places prevues
         </span>
       </div>
 
       <div class="places-summary">
         <div class="places-summary__item">
-          <strong>{{ places.length }}</strong>
-          <span>Places configurees</span>
+          <strong>{{ structureDraft.length }}</strong>
+          <span>Etages</span>
         </div>
         <div class="places-summary__item">
-          <strong>{{ remainingPlaces }}</strong>
-          <span>Places restantes</span>
+          <strong>{{ generatedCapacity }}</strong>
+          <span>Places generees</span>
         </div>
       </div>
 
-      <div class="zone-chips" *ngIf="zoneSummaries.length > 0">
-        <span class="zone-chip" *ngFor="let summary of zoneSummaries">
-          Zone {{ summary.zone }}: {{ summary.count }} / {{ parkingDraft.capacite }}
+      <div class="parking-structure-builder">
+        <article class="floor-card" *ngFor="let floor of structureDraft; let floorIndex = index">
+          <div class="floor-card__header">
+            <label class="field">
+              <span>Etage {{ floorIndex + 1 }}</span>
+              <input type="text" [(ngModel)]="floor.label" [name]="'floorLabel' + floor.id" placeholder="RDC, Etage 1, Sous-sol..." />
+            </label>
+            <button class="floor-card__remove" type="button" (click)="removeFloor(floor.id)">Supprimer l etage</button>
+          </div>
+
+          <div class="zone-builder">
+            <article class="zone-builder__card" *ngFor="let zone of floor.zones; let zoneIndex = index">
+              <label class="field">
+                <span>Zone {{ zoneIndex + 1 }}</span>
+                <input type="text" [(ngModel)]="zone.name" [name]="'zoneName' + zone.id" placeholder="A, B, VIP, Nord..." />
+              </label>
+
+              <label class="field">
+                <span>Nombre de places</span>
+                <input type="number" min="1" [(ngModel)]="zone.placeCount" [name]="'zoneCount' + zone.id" />
+              </label>
+
+              <button class="zone-builder__remove" type="button" (click)="removeZone(floor.id, zone.id)">
+                Supprimer la zone
+              </button>
+            </article>
+          </div>
+
+          <button class="owner-step__secondary" type="button" (click)="addZone(floor.id)">
+            Ajouter une zone a cet etage
+          </button>
+        </article>
+
+        <button class="owner-step__secondary" type="button" (click)="addFloor()">
+          Ajouter un nouvel etage
+        </button>
+      </div>
+
+      <div class="zone-chips" *ngIf="structurePreviewZones.length > 0">
+        <span class="zone-chip" *ngFor="let preview of structurePreviewZones">
+          {{ preview.floorLabel }} - {{ preview.zoneName }} : {{ preview.spots.length }} place(s)
         </span>
       </div>
 
-      <div class="parking-grid parking-grid--places">
-        <label class="field">
-          <span>Numero de place</span>
-          <input type="number" min="1" [(ngModel)]="placeDraft.num_place" name="placeNumber" />
-        </label>
-
-        <label class="field">
-          <span>Zone</span>
-          <input type="text" [(ngModel)]="placeDraft.zone" name="placeZone" placeholder="A, VIP, Nord..." />
-        </label>
-
-        <label class="field">
-          <span>Etage</span>
-          <input type="text" [(ngModel)]="placeDraft.etage" name="placeFloor" placeholder="RDC, 1, -1..." />
-        </label>
-
-        <div class="field field--actions">
-          <span>Action</span>
-          <button
-            class="owner-step__secondary"
-            type="button"
-            (click)="addPlace()"
-            [disabled]="isAddingPlace || isLoadingPlaces"
-          >
-            {{ isAddingPlace ? 'Ajout...' : 'Ajouter la place' }}
-          </button>
-        </div>
-      </div>
-
-      <div class="layout-shell" *ngIf="!isLoadingPlaces && places.length > 0">
+      <div class="layout-shell" *ngIf="structurePreviewZones.length > 0">
         <div class="layout-toolbar">
-          <button class="layout-toolbar__button" type="button">
+          <button class="layout-toolbar__button" type="button" (click)="generateParkingStructure()" [disabled]="isGeneratingStructure">
             <ion-icon name="create-outline"></ion-icon>
-            Disposition actuelle
+            {{ isGeneratingStructure ? 'Generation...' : 'Generer la structure du parking' }}
           </button>
         </div>
 
-        <div class="layout-preview">
+        <div class="structure-preview-grid">
+          <article class="preview-zone-card" *ngFor="let preview of structurePreviewZones">
+            <div class="preview-zone-card__header">
+              <strong>{{ preview.zoneName }}</strong>
+              <span>{{ preview.floorLabel }}</span>
+            </div>
+
+            <div class="preview-zone-card__spots">
+              <span class="preview-spot" *ngFor="let spot of preview.spots">
+                {{ spot.label }}
+              </span>
+            </div>
+          </article>
+        </div>
+
+        <div class="layout-preview" *ngIf="!isLoadingPlaces && places.length > 0">
           <div class="layout-column">
             <article class="slot-card" *ngFor="let place of leftColumnPlaces">
               <button class="slot-card__delete" type="button" (click)="removePlace(place.id_place)">
@@ -184,7 +211,7 @@
       </div>
 
       <div class="parking-panel--empty" *ngIf="!isLoadingPlaces && places.length === 0">
-        <p>Aucune place configuree pour le moment.</p>
+        <p>Aucune place n a encore ete generee pour ce parking.</p>
       </div>
     </section>
 

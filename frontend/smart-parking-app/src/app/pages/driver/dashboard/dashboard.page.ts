@@ -76,6 +76,14 @@ interface SubscriptionItem {
   tarif: number;
 }
 
+interface ParkingStructureSection {
+  etage: string;
+  zones: Array<{
+    name: string;
+    spots: ParkingSpot[];
+  }>;
+}
+
 @Component({
   selector: 'app-dashboard',
   templateUrl: './dashboard.page.html',
@@ -352,6 +360,33 @@ export class DashboardPage implements OnInit, OnDestroy {
     return this.parkings.find((parking) => parking.id_park === parkingId);
   }
 
+  get selectedReservationStructure(): ParkingStructureSection[] {
+    const parkingId = Number(this.reservationForm.get('parking_id')?.value);
+    const parkingSpots = this.spots
+      .filter((spot) => spot.parking_id === parkingId)
+      .sort((a, b) => a.num_place - b.num_place);
+
+    const floors = new Map<string, Map<string, ParkingSpot[]>>();
+
+    parkingSpots.forEach((spot) => {
+      const floorKey = (spot.etage || 'RDC').trim() || 'RDC';
+      const zoneKey = (spot.zone || 'A').trim() || 'A';
+      const floorZones = floors.get(floorKey) ?? new Map<string, ParkingSpot[]>();
+      const zoneSpots = floorZones.get(zoneKey) ?? [];
+      zoneSpots.push(spot);
+      floorZones.set(zoneKey, zoneSpots);
+      floors.set(floorKey, floorZones);
+    });
+
+    return Array.from(floors.entries()).map(([etage, zones]) => ({
+      etage,
+      zones: Array.from(zones.entries()).map(([name, spots]) => ({
+        name,
+        spots,
+      })),
+    }));
+  }
+
   get reservationDurationHours(): number | null {
     const startValue = this.reservationForm.get('date_debut')?.value;
     const endValue = this.reservationForm.get('date_fin')?.value;
@@ -590,6 +625,33 @@ export class DashboardPage implements OnInit, OnDestroy {
     return this.spots.filter((spot) => spot.parking_id === parkingId && this.isSpotAvailable(spot.etat));
   }
 
+  get selectedSubscriptionStructure(): ParkingStructureSection[] {
+    const parkingId = Number(this.subscriptionForm.get('parking_id')?.value);
+    const parkingSpots = this.spots
+      .filter((spot) => spot.parking_id === parkingId)
+      .sort((a, b) => a.num_place - b.num_place);
+
+    const floors = new Map<string, Map<string, ParkingSpot[]>>();
+
+    parkingSpots.forEach((spot) => {
+      const floorKey = (spot.etage || 'RDC').trim() || 'RDC';
+      const zoneKey = (spot.zone || 'A').trim() || 'A';
+      const floorZones = floors.get(floorKey) ?? new Map<string, ParkingSpot[]>();
+      const zoneSpots = floorZones.get(zoneKey) ?? [];
+      zoneSpots.push(spot);
+      floorZones.set(zoneKey, zoneSpots);
+      floors.set(floorKey, floorZones);
+    });
+
+    return Array.from(floors.entries()).map(([etage, zones]) => ({
+      etage,
+      zones: Array.from(zones.entries()).map(([name, spots]) => ({
+        name,
+        spots,
+      })),
+    }));
+  }
+
   openReservation(parking?: ParkingCard): void {
     this.selectedParking = parking ?? null;
     const preferredParkingId = parking?.id_park ?? this.parkings[0]?.id_park ?? '';
@@ -598,7 +660,7 @@ export class DashboardPage implements OnInit, OnDestroy {
     const defaultVehicleId = this.defaultVehicle?.id ?? '';
 
     const availableSpot = this.spots.find(
-      (spot) => spot.parking_id === preferredParkingId && this.isSpotAvailable(spot.etat)
+      (spot) => spot.parking_id === Number(targetParkingId) && this.isSpotAvailable(spot.etat)
     );
 
 
@@ -636,6 +698,23 @@ export class DashboardPage implements OnInit, OnDestroy {
     this.reservationForm.patchValue({
       place_id: firstSpot?.id_place ?? '',
     });
+    this.selectedParking =
+      this.parkings.find((parking) => parking.id_park === Number(this.reservationForm.get('parking_id')?.value)) ??
+      null;
+  }
+
+  selectReservationSpot(spot: ParkingSpot): void {
+    if (!this.isSpotAvailable(spot.etat)) {
+      return;
+    }
+
+    this.reservationForm.patchValue({
+      place_id: spot.id_place,
+    });
+  }
+
+  isReservationSpotSelected(spotId: number): boolean {
+    return Number(this.reservationForm.get('place_id')?.value) === spotId;
   }
 
   private hasAvailableSpot(parkingId: number | string | undefined): boolean {
@@ -872,6 +951,20 @@ export class DashboardPage implements OnInit, OnDestroy {
     });
   }
 
+  selectSubscriptionSpot(spot: ParkingSpot): void {
+    if (!this.isSpotAvailable(spot.etat)) {
+      return;
+    }
+
+    this.subscriptionForm.patchValue({
+      place_id: spot.id_place,
+    });
+  }
+
+  isSubscriptionSpotSelected(spotId: number): boolean {
+    return Number(this.subscriptionForm.get('place_id')?.value) === spotId;
+  }
+
   async submitSubscription(): Promise<void> {
     if (this.subscriptionForm.invalid) {
       this.subscriptionForm.markAllAsTouched();
@@ -911,18 +1004,7 @@ export class DashboardPage implements OnInit, OnDestroy {
       };
 
       await firstValueFrom(this.subscriptionService.createPlaceSubscription(payload));
-
-      this.spots = this.spots.map((item) =>
-        item.id_place === spot.id_place
-          ? { ...item, etat: 'reservee' }
-          : item
-      );
-      this.parkings = this.parkings.map((item) =>
-        item.id_park === parking.id_park
-          ? { ...item, availablePlaces: Math.max(item.availablePlaces - 1, 0) }
-          : item
-      );
-
+      await this.loadParkingsAndPlaces();
       await this.loadSubscriptions();
       this.toastService.show('Abonnement cree avec succes', 'success');
       this.closeSubscriptionModal();
@@ -1009,6 +1091,16 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   buildSpotLabel(spot: ParkingSpot): string {
     return `Place ${spot.zone}-${spot.num_place} • Etage ${spot.etage}`;
+  }
+
+  getSpotStatusLabel(status: ParkingSpot['etat']): string {
+    if (status === 'libre') {
+      return 'Libre';
+    }
+    if (status === 'reservee') {
+      return 'Reservee';
+    }
+    return 'Occupee';
   }
 
   private formatNotificationTimestamp(value: string): string {

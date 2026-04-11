@@ -9,6 +9,7 @@ from ..models.abonnement_place import AbonnementPlace
 from ..models.compte import Compte, RoleCompte
 from ..models.parking import Parking
 from ..models.place import Place
+from ..models.place import StatutPlace
 
 
 abonnement_bp = Blueprint("abonnement", __name__)
@@ -185,6 +186,17 @@ def create_abonnement_place():
             {"error": "type, date_debut, date_fin, tarif and place_id are required"}
         ), 400
 
+    place = Place.query.get(data["place_id"])
+    if not place:
+        return jsonify({"error": "Place introuvable"}), 404
+
+    if place.etat != StatutPlace.libre:
+        return jsonify({"error": "Cette place n est plus disponible pour un abonnement"}), 400
+
+    existing_link = AbonnementPlace.query.filter_by(place_id=place.id_place).first()
+    if existing_link:
+        return jsonify({"error": "Cette place a deja un abonnement"}), 400
+
     abonnement = _build_abonnement(data)
     db.session.add(abonnement)
     db.session.flush()
@@ -195,6 +207,7 @@ def create_abonnement_place():
         place_id=data["place_id"],
     )
     db.session.add(abonnement_place)
+    place.etat = StatutPlace.reservee
     db.session.commit()
 
     return jsonify(_abonnement_to_dict(abonnement)), 201
