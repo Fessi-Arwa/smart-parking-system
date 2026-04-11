@@ -29,4 +29,63 @@ export class PendingPage implements OnInit {
       await this.router.navigateByUrl(route);
     }
   }
+
+  get waitingOnOwnerApproval(): boolean {
+    return this.workflowState?.ownerStatus !== 'accepte';
+  }
+
+  get waitingOnParkingApproval(): boolean {
+    return Boolean(
+      this.workflowState?.ownerStatus === 'accepte' &&
+      this.workflowState?.hasParking &&
+      this.workflowState?.parkingStatus !== 'valide'
+    );
+  }
+
+  get waitingOnParkingCreation(): boolean {
+    return Boolean(this.workflowState?.ownerStatus === 'accepte' && !this.workflowState?.hasParking);
+  }
+
+  get pendingTitle(): string {
+    if (this.waitingOnOwnerApproval) {
+      return 'Validation du compte owner en attente';
+    }
+
+    if (this.waitingOnParkingCreation) {
+      return 'Creation du premier parking requise';
+    }
+
+    if (this.waitingOnParkingApproval) {
+      return 'Validation du parking en attente';
+    }
+
+    return 'Validation administrative en attente';
+  }
+
+  get pendingDescription(): string {
+    if (this.waitingOnOwnerApproval) {
+      return "Votre compte owner a bien ete cree. L admin doit d abord valider votre profil avant que vous puissiez enregistrer un parking.";
+    }
+
+    if (this.waitingOnParkingCreation) {
+      return "Votre compte owner est accepte. Vous pouvez maintenant creer votre premier parking depuis votre profil owner.";
+    }
+
+    if (this.waitingOnParkingApproval) {
+      const parkingSuffix = this.workflowState?.parkingId
+        ? ` Le parking concerne est le #${this.workflowState.parkingId}.`
+        : '';
+      return `Votre compte owner est accepte. Le parking cree est maintenant en attente de validation administrative avant le deblocage de l abonnement applicatif.${parkingSuffix}`;
+    }
+
+    return "Le dossier owner est encore en cours de verification administrative.";
+  }
+
+  get pendingParkingLabel(): string | null {
+    if (!this.waitingOnParkingApproval || !this.workflowState?.parkingId) {
+      return null;
+    }
+
+    return `Parking #${this.workflowState.parkingId}`;
+  }
 }

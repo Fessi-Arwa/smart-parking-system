@@ -33,6 +33,7 @@ export interface OwnerParking {
   totalSpaces: number;
   availableSpaces: number;
   status: 'active' | 'maintenance';
+  validationStatus: string;
   image: string;
 }
 
@@ -116,6 +117,7 @@ export class DashboardPage implements OnInit {
   selectedPeriod: DashboardPeriod = '7d';
   selectedAiParkingId: number | null = null;
   private previewErrorIds = new Set<number>();
+  private analysisVideoErrorIds = new Set<number>();
 
   constructor(
     private authService: AuthService,
@@ -376,6 +378,34 @@ export class DashboardPage implements OnInit {
     };
   }
 
+  get dashboardParkingStatusLabel(): string | null {
+    if (!this.workflowState?.parkingId) {
+      return null;
+    }
+
+    const parking = this.parkings.find((item) => item.id === this.workflowState?.parkingId);
+    if (!parking) {
+      return `Parking #${this.workflowState.parkingId}`;
+    }
+
+    const statusMap: Record<string, string> = {
+      brouillon: 'Brouillon',
+      en_attente_validation: 'En attente de validation',
+      valide: 'Valide',
+      rejete: 'Rejete',
+    };
+    const label = statusMap[parking.validationStatus] || parking.validationStatus;
+    return `${parking.name} • ${label}`;
+  }
+
+  get showDashboardPendingParkingBanner(): boolean {
+    return Boolean(
+      this.workflowState?.hasParking &&
+      this.workflowState?.parkingStatus &&
+      this.workflowState.parkingStatus !== 'valide'
+    );
+  }
+
   get aiSummary(): string {
     const images = this.aiSources.filter((source) => source.source_type === 'image').length;
     const videos = this.aiSources.filter((source) => source.source_type === 'video').length;
@@ -525,6 +555,21 @@ export class DashboardPage implements OnInit {
   }
 
   get notificationItems(): HeaderNotificationItem[] {
+    const parkingValidatedNotification =
+      this.workflowState?.ownerStatus === 'accepte' &&
+      this.workflowState?.parkingStatus === 'valide' &&
+      this.workflowState?.subscriptionStatus !== 'actif'
+        ? [
+            {
+              title: 'Parking valide par l admin',
+              description: 'Le parking est valide. Terminez maintenant l abonnement pour debloquer la suite.',
+              timestamp: this.workflowState?.parkingId ? `Parking #${this.workflowState.parkingId}` : 'Mise a jour recente',
+              icon: 'checkmark-circle-outline',
+              tone: 'success' as const,
+            },
+          ]
+        : [];
+
     const workflowNotification =
       this.workflowState && this.workflowCompletion < 100
         ? [
@@ -583,6 +628,7 @@ export class DashboardPage implements OnInit {
         : [];
 
     return [
+      ...parkingValidatedNotification,
       ...workflowNotification,
       ...maintenanceNotifications,
       ...reservationNotifications,
@@ -616,6 +662,106 @@ export class DashboardPage implements OnInit {
 
   isCameraSource(source: ParkingAISource): boolean {
     return source.source_type === 'camera';
+  }
+
+  hasProcessedAnalysis(source: ParkingAISource): boolean {
+    return source.analysis?.status === 'done';
+  }
+
+  hasAnalysisError(source: ParkingAISource): boolean {
+    return source.analysis?.status === 'error';
+  }
+
+  getAnalysisSummary(source: ParkingAISource): string | null {
+    const analysis = source.analysis;
+    if (!analysis || analysis.status !== 'done') {
+      return null;
+    }
+
+    const parts = [
+      analysis.free !== undefined && analysis.free !== null ? `${analysis.free} free` : null,
+      analysis.occupied !== undefined && analysis.occupied !== null ? `${analysis.occupied} occupied` : null,
+      analysis.total !== undefined && analysis.total !== null ? `${analysis.total} total` : null,
+    ].filter((value): value is string => Boolean(value));
+
+    return parts.length > 0 ? parts.join(' | ') : 'Analyse terminee';
+  }
+
+  getAnalysisMeta(source: ParkingAISource): string | null {
+    const analysis = source.analysis;
+    if (!analysis || analysis.status !== 'done') {
+      return null;
+    }
+
+    const parts = [
+      analysis.processed_frames ? `${analysis.processed_frames} frames` : null,
+      analysis.fps ? `${analysis.fps} FPS` : null,
+      analysis.resolution || null,
+    ].filter((value): value is string => Boolean(value));
+
+    return parts.length > 0 ? parts.join(' | ') : null;
+  }
+
+  getSyncMeta(source: ParkingAISource): string | null {
+    const analysis = source.analysis;
+    if (!analysis || analysis.status !== 'done') {
+      return null;
+    }
+
+    const parts = [
+      analysis.sync_mode ? `sync: ${analysis.sync_mode}` : null,
+      analysis.synced_places !== undefined && analysis.synced_places !== null
+        ? `${analysis.synced_places} place(s) mise(s) a jour`
+        : null,
+    ].filter((value): value is string => Boolean(value));
+
+    return parts.length > 0 ? parts.join(' | ') : null;
+  }
+
+  getSyncWarning(source: ParkingAISource): string | null {
+    return source.analysis?.sync_warning || null;
+  }
+
+  getAnalysisOutputUrl(source: ParkingAISource): string | null {
+    return source.analysis?.output_url || null;
+  }
+
+  getAnalysisPreviewUrl(source: ParkingAISource): string | null {
+    return source.analysis?.output_preview_url || null;
+  }
+
+  getAnalysisError(source: ParkingAISource): string | null {
+    return source.analysis?.error || null;
+  }
+
+  showAnalysisVideo(source: ParkingAISource): boolean {
+    return this.isVideoSource(source) && !!this.getAnalysisOutputUrl(source) && !this.analysisVideoErrorIds.has(source.id_source);
+  }
+
+  markAnalysisVideoError(source: ParkingAISource): void {
+    this.analysisVideoErrorIds.add(source.id_source);
+  }
+
+  showAnalysisVideoFallback(source: ParkingAISource): boolean {
+    return this.isVideoSource(source) && !!this.getAnalysisOutputUrl(source) && !this.showAnalysisVideo(source);
+  }
+
+  getSlotDebugRows(source: ParkingAISource): string[] {
+    const rows = source.analysis?.slot_debug || [];
+    return rows.map((item) => {
+      const parts = [
+        `S${item.slot_index}`,
+        item.place_id ? `P${item.place_id}` : null,
+        item.label,
+        item.average_confidence !== undefined && item.average_confidence !== null
+          ? `${Math.round(item.average_confidence * 100)}%`
+          : null,
+        item.free_votes !== undefined && item.busy_votes !== undefined
+          ? `F${item.free_votes}/B${item.busy_votes}`
+          : null,
+      ].filter((value): value is string => Boolean(value));
+      return parts.join(' • ');
+    });
   }
 
   private async loadOwnerData(): Promise<void> {
@@ -678,6 +824,7 @@ export class DashboardPage implements OnInit {
       totalSpaces: parking.capacite,
       availableSpaces,
       status: parking.statut === 'actif' ? 'active' : 'maintenance',
+      validationStatus: parking.validation_status || 'brouillon',
       image: `assets/parking${(index % 3) + 1}.jpg`,
     };
   }

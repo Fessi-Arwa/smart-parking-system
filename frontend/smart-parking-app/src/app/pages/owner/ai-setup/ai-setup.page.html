@@ -1,11 +1,48 @@
 <ion-content class="owner-step owner-step--ai">
   <div class="owner-step__wrap">
-    <span class="owner-step__eyebrow">Etape 4</span>
-    <h1>Configurer les sources du module IA</h1>
-    <p>
-      Ajoutez maintenant les medias et flux de surveillance que le modele IA utilisera pour
-      detecter les vehicules, estimer l occupation et assister la configuration finale du parking.
-    </p>
+    <div class="owner-progress">
+      <article class="owner-progress__step owner-progress__step--done">
+        <span>1</span>
+        <strong>Validation</strong>
+      </article>
+      <article class="owner-progress__step owner-progress__step--done">
+        <span>2</span>
+        <strong>Abonnement</strong>
+      </article>
+      <article class="owner-progress__step owner-progress__step--done">
+        <span>3</span>
+        <strong>Parking</strong>
+      </article>
+      <article class="owner-progress__step owner-progress__step--active">
+        <span>4</span>
+        <strong>IA</strong>
+      </article>
+    </div>
+
+    <section class="owner-hero">
+      <div>
+        <span class="owner-step__eyebrow">Etape 4</span>
+        <h1>Configurer les sources du module IA</h1>
+        <p>
+          Ajoutez maintenant les medias et flux de surveillance que le modele IA utilisera pour
+          detecter les vehicules, estimer l occupation et assister la configuration finale du parking.
+        </p>
+        <p class="owner-step__active-parking" *ngIf="workflowState?.parkingId">
+          Parking actif : #{{ workflowState.parkingId }}
+        </p>
+      </div>
+
+      <div class="owner-hero__stats">
+        <article>
+          <span>Sources IA</span>
+          <strong>{{ aiSources.length }}</strong>
+        </article>
+        <article>
+          <span>Videos IA</span>
+          <strong>{{ videoSourcesCount }}</strong>
+        </article>
+      </div>
+    </section>
 
     <div class="ai-grid">
       <article class="ai-grid__item" *ngFor="let item of aiTasks">
@@ -24,15 +61,15 @@
 
       <div class="ai-actions-grid">
         <label class="ai-upload-card">
-          <input type="file" accept="image/*" (change)="onImageSelected($event)" hidden />
-          <strong>{{ isUploadingImage ? 'Upload image...' : 'Ajouter une image' }}</strong>
-          <span>JPEG, PNG ou autre vue statique du parking</span>
+          <input type="file" accept="image/*" multiple (change)="onImageSelected($event)" hidden />
+          <strong>{{ isUploadingImage ? 'Upload images...' : 'Ajouter des images' }}</strong>
+          <span>JPEG, PNG ou autres vues statiques du parking</span>
         </label>
 
         <label class="ai-upload-card">
-          <input type="file" accept="video/*" (change)="onVideoSelected($event)" hidden />
-          <strong>{{ isUploadingVideo ? 'Upload video...' : 'Ajouter une video' }}</strong>
-          <span>Courte sequence video pour detection et calibration</span>
+          <input type="file" accept="video/*" multiple (change)="onVideoSelected($event)" hidden />
+          <strong>{{ isUploadingVideo ? 'Upload videos...' : 'Ajouter des videos' }}</strong>
+          <span>Plusieurs sequences video pour detection et calibration</span>
         </label>
       </div>
 
@@ -58,7 +95,7 @@
       </div>
 
       <div class="sources-list" *ngIf="!isLoadingSources && aiSources.length > 0">
-        <article class="source-card" *ngFor="let source of aiSources">
+        <article class="source-card" *ngFor="let source of aiSources; trackBy: trackSource">
           <div class="source-card__preview" *ngIf="isImageSource(source) && source.preview_url">
             <img [src]="source.preview_url" [alt]="source.label || source.original_name || 'Image IA'" />
           </div>
@@ -76,6 +113,82 @@
             <strong>{{ source.label || source.original_name || 'Source IA' }}</strong>
             <p *ngIf="source.stream_url">{{ source.stream_url }}</p>
             <p *ngIf="!source.stream_url">{{ source.original_name || source.mime_type }}</p>
+
+            <div class="source-analysis source-analysis--success" *ngIf="hasProcessedAnalysis(source)">
+              <span class="source-analysis__badge">Analyse terminee</span>
+              <strong *ngIf="getAnalysisSummary(source)">{{ getAnalysisSummary(source) }}</strong>
+              <p *ngIf="getAnalysisMeta(source)">{{ getAnalysisMeta(source) }}</p>
+              <p *ngIf="getSyncMeta(source)">{{ getSyncMeta(source) }}</p>
+              <p class="source-analysis__warning" *ngIf="getSyncWarning(source)">{{ getSyncWarning(source) }}</p>
+              <div class="source-analysis__debug" *ngIf="getSlotDebugRows(source).length > 0">
+                <span *ngFor="let row of getSlotDebugRows(source)">{{ row }}</span>
+              </div>
+
+              <div class="source-analysis__preview" *ngIf="isImageAnalysis(source)">
+                <img [src]="getAnalysisOutputUrl(source)!" [alt]="'Analyse ' + (source.label || source.original_name || 'IA')" />
+              </div>
+
+              <div class="source-analysis__preview source-analysis__preview--video" *ngIf="showAnalysisVideo(source)">
+                <video
+                  [src]="getAnalysisOutputUrl(source)!"
+                  [poster]="getAnalysisPreviewUrl(source) || undefined"
+                  controls
+                  (error)="markAnalysisVideoError(source)"
+                  preload="metadata"></video>
+              </div>
+
+              <p class="source-analysis__warning" *ngIf="showAnalysisVideoFallback(source)">
+                La video annotee existe bien, mais ce navigateur ne peut pas la lire inline. Ouvrez le resultat dans un nouvel onglet.
+              </p>
+
+              <a
+                class="source-analysis__link"
+                *ngIf="getAnalysisOutputUrl(source)"
+                [href]="getAnalysisOutputUrl(source)!"
+                target="_blank"
+                rel="noopener">
+                Ouvrir le resultat annote
+              </a>
+            </div>
+
+            <div class="source-analysis source-analysis--pending" *ngIf="hasPendingVideoProcessing(source)">
+              <span class="source-analysis__badge source-analysis__badge--pending">Calibration requise</span>
+              <p>La video est bien enregistree. Calibrez les places sur une capture, puis relancez le traitement.</p>
+            </div>
+
+            <div class="source-analysis source-analysis--processing" *ngIf="isVideoProcessing(source)">
+              <span class="source-analysis__badge source-analysis__badge--processing">Traitement en cours</span>
+              <p>Le backend traite cette video en arriere-plan. Les resultats s afficheront automatiquement.</p>
+            </div>
+
+            <div class="source-analysis source-analysis--error" *ngIf="hasAnalysisError(source)">
+              <span class="source-analysis__badge source-analysis__badge--error">Analyse impossible</span>
+              <p>{{ getAnalysisError(source) }}</p>
+              <button
+                class="source-analysis__link"
+                type="button"
+                *ngIf="!isCameraSource(source) && source.calibration_preview_url"
+                (click)="openCalibration(source)">
+                Calibrer les places sur cette capture
+              </button>
+            </div>
+
+            <button
+              class="owner-step__secondary"
+              type="button"
+              *ngIf="!isCameraSource(source) && source.calibration_preview_url"
+              (click)="openCalibration(source)">
+              {{ isVideoSource(source) ? 'Calibrer a partir de la video' : 'Calibration des places' }}
+            </button>
+
+            <button
+              class="owner-step__secondary"
+              type="button"
+              *ngIf="!isCameraSource(source)"
+              (click)="reanalyzeSource(source)"
+              [disabled]="isReanalyzingSource(source.id_source)">
+              {{ isReanalyzingSource(source.id_source) ? 'Retraitement...' : 'Reanalyser' }}
+            </button>
           </div>
 
           <button class="source-card__delete" type="button" (click)="removeSource(source.id_source)">
@@ -87,6 +200,96 @@
       <div class="ai-panel__empty" *ngIf="!isLoadingSources && aiSources.length === 0">
         <p>Aucune source IA n a encore ete configuree.</p>
       </div>
+    </section>
+
+    <section class="ai-panel" *ngIf="calibrationSource">
+      <div class="ai-panel__header">
+        <div>
+          <h2>Calibration des places</h2>
+          <p>{{ calibrationSource.label || calibrationSource.original_name || 'Image source' }}</p>
+        </div>
+        <span class="ai-panel__tag">{{ calibrationSlots.length }} slot(s)</span>
+      </div>
+
+      <p class="small-note">
+        Dessinez un rectangle par place directement sur l image, associez chaque slot a une place, puis sauvegardez.
+      </p>
+
+      <div class="calibration-layout" *ngIf="!isLoadingCalibration; else loadingCalibration">
+        <div class="calibration-canvas-wrap">
+          <canvas
+            #calibrationCanvas
+            class="calibration-canvas"
+            (mousedown)="onCalibrationMouseDown($event)"
+            (mousemove)="onCalibrationMouseMove($event)"
+            (mouseup)="onCalibrationMouseUp($event)"
+            (mouseleave)="onCalibrationMouseUp($event)"></canvas>
+        </div>
+
+        <aside class="calibration-sidebar">
+          <div class="calibration-sidebar__meta">
+            <span *ngIf="calibrationUsesCustomSlots">Configuration parking personnalisee active</span>
+            <span *ngIf="!calibrationUsesCustomSlots">Aucune calibration parking enregistree pour le moment</span>
+          </div>
+
+          <p class="calibration-sidebar__warning" *ngIf="hasCalibrationDuplicates()">
+            Une meme place est selectionnee plusieurs fois. Corrige les doublons avant sauvegarde.
+          </p>
+          <p class="calibration-sidebar__warning" *ngIf="!hasCalibrationDuplicates() && hasUnassignedCalibrationSlots()">
+            Chaque slot doit etre associe a une place avant de lancer le retraitement.
+          </p>
+          <div class="calibration-sidebar__empty-places" *ngIf="!hasCalibrationPlaces()">
+            <strong>Aucune place disponible</strong>
+            <p>
+              Le parking actif #{{ workflowState.parkingId }} n a encore aucune place enregistree.
+              Ajoute d abord les places dans l etape Parking avant d affecter les slots.
+            </p>
+            <button class="owner-step__secondary" type="button" (click)="goToParkingSetup()">
+              Ouvrir l etape parking
+            </button>
+          </div>
+
+          <div class="calibration-slot-list" *ngIf="calibrationSlots.length > 0; else emptyCalibrationSlots">
+            <article class="calibration-slot" *ngFor="let slot of calibrationSlots; let i = index">
+              <strong>Slot {{ i + 1 }}</strong>
+              <span>x={{ slot.x }}, y={{ slot.y }}, w={{ slot.w }}, h={{ slot.h }}</span>
+              <label class="field">
+                <span>Associer a une place</span>
+                <select [ngModel]="slot.place_id" (ngModelChange)="updateCalibrationPlace(i, $event)" [disabled]="!hasCalibrationPlaces()">
+                  <option [ngValue]="0">Choisir une place</option>
+                  <option *ngFor="let place of calibrationPlaces" [ngValue]="place.id_place">
+                    Place {{ place.num_place }} | id {{ place.id_place }}
+                  </option>
+                </select>
+              </label>
+              <button class="source-card__delete" type="button" (click)="removeCalibrationSlot(i)">Supprimer</button>
+            </article>
+          </div>
+
+          <ng-template #emptyCalibrationSlots>
+            <div class="ai-panel__empty">
+              <p>Aucun slot dessine. Clique-glisse sur l image pour creer les rectangles.</p>
+            </div>
+          </ng-template>
+
+          <div class="owner-step__actions">
+            <button class="owner-step__secondary" type="button" (click)="closeCalibration()">Fermer</button>
+            <button
+              class="owner-step__primary"
+              type="button"
+              (click)="saveCalibration()"
+              [disabled]="isSavingCalibration || !hasCalibrationPlaces() || calibrationSlots.length === 0 || hasCalibrationDuplicates() || hasUnassignedCalibrationSlots()">
+              {{ isSavingCalibration ? 'Sauvegarde...' : 'Sauvegarder et retraiter' }}
+            </button>
+          </div>
+        </aside>
+      </div>
+
+      <ng-template #loadingCalibration>
+        <div class="ai-panel__empty">
+          <p>Chargement de la calibration...</p>
+        </div>
+      </ng-template>
     </section>
 
     <div class="owner-step__actions">

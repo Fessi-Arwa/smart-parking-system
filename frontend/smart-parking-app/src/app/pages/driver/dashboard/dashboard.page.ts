@@ -596,9 +596,11 @@ export class DashboardPage implements OnInit, OnDestroy {
     const fallbackParkingId = this.findFirstParkingWithAvailableSpot();
     const targetParkingId = this.hasAvailableSpot(preferredParkingId) ? preferredParkingId : fallbackParkingId;
     const defaultVehicleId = this.defaultVehicle?.id ?? '';
-    const availableSpot = targetParkingId
-      ? this.spots.find((spot) => spot.parking_id === targetParkingId && spot.etat === 'libre')
-      : undefined;
+
+    const availableSpot = this.spots.find(
+      (spot) => spot.parking_id === preferredParkingId && this.isSpotAvailable(spot.etat)
+    );
+
 
     this.reservationForm.reset({
       parking_id: targetParkingId ?? '',

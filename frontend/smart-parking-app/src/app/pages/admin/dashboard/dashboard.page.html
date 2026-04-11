@@ -37,8 +37,15 @@
 
       <div class="hero-action-card">
         <p class="hero-action-card__label">Action rapide</p>
-        <strong>Synchroniser les donnees</strong>
-        <p>Rafraichissez les utilisateurs et les parkings pour travailler sur des informations a jour.</p>
+        <strong>{{ nextAdminActionTitle }}</strong>
+        <p>{{ nextAdminActionDescription }}</p>
+        <div class="hero-action-card__meta">
+          <span>{{ pendingOwnerApprovalsCount }} owner(s) en attente</span>
+          <span>{{ pendingParkingReviews.length }} parking(s) a revoir</span>
+          <span *ngIf="blockedPendingParkingReviewsCount > 0">
+            {{ blockedPendingParkingReviewsCount }} dossier(s) bloques par le compte owner
+          </span>
+        </div>
         <button class="primary-btn" type="button" (click)="reloadData()">
           Actualiser
           <ion-icon name="refresh-outline"></ion-icon>
@@ -74,6 +81,18 @@
       <article class="stat-card stat-card--revenue">
         <div class="stat-card__top">
           <div class="stat-icon-wrapper">
+            <ion-icon name="card-outline" class="stat-icon"></ion-icon>
+          </div>
+          <span class="stat-badge stat-badge--warning">{{ stats.pendingSubscriptions }} en attente</span>
+        </div>
+        <div class="stat-value">{{ stats.activeSubscriptions }}</div>
+        <div class="stat-label">Abonnements parking</div>
+        <div class="stat-detail">Plans actifs geres par l admin</div>
+      </article>
+
+      <article class="stat-card stat-card--revenue">
+        <div class="stat-card__top">
+          <div class="stat-icon-wrapper">
             <ion-icon name="wallet-outline" class="stat-icon"></ion-icon>
           </div>
           <span class="stat-badge stat-badge--info">Cumule</span>
@@ -99,6 +118,13 @@
         (click)="setActiveSection('parkings')">
         Parkings
       </button>
+      <button
+        type="button"
+        class="section-switcher__tab"
+        [class.is-active]="activeSection === 'subscriptions'"
+        (click)="setActiveSection('subscriptions')">
+        Abonnements
+      </button>
     </section>
 
     <div
@@ -106,7 +132,8 @@
       (touchstart)="onSectionTouchStart($event)"
       (touchend)="onSectionTouchEnd($event)">
       <span *ngIf="activeSection === 'users'">Glissez vers la gauche ou cliquez sur Parkings</span>
-      <span *ngIf="activeSection === 'parkings'">Glissez vers la droite ou cliquez sur Utilisateurs</span>
+      <span *ngIf="activeSection === 'parkings'">Glissez pour naviguer entre parkings et abonnements</span>
+      <span *ngIf="activeSection === 'subscriptions'">Glissez vers la droite ou cliquez sur une autre section</span>
     </div>
 
     <section
@@ -228,6 +255,30 @@
         </div>
       </div>
 
+      <div class="review-queue" *ngIf="pendingParkingReviews.length > 0">
+        <div class="review-queue__header">
+          <div>
+            <p class="review-queue__kicker">File de revue</p>
+            <strong>{{ pendingParkingReviews.length }} dossier(s) parking en attente</strong>
+          </div>
+          <span class="review-queue__meta" *ngIf="blockedPendingParkingReviewsCount > 0">
+            {{ blockedPendingParkingReviewsCount }} bloque(s) par le compte owner
+          </span>
+        </div>
+
+        <div class="review-queue__list">
+          <article class="review-queue__item" *ngFor="let parking of pendingParkingReviews | slice:0:3">
+            <div>
+              <strong>{{ parking.nom }}</strong>
+              <p>{{ parking.owner_name || getParkingOwnerName(parking.owner_id) }}</p>
+            </div>
+            <span class="validation-badge" [class]="getOwnerStatusBadgeClass(parking.owner_status)">
+              {{ getParkingReviewStepLabel(parking) }}
+            </span>
+          </article>
+        </div>
+      </div>
+
       <div class="parkings-list">
         <article *ngFor="let parking of filteredParkings" class="parking-card">
           <div class="parking-header">
@@ -236,7 +287,7 @@
             </div>
             <div class="parking-title">
               <h3>{{ parking.nom }}</h3>
-              <p>{{ getParkingOwnerName(parking.owner_id) }}</p>
+              <p>{{ parking.owner_name || getParkingOwnerName(parking.owner_id) }}</p>
             </div>
             <div class="parking-price">{{ parking.prix_heure }} TND/h</div>
           </div>
@@ -247,6 +298,9 @@
           </div>
 
           <div class="parking-badges">
+            <span class="validation-badge" [class]="getOwnerStatusBadgeClass(parking.owner_status)">
+              Owner: {{ getOwnerStatusLabel(parking.owner_status) }}
+            </span>
             <span class="status-badge" [class]="parking.statut === 'actif' ? 'active' : 'inactive'">
               {{ parking.statut === 'actif' ? 'Actif' : 'Inactif' }}
             </span>
@@ -255,8 +309,23 @@
             </span>
           </div>
 
+          <div class="parking-address">
+            <ion-icon name="grid-outline"></ion-icon>
+            <span>{{ parking.capacite || 0 }} places • {{ getSetupStatusLabel(parking.setup_status) }} • {{ getAiSetupStatusLabel(parking.ai_setup_status) }}</span>
+          </div>
+
+          <div class="parking-address" *ngIf="getParkingApprovalHint(parking)">
+            <ion-icon name="information-circle-outline"></ion-icon>
+            <span>{{ getParkingApprovalHint(parking) }}</span>
+          </div>
+
+          <div class="parking-address parking-address--step">
+            <ion-icon name="trail-sign-outline"></ion-icon>
+            <span>{{ getParkingReviewStepLabel(parking) }}</span>
+          </div>
+
           <div class="parking-actions" *ngIf="parking.validation_status === 'en_attente_validation'">
-            <button class="action-btn approve" type="button" (click)="approveParking(parking.id_park)">
+            <button class="action-btn approve" type="button" (click)="approveParking(parking.id_park)" [disabled]="!canApproveParking(parking)">
               <ion-icon name="checkmark-outline"></ion-icon>
               Approuver
             </button>
@@ -280,6 +349,98 @@
         <div *ngIf="filteredParkings.length === 0" class="empty-state">
           <ion-icon name="business-outline"></ion-icon>
           <p>Aucun parking trouve</p>
+        </div>
+      </div>
+    </section>
+
+    <section
+      class="data-card"
+      *ngIf="activeSection === 'subscriptions'"
+      (touchstart)="onSectionTouchStart($event)"
+      (touchend)="onSectionTouchEnd($event)">
+      <div class="card-header">
+        <div class="header-left">
+          <div class="header-icon-wrapper">
+            <ion-icon name="card-outline" class="header-icon"></ion-icon>
+          </div>
+          <div>
+            <h2>Abonnements parking</h2>
+            <p>Validation des plans mensuels et annuels des proprietaires</p>
+          </div>
+        </div>
+        <button class="ghost-btn" type="button" (click)="reloadData()">
+          <ion-icon name="refresh-outline"></ion-icon>
+          Actualiser
+        </button>
+      </div>
+
+      <div class="filters">
+        <div class="search-box">
+          <ion-icon name="search-outline"></ion-icon>
+          <input
+            type="text"
+            [(ngModel)]="subscriptionSearchTerm"
+            placeholder="Rechercher un parking, un owner ou un abonnement" />
+        </div>
+        <div class="filter-chips">
+          <button class="filter-chip" [class.active]="subscriptionStatusFilter === 'all'" (click)="subscriptionStatusFilter = 'all'">Tous</button>
+          <button class="filter-chip" [class.active]="subscriptionStatusFilter === 'en_attente'" (click)="subscriptionStatusFilter = 'en_attente'">En attente</button>
+          <button class="filter-chip" [class.active]="subscriptionStatusFilter === 'actif'" (click)="subscriptionStatusFilter = 'actif'">Actifs</button>
+          <button class="filter-chip" [class.active]="subscriptionStatusFilter === 'suspendu'" (click)="subscriptionStatusFilter = 'suspendu'">Suspendus</button>
+          <button class="filter-chip" [class.active]="subscriptionStatusFilter === 'expire'" (click)="subscriptionStatusFilter = 'expire'">Expires</button>
+        </div>
+      </div>
+
+      <div class="parkings-list">
+        <article *ngFor="let subscription of filteredSubscriptions" class="parking-card">
+          <div class="parking-header">
+            <div class="parking-icon">
+              <ion-icon name="ribbon-outline"></ion-icon>
+            </div>
+            <div class="parking-title">
+              <h3>{{ subscription.parking?.nom || ('Parking #' + subscription.parking_id) }}</h3>
+              <p>{{ subscription.owner?.nom || 'Owner inconnu' }}</p>
+            </div>
+            <div class="parking-price">{{ subscription.tarif }} TND</div>
+          </div>
+
+          <div class="parking-address">
+            <ion-icon name="calendar-outline"></ion-icon>
+            <span>{{ subscription.type }} • du {{ subscription.date_debut }} au {{ subscription.date_fin }}</span>
+          </div>
+
+          <div class="parking-badges">
+            <span class="validation-badge" [class]="getSubscriptionBadgeClass(subscription.statut)">
+              {{ getSubscriptionStatusLabel(subscription.statut) }}
+            </span>
+            <span class="status-badge active">
+              {{ subscription.parking?.validation_status || 'parking' }}
+            </span>
+          </div>
+
+          <div class="parking-actions">
+            <button
+              class="action-btn approve"
+              type="button"
+              *ngIf="subscription.statut === 'en_attente' || subscription.statut === 'suspendu'"
+              (click)="activateSubscription(subscription.id_abon)">
+              <ion-icon name="checkmark-outline"></ion-icon>
+              Activer
+            </button>
+            <button
+              class="action-btn reject"
+              type="button"
+              *ngIf="subscription.statut === 'actif'"
+              (click)="suspendSubscription(subscription.id_abon)">
+              <ion-icon name="pause-outline"></ion-icon>
+              Suspendre
+            </button>
+          </div>
+        </article>
+
+        <div *ngIf="filteredSubscriptions.length === 0" class="empty-state">
+          <ion-icon name="card-outline"></ion-icon>
+          <p>Aucun abonnement parking trouve</p>
         </div>
       </div>
     </section>

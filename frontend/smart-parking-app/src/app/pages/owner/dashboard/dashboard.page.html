@@ -5,6 +5,16 @@
 
   <div class="dashboard-content">
     <section class="overview-shell">
+      <div class="owner-ribbon">
+        <span class="owner-ribbon__label">Parcours owner</span>
+        <div class="owner-ribbon__steps">
+          <span>Validation</span>
+          <span>Abonnement</span>
+          <span>Parking</span>
+          <span>IA</span>
+        </div>
+      </div>
+
       <div class="overview-header">
         <div>
           <p class="overview-kicker">Owner analytics</p>
@@ -56,6 +66,22 @@
             <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
           </ion-button>
         </article>
+      </div>
+
+      <div class="workflow-banner">
+        <div>
+          <span>Etape actuelle</span>
+          <strong>{{ nextAction.title }}</strong>
+        </div>
+        <p>{{ dashboardInsightText }}</p>
+      </div>
+
+      <div class="workflow-banner workflow-banner--pending" *ngIf="showDashboardPendingParkingBanner">
+        <div>
+          <span>Parking en attente</span>
+          <strong>{{ dashboardParkingStatusLabel }}</strong>
+        </div>
+        <p>Le dashboard reste accessible, mais ce parking doit encore passer la validation administrative.</p>
       </div>
     </section>
 
@@ -198,6 +224,7 @@
                   {{ parking.status === 'active' ? 'Actif' : 'Maintenance' }}
                 </span>
               </div>
+              <p class="parking-card__validation">Statut dossier : {{ parking.validationStatus }}</p>
 
               <div class="parking-card__metrics">
                 <div>
@@ -341,6 +368,44 @@
                     <strong>{{ source.label || source.original_name || 'Source IA' }}</strong>
                     <p *ngIf="source.stream_url">{{ source.stream_url }}</p>
                     <p *ngIf="!source.stream_url">{{ source.original_name || source.mime_type }}</p>
+                    <div class="ai-source-analysis ai-source-analysis--success" *ngIf="hasProcessedAnalysis(source)">
+                      <span class="ai-source-analysis__badge">Analyse terminee</span>
+                      <strong *ngIf="getAnalysisSummary(source)">{{ getAnalysisSummary(source) }}</strong>
+                      <p *ngIf="getAnalysisMeta(source)">{{ getAnalysisMeta(source) }}</p>
+                      <p *ngIf="getSyncMeta(source)">{{ getSyncMeta(source) }}</p>
+                      <p class="ai-source-analysis__warning" *ngIf="getSyncWarning(source)">{{ getSyncWarning(source) }}</p>
+                      <div class="ai-source-analysis__debug" *ngIf="getSlotDebugRows(source).length > 0">
+                        <span *ngFor="let row of getSlotDebugRows(source)">{{ row }}</span>
+                      </div>
+                      <div class="ai-source-analysis__preview" *ngIf="isImageSource(source) && getAnalysisOutputUrl(source)">
+                        <img [src]="getAnalysisOutputUrl(source)!" [alt]="'Analyse ' + (source.label || source.original_name || 'IA')" />
+                      </div>
+                      <div
+                        class="ai-source-analysis__preview ai-source-analysis__preview--video"
+                        *ngIf="showAnalysisVideo(source)">
+                        <video
+                          [src]="getAnalysisOutputUrl(source)!"
+                          [poster]="getAnalysisPreviewUrl(source) || undefined"
+                          controls
+                          (error)="markAnalysisVideoError(source)"
+                          preload="metadata"></video>
+                      </div>
+                      <p class="ai-source-analysis__warning" *ngIf="showAnalysisVideoFallback(source)">
+                        La video annotee existe bien, mais ce navigateur ne peut pas la lire inline. Ouvrez le resultat pour la consulter.
+                      </p>
+                      <a
+                        class="ai-source-analysis__link"
+                        *ngIf="getAnalysisOutputUrl(source)"
+                        [href]="getAnalysisOutputUrl(source)!"
+                        target="_blank"
+                        rel="noopener">
+                        Ouvrir le resultat
+                      </a>
+                    </div>
+                    <div class="ai-source-analysis ai-source-analysis--error" *ngIf="hasAnalysisError(source)">
+                      <span class="ai-source-analysis__badge ai-source-analysis__badge--error">Analyse impossible</span>
+                      <p>{{ getAnalysisError(source) }}</p>
+                    </div>
                   </div>
                 </article>
               </div>

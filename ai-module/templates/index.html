@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Parking Batch Analyzer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f2f5f9;
+      --panel: rgba(255, 255, 255, 0.9);
+      --panel-border: rgba(15, 23, 42, 0.08);
+      --text: #112031;
+      --muted: #62748a;
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --accent-soft: #ccfbf1;
+      --danger: #b91c1c;
+      --danger-soft: #fee2e2;
+      --shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+      --radius: 24px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(13, 148, 136, 0.2), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(14, 116, 144, 0.18), transparent 32%),
+        linear-gradient(180deg, #f9fbfd 0%, #edf3f8 100%);
+    }
+
+    .page {
+      width: min(1200px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 24px;
+      align-items: stretch;
+      margin-bottom: 24px;
+    }
+
+    .hero-card,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .hero-card {
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -10% -20% auto;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(13, 148, 136, 0.16), rgba(8, 145, 178, 0.08));
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--accent-strong);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+
+    .hero h1 {
+      margin-top: 18px;
+      font-size: clamp(2rem, 5vw, 3.7rem);
+      line-height: 0.95;
+      max-width: 9ch;
+    }
+
+    .hero p {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.6;
+      max-width: 60ch;
+    }
+
+    .meta-list {
+      margin-top: 24px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .meta-item {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    .meta-item strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.92rem;
+    }
+
+    .meta-item span {
+      color: var(--muted);
+      font-size: 0.92rem;
+      word-break: break-word;
+    }
+
+    .upload-panel {
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      justify-content: center;
+    }
+
+    .dropzone {
+      position: relative;
+      border: 2px dashed rgba(15, 118, 110, 0.3);
+      border-radius: 22px;
+      padding: 24px;
+      background: linear-gradient(180deg, rgba(204, 251, 241, 0.55), rgba(255, 255, 255, 0.95));
+    }
+
+    .dropzone input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .dropzone-label {
+      display: grid;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .dropzone-label strong {
+      font-size: 1.1rem;
+    }
+
+    .dropzone-label span {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .cta {
+      border: none;
+      border-radius: 16px;
+      padding: 15px 18px;
+      background: linear-gradient(135deg, var(--accent), #0ea5a0);
+      color: white;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 18px 30px rgba(15, 118, 110, 0.2);
+    }
+
+    .cta:hover {
+      background: linear-gradient(135deg, var(--accent-strong), #0f9488);
+    }
+
+    .small-note {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .flash-stack {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .flash {
+      padding: 16px 18px;
+      border-radius: 18px;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+
+    .flash.success {
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      border-color: rgba(15, 118, 110, 0.16);
+    }
+
+    .flash.error {
+      background: var(--danger-soft);
+      color: var(--danger);
+      border-color: rgba(185, 28, 28, 0.14);
+    }
+
+    .section {
+      margin-top: 24px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 14px;
+      gap: 16px;
+    }
+
+    .section-header h2 {
+      font-size: 1.45rem;
+    }
+
+    .section-header p {
+      color: var(--muted);
+    }
+
+    .results-grid,
+    .history-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 18px;
+    }
+
+    .result-card,
+    .history-card {
+      padding: 18px;
+    }
+
+    .card-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--accent-strong);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .video-frame {
+      width: 100%;
+      border-radius: 18px;
+      background: #09111f;
+      margin-bottom: 16px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .stat {
+      padding: 14px;
+      border-radius: 18px;
+      background: #f8fbfc;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.3rem;
+      margin-bottom: 4px;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .meta-grid {
+      display: grid;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+      margin-bottom: 14px;
+    }
+
+    .button-muted {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 14px;
+      padding: 12px 16px;
+      background: white;
+      color: var(--text);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .button-muted:disabled,
+    .cta:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .calibration-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.6fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .canvas-wrap {
+      border-radius: 22px;
+      overflow: hidden;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      background: linear-gradient(180deg, #edf6f7, #ffffff);
+      min-height: 260px;
+    }
+
+    .calibration-canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      cursor: crosshair;
+    }
+
+    .slot-list {
+      display: grid;
+      gap: 10px;
+      max-height: 420px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .slot-item {
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: #f8fbfc;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .slot-item strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--text);
+    }
+
+    .slot-item small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+
+    .slot-item small.warning {
+      color: #b91c1c;
+      font-weight: 700;
+    }
+
+    .slot-item label {
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+      color: var(--text);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .slot-item input {
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font: inherit;
+    }
+
+    .slot-item select {
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font: inherit;
+      background: white;
+    }
+
+    .link-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 140px;
+      padding: 12px 16px;
+      border-radius: 14px;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .link-button.primary {
+      background: #0f172a;
+      color: white;
+    }
+
+    .link-button.secondary {
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--accent-strong);
+    }
+
+    .empty-state {
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    @media (max-width: 900px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        width: min(100% - 20px, 1200px);
+        padding-top: 20px;
+      }
+
+      .hero-card,
+      .upload-panel,
+      .result-card,
+      .history-card {
+        padding: 18px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <section class="flash-stack">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+    {% endwith %}
+
+    <section class="hero">
+      <article class="hero-card">
+        <div class="eyebrow">Smart Parking Video Batch</div>
+        <h1>Analyse propre, rapide et locale de vos videos parking.</h1>
+        <p>
+          Uploade plusieurs videos, traite-les avec ton modele IA existant, recupere les versions annotees,
+          lis le resume <strong>free / occupied / total</strong> et garde un historique local directement dans le projet.
+        </p>
+
+        <div class="meta-list">
+          <div class="meta-item">
+            <strong>Modele actif</strong>
+            <span>{{ model_path if model_path else "Modele introuvable" }}</span>
+          </div>
+          <div class="meta-item">
+            <strong>slots.json actif</strong>
+            <span>{{ slots_path if slots_path else "Fichier slots introuvable" }}</span>
+          </div>
+          <div class="meta-item">
+            <strong>Places configurees</strong>
+            <span>{{ slots_count }} slot(s) charges{{ " | Historique local: " ~ max_history ~ " video(s)" if max_history is not none else "" }}</span>
+          </div>
+        </div>
+      </article>
+
+      <aside class="panel upload-panel">
+        <h2>Lancer un traitement batch</h2>
+        <p class="small-note">
+          Formats acceptes: MP4, MOV, AVI, MKV, M4V. Le traitement est local et chaque video annotee est stockee dans le projet.
+        </p>
+
+        <form action="{{ url_for('process_videos') }}" method="post" enctype="multipart/form-data">
+          <label class="dropzone">
+            <input id="videos" type="file" name="videos" multiple accept="video/*">
+            <div class="dropzone-label">
+              <strong>Deposer ou selectionner plusieurs videos</strong>
+              <span id="file-count">Aucune video selectionnee pour le moment.</span>
+            </div>
+          </label>
+
+          <button class="cta" type="submit">Traiter les videos</button>
+        </form>
+
+        {% if config_error %}
+          <div class="flash error">{{ config_error }}</div>
+        {% endif %}
+      </aside>
+    </section>
+
+	    <section class="section">
+	      <div class="section-header">
+	        <h2>Calibration des places</h2>
+	        <p>Charge une image du parking, dessine chaque place, puis enregistre `slots.json`.</p>
+	      </div>
+
+	      <div class="panel history-card">
+	        <form action="{{ url_for('upload_calibration_image') }}" method="post" enctype="multipart/form-data">
+	          <div class="toolbar">
+	            <label class="field" style="min-width: 220px;">
+	              <span>parking_id backend</span>
+	              <input
+	                type="number"
+	                name="parking_id"
+	                min="1"
+	                step="1"
+	                value="{{ calibration_parking_id if calibration_parking_id else '' }}"
+	                placeholder="ex: 3">
+	            </label>
+	            <div style="display:flex; align-items:end;">
+	              <button class="button-muted" type="submit" formaction="{{ url_for('save_calibration_parking') }}" formenctype="application/x-www-form-urlencoded">
+	                Charger les places
+	              </button>
+	            </div>
+	          </div>
+
+	          <label class="dropzone">
+	            <input id="calibration-image" type="file" name="image" accept="image/png,image/jpeg,image/webp">
+	            <div class="dropzone-label">
+	              <strong>Charger une image de reference du parking</strong>
+	              <span id="calibration-file-label">Utilise une vue claire ou les places sont bien visibles.</span>
+	            </div>
+	          </label>
+
+	          <div class="toolbar">
+	            <button class="cta" type="submit">Utiliser cette image</button>
+	          </div>
+	        </form>
+
+	        {% if calibration_image_url %}
+	          <div class="calibration-layout">
+	            <div>
+	              <p class="small-note">
+	                Dessin: clique et glisse pour creer un rectangle. Les coordonnees seront sauvegardees dans
+	                <strong>ai-module/slots.json</strong>.
+	              </p>
+	              <div class="toolbar">
+	                <button id="undo-slot" class="button-muted" type="button">Annuler le dernier</button>
+	                <button id="clear-slots" class="button-muted" type="button">Vider tout</button>
+	                <button id="save-slots" class="cta" type="button">Sauvegarder slots.json</button>
+	              </div>
+	              <div class="canvas-wrap">
+	                <canvas id="calibration-canvas" class="calibration-canvas"></canvas>
+	              </div>
+	            </div>
+
+	            <aside>
+		              <div class="meta-list">
+		                <div class="meta-item">
+		                  <strong>Image active</strong>
+		                  <span>{{ calibration_image_url }}</span>
+		                </div>
+		                <div class="meta-item">
+		                  <strong>Parking backend</strong>
+		                  <span>{{ calibration_parking_id if calibration_parking_id else "Aucun parking selectionne" }}</span>
+		                </div>
+		                <div class="meta-item">
+		                  <strong>Places chargees</strong>
+		                  <span>{{ calibration_places|length }} place(s) detectee(s) via {{ calibration_parking_id if calibration_parking_id else "backend" }}</span>
+		                </div>
+		                <div class="meta-item">
+		                  <strong>Slots prepares</strong>
+		                  <span id="slot-count">{{ current_slots|length }} rectangle(s)</span>
+		                </div>
+		                <div class="meta-item">
+		                  <strong>Conseil</strong>
+		                  <span>Commence de gauche a droite et cadre uniquement la zone utile de chaque place.</span>
+		                </div>
+		                {% if calibration_places_error %}
+		                  <div class="meta-item">
+		                    <strong>Erreur backend</strong>
+		                    <span>{{ calibration_places_error }}</span>
+		                  </div>
+		                {% endif %}
+		              </div>
+
+	              <div id="slot-list" class="slot-list"></div>
+	            </aside>
+	          </div>
+	        {% else %}
+	          <div class="empty-state">
+	            Aucune image de calibration chargee. Ajoute d'abord une image de reference.
+	          </div>
+	        {% endif %}
+	      </div>
+	    </section>
+
+	    <section class="section">
+	      <div class="section-header">
+	        <h2>Dernier batch</h2>
+	        <p>Les videos annotees les plus recentes apparaissent ici apres traitement.</p>
+	      </div>
+
+      {% if recent_results %}
+        <div class="results-grid">
+          {% for item in recent_results %}
+            <article class="panel result-card">
+              <div class="card-title">
+                <div>
+                  <h3>{{ item.source_filename }}</h3>
+                  <p>{{ item.processed_at }}</p>
+                </div>
+                <span class="badge">Batch recent</span>
+              </div>
+
+              <video class="video-frame" controls preload="metadata">
+                <source src="{{ item.video_url }}" type="video/mp4">
+              </video>
+
+              <div class="stats">
+                <div class="stat">
+                  <strong>{{ item.free }}</strong>
+                  <span>Free</span>
+                </div>
+                <div class="stat">
+                  <strong>{{ item.occupied }}</strong>
+                  <span>Occupied</span>
+                </div>
+                <div class="stat">
+                  <strong>{{ item.total }}</strong>
+                  <span>Total</span>
+                </div>
+              </div>
+
+              <div class="meta-grid">
+                <span>{{ item.processed_frames }} frame(s) | {{ item.fps }} FPS | {{ item.resolution }}</span>
+                <span>Sortie: {{ item.output_filename }}</span>
+              </div>
+
+              <div class="actions">
+                <a class="link-button primary" href="{{ item.video_url }}" target="_blank" rel="noopener">Voir la video</a>
+                <a class="link-button secondary" href="{{ item.download_url }}">Telecharger</a>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="panel empty-state">
+          Aucun batch recent a afficher. Lance un upload pour generer les premieres videos annotees.
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <h2>Historique local</h2>
+        <p>Toutes les videos traitees sont conservees localement dans ce projet.</p>
+      </div>
+
+      {% if history %}
+        <div class="history-grid">
+          {% for item in history %}
+            <article class="panel history-card">
+              <div class="card-title">
+                <div>
+                  <h3>{{ item.source_filename }}</h3>
+                  <p>{{ item.processed_at }}</p>
+                </div>
+                <span class="badge">{{ item.free }}/{{ item.total }} free</span>
+              </div>
+
+              <div class="stats">
+                <div class="stat">
+                  <strong>{{ item.free }}</strong>
+                  <span>Free</span>
+                </div>
+                <div class="stat">
+                  <strong>{{ item.occupied }}</strong>
+                  <span>Occupied</span>
+                </div>
+                <div class="stat">
+                  <strong>{{ item.total }}</strong>
+                  <span>Total</span>
+                </div>
+              </div>
+
+              <div class="meta-grid">
+                <span>{{ item.processed_frames }} frame(s) | {{ item.fps }} FPS | {{ item.resolution }}</span>
+                <span>Modele: {{ item.model_path }}</span>
+              </div>
+
+              <div class="actions">
+                <a class="link-button primary" href="{{ item.video_url }}" target="_blank" rel="noopener">Voir la video</a>
+                <a class="link-button secondary" href="{{ item.download_url }}">Telecharger</a>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="panel empty-state">
+          L'historique est vide. Une fois les traitements lances, les videos apparaitront ici.
+        </div>
+      {% endif %}
+    </section>
+  </main>
+
+	  <script>
+	    const input = document.getElementById("videos");
+	    const fileCount = document.getElementById("file-count");
+	    const calibrationInput = document.getElementById("calibration-image");
+	    const calibrationFileLabel = document.getElementById("calibration-file-label");
+
+	    if (input && fileCount) {
+	      input.addEventListener("change", () => {
+	        const count = input.files ? input.files.length : 0;
+	        fileCount.textContent = count
+	          ? `${count} video(s) prete(s) pour le traitement.`
+	          : "Aucune video selectionnee pour le moment.";
+	      });
+	    }
+
+	    if (calibrationInput && calibrationFileLabel) {
+	      calibrationInput.addEventListener("change", () => {
+	        const name = calibrationInput.files && calibrationInput.files[0]
+	          ? calibrationInput.files[0].name
+	          : null;
+	        calibrationFileLabel.textContent = name
+	          ? `Image selectionnee: ${name}`
+	          : "Utilise une vue claire ou les places sont bien visibles.";
+	      });
+	    }
+
+	    const calibrationImageUrl = {{ calibration_image_url|tojson }};
+	    const initialSlots = {{ current_slots|tojson }};
+	    const calibrationPlaces = {{ calibration_places|tojson }};
+	    const canvas = document.getElementById("calibration-canvas");
+	    const saveButton = document.getElementById("save-slots");
+	    const undoButton = document.getElementById("undo-slot");
+	    const clearButton = document.getElementById("clear-slots");
+	    const slotList = document.getElementById("slot-list");
+	    const slotCount = document.getElementById("slot-count");
+
+	    if (canvas && calibrationImageUrl && saveButton && undoButton && clearButton && slotList && slotCount) {
+	      const ctx = canvas.getContext("2d");
+	      const image = new Image();
+	      const slots = Array.isArray(initialSlots)
+	        ? initialSlots.map((slot, index) => ({
+	            slot_index: Number(slot.slot_index || index + 1),
+	            place_id: slot.place_id ?? null,
+	            x: Number(slot.x || 0),
+	            y: Number(slot.y || 0),
+	            w: Number(slot.w || 0),
+	            h: Number(slot.h || 0),
+	          }))
+	        : [];
+	      let draftRect = null;
+	      let dragStart = null;
+
+	      const findPlace = (placeId) => calibrationPlaces.find((place) => Number(place.id_place) === Number(placeId)) || null;
+	      const getDuplicatePlaceIds = () => {
+	        const counts = new Map();
+	        slots.forEach((slot) => {
+	          if (!slot.place_id) {
+	            return;
+	          }
+	          counts.set(slot.place_id, (counts.get(slot.place_id) || 0) + 1);
+	        });
+	        return new Set(Array.from(counts.entries()).filter(([, count]) => count > 1).map(([placeId]) => Number(placeId)));
+	      };
+
+	      const formatPlaceLabel = (placeId) => {
+	        const place = findPlace(placeId);
+	        if (!place) {
+	          return placeId ? `place_id ${placeId}` : "Aucune place associee";
+	        }
+	        return `Place ${place.num_place} | id ${place.id_place}${place.zone ? ` | zone ${place.zone}` : ""}${place.etage ? ` | etage ${place.etage}` : ""}`;
+	      };
+
+	      const updateSidebar = () => {
+	        slots.forEach((slot, index) => {
+	          slot.slot_index = index + 1;
+	        });
+	        const duplicatePlaceIds = getDuplicatePlaceIds();
+
+	        slotCount.textContent = `${slots.length} rectangle(s)`;
+	        slotList.innerHTML = slots.length
+	          ? slots.map((slot, index) => `
+	              <div class="slot-item">
+	                <strong>Slot ${index + 1}</strong>
+	                <span>x=${slot.x}, y=${slot.y}, w=${slot.w}, h=${slot.h}</span>
+	                <small>${formatPlaceLabel(slot.place_id)}</small>
+	                ${duplicatePlaceIds.has(Number(slot.place_id)) ? '<small class="warning">Cette place est deja associee a un autre slot.</small>' : ''}
+	                ${
+	                  calibrationPlaces.length
+	                    ? `
+	                        <label>
+	                          <span>Associer a une place</span>
+	                          <select data-slot-index="${index}">
+	                            <option value="">Aucune correspondance</option>
+	                            ${calibrationPlaces.map((place) => `
+	                              <option value="${place.id_place}" ${Number(slot.place_id) === Number(place.id_place) ? 'selected' : ''}>
+	                                #${place.id_place} | Place ${place.num_place}${place.etat ? ` | ${place.etat}` : ''}
+	                              </option>
+	                            `).join("")}
+	                          </select>
+	                        </label>
+	                      `
+	                    : `
+	                        <label>
+	                          <span>place_id en base</span>
+	                          <input
+	                            type="number"
+	                            min="1"
+	                            step="1"
+	                            data-slot-index="${index}"
+	                            value="${slot.place_id ?? ''}"
+	                            placeholder="ex: 12" />
+	                        </label>
+	                      `
+	                }
+	              </div>
+	            `).join("")
+	          : '<div class="slot-item"><strong>Aucune place</strong><span>Dessine les rectangles sur l image.</span></div>';
+	        saveButton.disabled = duplicatePlaceIds.size > 0;
+	      };
+
+	      const draw = () => {
+	        ctx.clearRect(0, 0, canvas.width, canvas.height);
+	        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+	        slots.forEach((slot, index) => {
+	          ctx.strokeStyle = "#0f766e";
+	          ctx.lineWidth = 3;
+	          ctx.strokeRect(slot.x, slot.y, slot.w, slot.h);
+	          ctx.fillStyle = "rgba(15, 118, 110, 0.18)";
+	          ctx.fillRect(slot.x, slot.y, slot.w, slot.h);
+	          ctx.fillStyle = "#112031";
+	          ctx.font = "bold 16px Segoe UI";
+	          ctx.fillText(`P${index + 1}`, slot.x + 8, Math.max(20, slot.y + 22));
+	          const place = findPlace(slot.place_id);
+	          const detailLabel = place ? `#${place.num_place}` : slot.place_id ? `id ${slot.place_id}` : "non lie";
+	          ctx.font = "600 13px Segoe UI";
+	          ctx.fillText(detailLabel, slot.x + 8, Math.max(40, slot.y + 40));
+	        });
+
+	        if (draftRect) {
+	          ctx.strokeStyle = "#b45309";
+	          ctx.lineWidth = 2;
+	          ctx.setLineDash([8, 6]);
+	          ctx.strokeRect(draftRect.x, draftRect.y, draftRect.w, draftRect.h);
+	          ctx.setLineDash([]);
+	        }
+	      };
+
+	      const getCanvasPoint = (event) => {
+	        const rect = canvas.getBoundingClientRect();
+	        const scaleX = canvas.width / rect.width;
+	        const scaleY = canvas.height / rect.height;
+	        return {
+	          x: Math.round((event.clientX - rect.left) * scaleX),
+	          y: Math.round((event.clientY - rect.top) * scaleY),
+	        };
+	      };
+
+	      const normalizeRect = (start, end) => {
+	        const x = Math.min(start.x, end.x);
+	        const y = Math.min(start.y, end.y);
+	        const w = Math.abs(end.x - start.x);
+	        const h = Math.abs(end.y - start.y);
+	        return { x, y, w, h };
+	      };
+
+	      canvas.addEventListener("mousedown", (event) => {
+	        dragStart = getCanvasPoint(event);
+	        draftRect = { x: dragStart.x, y: dragStart.y, w: 0, h: 0 };
+	        draw();
+	      });
+
+	      canvas.addEventListener("mousemove", (event) => {
+	        if (!dragStart) {
+	          return;
+	        }
+	        draftRect = normalizeRect(dragStart, getCanvasPoint(event));
+	        draw();
+	      });
+
+	      window.addEventListener("mouseup", (event) => {
+	        if (!dragStart) {
+	          return;
+	        }
+
+	        const rect = normalizeRect(dragStart, getCanvasPoint(event));
+	        dragStart = null;
+	        draftRect = null;
+
+	        if (rect.w >= 12 && rect.h >= 12) {
+	          slots.push({
+	            slot_index: slots.length + 1,
+	            place_id: null,
+	            ...rect,
+	          });
+	          updateSidebar();
+	        }
+
+	        draw();
+	      });
+
+	      undoButton.addEventListener("click", () => {
+	        slots.pop();
+	        updateSidebar();
+	        draw();
+	      });
+
+	      clearButton.addEventListener("click", () => {
+	        slots.length = 0;
+	        updateSidebar();
+	        draw();
+	      });
+
+	      slotList.addEventListener("input", (event) => {
+	        const target = event.target;
+	        if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) {
+	          return;
+	        }
+
+	        const index = Number(target.dataset.slotIndex);
+	        if (!Number.isInteger(index) || !slots[index]) {
+	          return;
+	        }
+
+	        const value = target.value.trim();
+	        slots[index].place_id = value ? Number(value) : null;
+	      });
+
+	      saveButton.addEventListener("click", async () => {
+	        const duplicatePlaceIds = getDuplicatePlaceIds();
+	        if (duplicatePlaceIds.size > 0) {
+	          alert(`Doublon detecte pour les place_id: ${Array.from(duplicatePlaceIds).join(", ")}`);
+	          return;
+	        }
+	        saveButton.disabled = true;
+	        try {
+	          const response = await fetch("{{ url_for('save_calibration_slots') }}", {
+	            method: "POST",
+	            headers: { "Content-Type": "application/json" },
+	            body: JSON.stringify({ slots }),
+	          });
+	          const payload = await response.json();
+	          if (!response.ok) {
+	            throw new Error(payload.error || "Sauvegarde impossible");
+	          }
+	          window.location.href = "{{ url_for('index') }}";
+	        } catch (error) {
+	          alert(error.message || "Impossible de sauvegarder slots.json");
+	        } finally {
+	          saveButton.disabled = false;
+	        }
+	      });
+
+	      image.onload = () => {
+	        canvas.width = image.naturalWidth;
+	        canvas.height = image.naturalHeight;
+	        updateSidebar();
+	        draw();
+	      };
+	      image.src = calibrationImageUrl;
+	    }
+	  </script>
+	</body>
+	</html>

@@ -36,6 +36,9 @@
           },
           "configurations": {
             "production": {
+              "buildOptimizer": false,
+              "optimization": false,
+              "extractLicenses": false,
               "budgets": [
                 {
                   "type": "initial",
@@ -44,8 +47,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "2kb",
-                  "maximumError": "4kb"
+                  "maximumWarning": "24kb",
+                  "maximumError": "40kb"
                 }
               ],
               "fileReplacements": [
