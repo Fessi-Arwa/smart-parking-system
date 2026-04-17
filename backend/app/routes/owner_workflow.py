@@ -71,6 +71,8 @@ def _get_subscription_status_for_parking(parking):
     if not abonnement:
         return "non_souscrit"
 
+    abonnement.sync_status_with_dates()
+
     if abonnement.statut == StatutAbonnement.actif:
         return "actif"
     if abonnement.statut == StatutAbonnement.en_attente:
@@ -115,6 +117,8 @@ def _get_latest_app_subscription_for_parking(parking):
         return None, None
 
     abonnement = Abonnement.query.get(abonnement_app_link.id_abon)
+    if abonnement:
+        abonnement.sync_status_with_dates()
     return abonnement_app_link, abonnement
 
 
@@ -192,6 +196,7 @@ def get_owner_workflow_status():
         return error_response
 
     parking, subscription_status = _select_workflow_parking(user)
+    _, abonnement = _get_latest_app_subscription_for_parking(parking)
 
     return jsonify(
         {
@@ -215,6 +220,9 @@ def get_owner_workflow_status():
             "parkingId": parking.id_park if parking else None,
             "parkingName": parking.nom if parking else None,
             "hasParking": parking is not None,
+            "subscriptionStartDate": abonnement.date_debut.isoformat() if abonnement else None,
+            "subscriptionEndDate": abonnement.date_fin.isoformat() if abonnement else None,
+            "subscriptionType": abonnement.type.value if abonnement and abonnement.type else None,
         }
     ), 200
 
@@ -253,6 +261,7 @@ def activate_app_subscription():
         abonnement.date_fin = end_date
         abonnement.tarif = pricing["price"]
         abonnement.statut = StatutAbonnement.en_attente
+        abonnement.sync_status_with_dates()
     elif abonnement and abonnement.statut == StatutAbonnement.actif:
         return jsonify({"msg": "Un abonnement actif existe deja pour ce parking"}), 400
     else:
@@ -263,6 +272,7 @@ def activate_app_subscription():
             statut=StatutAbonnement.en_attente,
             tarif=pricing["price"],
         )
+        abonnement.sync_status_with_dates()
         db.session.add(abonnement)
         db.session.flush()
 

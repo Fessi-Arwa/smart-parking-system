@@ -91,6 +91,8 @@ interface ParkingStructureSection {
   standalone: false,
 })
 export class DashboardPage implements OnInit, OnDestroy {
+  private readonly subscriptionAlertWindowDays = 3;
+  private readonly notifiedSubscriptionIds = new Set<number>();
   activeTab: DriverTab = 'home';
   searchTerm = '';
   isDriverLocationFocused = false;
@@ -326,6 +328,11 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   get notificationItems(): HeaderNotificationItem[] {
+    const subscriptionAlerts = this.subscriptions
+      .map((subscription) => this.buildSubscriptionExpiryNotification(subscription))
+      .filter((item): item is HeaderNotificationItem => item !== null)
+      .slice(0, 3);
+
     const reservationNotifications = this.reservations
       .filter((reservation) => reservation.statut === 'en_attente' || reservation.statut === 'confirmee')
       .slice(0, 4)
@@ -336,15 +343,17 @@ export class DashboardPage implements OnInit, OnDestroy {
       }));
 
     const subscriptionNotifications = this.subscriptions
-      .filter((subscription) => subscription.statut === 'en_attente' || subscription.statut === 'actif')
+      .filter((subscription) => subscription.statut === 'en_attente')
       .slice(0, 2)
       .map((subscription) => ({
         title: `Abonnement ${this.getStatusLabel(subscription.statut)}`,
         description: `${subscription.parkingNom} • ${subscription.type}`,
         timestamp: this.formatNotificationTimestamp(subscription.date_debut),
+        icon: 'card-outline',
+        tone: 'info' as const,
       }));
 
-    return [...reservationNotifications, ...subscriptionNotifications].slice(0, 5);
+    return [...subscriptionAlerts, ...reservationNotifications, ...subscriptionNotifications].slice(0, 6);
   }
 
   get notificationsCount(): number {
@@ -499,6 +508,7 @@ export class DashboardPage implements OnInit, OnDestroy {
     try {
       const subscriptions = await firstValueFrom(this.subscriptionService.getSubscriptions());
       this.subscriptions = subscriptions.map((subscription) => this.mapSubscription(subscription));
+      this.notifyExpiringSubscriptions();
     } catch (error: any) {
       this.toastService.show(
         error?.error?.msg || error?.error?.error || 'Impossible de charger les abonnements',
@@ -624,6 +634,7 @@ export class DashboardPage implements OnInit, OnDestroy {
     const parkingId = Number(this.subscriptionForm.get('parking_id')?.value);
     return this.spots.filter((spot) => spot.parking_id === parkingId && this.isSpotAvailable(spot.etat));
   }
+
 
   get selectedSubscriptionStructure(): ParkingStructureSection[] {
     const parkingId = Number(this.subscriptionForm.get('parking_id')?.value);
@@ -1101,6 +1112,75 @@ export class DashboardPage implements OnInit, OnDestroy {
       return 'Reservee';
     }
     return 'Occupee';
+  }
+
+  private buildSubscriptionExpiryNotification(subscription: SubscriptionItem): HeaderNotificationItem | null {
+    if (this.isSubscriptionExpired(subscription)) {
+      return {
+        title: 'Abonnement expire',
+        description: `${subscription.parkingNom} • ${subscription.placeLabel}`,
+        timestamp: this.formatNotificationTimestamp(subscription.date_fin),
+        icon: 'alert-circle-outline',
+        tone: 'warning',
+      };
+    }
+
+    const remainingDays = this.getSubscriptionRemainingDays(subscription);
+    if (subscription.statut === 'actif' && remainingDays !== null && remainingDays <= this.subscriptionAlertWindowDays) {
+      return {
+        title: 'Abonnement bientot termine',
+        description: `${subscription.placeLabel} expire dans ${remainingDays} jour${remainingDays > 1 ? 's' : ''}`,
+        timestamp: this.formatNotificationTimestamp(subscription.date_fin),
+        icon: 'notifications-outline',
+        tone: 'alert',
+      };
+    }
+
+    return null;
+  }
+
+  private getSubscriptionRemainingDays(subscription: SubscriptionItem): number | null {
+    if (!subscription.date_fin) {
+      return null;
+    }
+
+    const endDate = new Date(subscription.date_fin);
+    if (Number.isNaN(endDate.getTime())) {
+      return null;
+    }
+
+    endDate.setHours(23, 59, 59, 999);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diffMs = endDate.getTime() - today.getTime();
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  }
+
+  private isSubscriptionExpired(subscription: SubscriptionItem): boolean {
+    const remainingDays = this.getSubscriptionRemainingDays(subscription);
+    return subscription.statut === 'expire' || (remainingDays !== null && remainingDays < 0);
+  }
+
+  private notifyExpiringSubscriptions(): void {
+    this.subscriptions.forEach((subscription) => {
+      const remainingDays = this.getSubscriptionRemainingDays(subscription);
+      const isAlertable =
+        subscription.statut === 'actif' &&
+        remainingDays !== null &&
+        remainingDays >= 0 &&
+        remainingDays <= this.subscriptionAlertWindowDays;
+
+      if (!isAlertable || this.notifiedSubscriptionIds.has(subscription.id_abon)) {
+        return;
+      }
+
+      this.notifiedSubscriptionIds.add(subscription.id_abon);
+      this.toastService.show(
+        `Alerte abonnement: votre place ${subscription.placeLabel} expire dans ${remainingDays} jour${remainingDays > 1 ? 's' : ''}.`,
+        'info'
+      );
+    });
   }
 
   private formatNotificationTimestamp(value: string): string {

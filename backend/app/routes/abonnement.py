@@ -50,6 +50,16 @@ def _build_abonnement(data):
     )
 
 
+def _sync_abonnements_statuses(abonnements):
+    has_changes = False
+    for abonnement in abonnements:
+        if abonnement and abonnement.sync_status_with_dates():
+            has_changes = True
+
+    if has_changes:
+        db.session.commit()
+
+
 @abonnement_bp.route("/", methods=["GET"])
 @jwt_required()
 def get_abonnements():
@@ -67,6 +77,7 @@ def get_abonnements():
         abonnement.id_abon: abonnement
         for abonnement in Abonnement.query.filter(Abonnement.id_abon.in_(abonnement_ids)).all()
     } if abonnement_ids else {}
+    _sync_abonnements_statuses(abonnements.values())
     places = {
         place.id_place: place
         for place in Place.query.filter(Place.id_place.in_(place_ids)).all()
@@ -126,6 +137,7 @@ def get_owner_abonnements():
         abonnement.id_abon: abonnement
         for abonnement in Abonnement.query.filter(Abonnement.id_abon.in_(abonnement_ids)).all()
     } if abonnement_ids else {}
+    _sync_abonnements_statuses(abonnements.values())
 
     data = []
     for link in abonnement_links:
@@ -149,6 +161,8 @@ def get_abonnement(abonnement_id):
     abonnement = Abonnement.query.get(abonnement_id)
     if not abonnement:
         return jsonify({"error": "Abonnement not found"}), 404
+    if abonnement.sync_status_with_dates():
+        db.session.commit()
     return jsonify(_abonnement_to_dict(abonnement))
 
 
@@ -161,6 +175,7 @@ def create_abonnement_app():
         return jsonify({"error": "type, date_debut, date_fin, tarif and parking_id are required"}), 400
 
     abonnement = _build_abonnement(data)
+    abonnement.sync_status_with_dates()
     db.session.add(abonnement)
     db.session.flush()
 
@@ -198,6 +213,7 @@ def create_abonnement_place():
         return jsonify({"error": "Cette place a deja un abonnement"}), 400
 
     abonnement = _build_abonnement(data)
+    abonnement.sync_status_with_dates()
     db.session.add(abonnement)
     db.session.flush()
 
@@ -227,6 +243,8 @@ def update_abonnement(abonnement_id):
         abonnement.date_debut = _parse_date(data["date_debut"])
     if "date_fin" in data:
         abonnement.date_fin = _parse_date(data["date_fin"])
+
+    abonnement.sync_status_with_dates()
 
     abonnement_app = AbonnementApp.query.get(abonnement_id)
     abonnement_place = AbonnementPlace.query.get(abonnement_id)
