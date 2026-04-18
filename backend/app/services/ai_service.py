@@ -98,28 +98,37 @@ class ParkingSourceAIService:
         )
         self.model = load_model(str(self.model_path))
         self.video_service = ParkingVideoAIService(upload_root)
-        self.classify_imgsz = max(96, int(os.getenv("SMART_PARKING_CLASSIFY_IMGSZ", "192")))
-        self.slot_padding_ratio = max(0.0, float(os.getenv("SMART_PARKING_SLOT_PADDING_RATIO", "0.12")))
+        # Match the standalone ai-module defaults so backend and local runs
+        # produce the same crops and classification behavior unless explicitly overridden.
+        self.classify_imgsz = max(96, int(os.getenv("SMART_PARKING_CLASSIFY_IMGSZ", "160")))
+        self.slot_padding_ratio = max(0.0, float(os.getenv("SMART_PARKING_SLOT_PADDING_RATIO", "0.0")))
+        self.debug_enabled = os.getenv("SMART_PARKING_AI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
         self._ensure_storage()
 
     def analyze_source(self, source: ParkingAISource) -> dict[str, Any]:
         source_type = source.source_type.value if isinstance(source.source_type, TypeSourceIA) else str(source.source_type)
+        source_id = source.id_source
+        parking_id = source.parking_id
+        file_path = Path(source.file_path or "")
         if source_type == TypeSourceIA.camera.value:
             return self.record_error(
-                source_id=source.id_source,
-                parking_id=source.parking_id,
+                source_id=source_id,
+                parking_id=parking_id,
                 source_type=source_type,
                 error="Le traitement automatique n'est pas disponible pour les cameras.",
             )
 
-        file_path = Path(source.file_path or "")
         if not file_path.exists():
             return self.record_error(
-                source_id=source.id_source,
-                parking_id=source.parking_id,
+                source_id=source_id,
+                parking_id=parking_id,
                 source_type=source_type,
                 error="Le fichier source est introuvable.",
             )
+
+        # Release any request-bound DB connection before long-running inference.
+        db.session.expunge(source)
+        db.session.remove()
 
         if source_type == TypeSourceIA.image.value:
             result = self._analyze_image(source, file_path)
@@ -127,8 +136,8 @@ class ParkingSourceAIService:
             result = self._analyze_video(source, file_path)
         else:
             result = self.record_error(
-                source_id=source.id_source,
-                parking_id=source.parking_id,
+                source_id=source_id,
+                parking_id=parking_id,
                 source_type=source_type,
                 error="Type de source IA non pris en charge.",
             )
@@ -218,6 +227,9 @@ class ParkingSourceAIService:
             self._upsert_history_entry(processing.to_dict())
 
             try:
+                # Release the worker's DB connection before long-running video inference.
+                db.session.expunge(source)
+                db.session.remove()
                 result = self._analyze_video(source, Path(source.file_path or ""))
                 self._upsert_history_entry(result.to_dict())
             except Exception as exc:
@@ -328,6 +340,17 @@ class ParkingSourceAIService:
 
     def _analyze_image(self, source: ParkingAISource, file_path: Path) -> ParkingSourceAnalysisResult:
         slots, slots_path = self.video_service.get_slots(source.parking_id)
+        self._log_debug(
+            "image-process-start parking_id=%s source_id=%s file=%s model=%s slots=%s imgsz=%s padding=%s total_slots=%s",
+            source.parking_id,
+            source.id_source,
+            file_path,
+            self.model_path,
+            slots_path,
+            self.classify_imgsz,
+            self.slot_padding_ratio,
+            len(slots),
+        )
         frame = cv2.imread(str(file_path))
         if frame is None:
             raise RuntimeError("Impossible de lire cette image.")
@@ -594,6 +617,7 @@ class ParkingSourceAIService:
         x2 = min(frame_width, x + w + pad_x)
         y2 = min(frame_height, y + h + pad_y)
         crop = frame[y1:y2, x1:x2]
+        self._log_slot_debug(slot, x1, y1, x2, y2, frame_width, frame_height)
         if crop.size == 0:
             return {"label": BUSY_LABEL, "confidence": 0.0, "class_mapping": {}}
 
@@ -613,6 +637,39 @@ class ParkingSourceAIService:
             "confidence": float(probs.top1conf),
             "class_mapping": names,
         }
+
+    def _log_debug(self, message: str, *args: Any) -> None:
+        if not self.debug_enabled:
+            return
+        self.flask_app.logger.info(message, *args)
+
+    def _log_slot_debug(
+        self,
+        slot: dict[str, int],
+        x1: int,
+        y1: int,
+        x2: int,
+        y2: int,
+        frame_width: int,
+        frame_height: int,
+    ) -> None:
+        if not self.debug_enabled:
+            return
+        self._log_debug(
+            "slot-crop slot_index=%s place_id=%s rect=(%s,%s,%s,%s) crop=(%s,%s)-(%s,%s) frame=%sx%s",
+            slot.get("slot_index"),
+            slot.get("place_id"),
+            slot["x"],
+            slot["y"],
+            slot["w"],
+            slot["h"],
+            x1,
+            y1,
+            x2,
+            y2,
+            frame_width,
+            frame_height,
+        )
 
     @staticmethod
     def _normalize_names(names: Any) -> dict[str, str]:
@@ -646,9 +703,12 @@ class ParkingSourceAIService:
 
     @staticmethod
     def _draw_header(frame: Any, free: int, occupied: int, total: int, title: str) -> None:
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (20, 20), (470, 110), (18, 24, 38), -1)
-        cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
+        x1, y1, x2, y2 = 20, 20, 470, 110
+        roi = frame[y1:y2, x1:x2]
+        if roi.size:
+            overlay = roi.copy()
+            cv2.rectangle(overlay, (0, 0), (x2 - x1, y2 - y1), (18, 24, 38), -1)
+            cv2.addWeighted(overlay, 0.75, roi, 0.25, 0, roi)
         cv2.putText(frame, f"Free: {free}", (36, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (46, 204, 113), 2, cv2.LINE_AA)
         cv2.putText(frame, f"Occupied: {occupied}", (160, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 193, 7), 2, cv2.LINE_AA)
         cv2.putText(frame, f"Total: {total}", (336, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2, cv2.LINE_AA)

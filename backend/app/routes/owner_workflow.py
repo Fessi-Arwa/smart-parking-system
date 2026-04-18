@@ -102,6 +102,12 @@ def _ensure_parking_ready_for_ai(parking):
     if parking.setup_status != StatutConfigurationParking.terminee:
         return jsonify({"msg": "Terminez d abord la configuration parking avant d utiliser l IA"}), 400
     return None
+
+
+def _get_ai_source_service():
+    return ParkingSourceAIService(current_app.config["UPLOAD_FOLDER"])
+
+
 def _get_latest_app_subscription_for_parking(parking):
     if not parking:
         return None, None
