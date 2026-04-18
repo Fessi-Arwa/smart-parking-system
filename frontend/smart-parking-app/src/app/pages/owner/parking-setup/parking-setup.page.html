@@ -103,6 +103,16 @@
           <strong>{{ generatedCapacity }}</strong>
           <span>Places generees</span>
         </div>
+        <div class="places-summary__item">
+          <strong>{{ etages.length }}</strong>
+          <span>Etages en base</span>
+        </div>
+      </div>
+
+      <div class="floor-chips" *ngIf="floorSummaries.length > 0">
+        <span class="floor-chip" *ngFor="let floor of floorSummaries">
+          {{ floor.name }} • ordre {{ floor.ordre + 1 }}
+        </span>
       </div>
 
       <div class="parking-structure-builder">

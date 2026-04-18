@@ -1,5 +1,6 @@
 from .base import ModelMixin
 from .compte import Compte
+from .etage import Etage
 from .parking import Parking
 from .place import Place
 from .vehicule import Vehicule

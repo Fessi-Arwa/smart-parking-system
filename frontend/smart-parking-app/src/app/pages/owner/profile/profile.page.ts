@@ -123,11 +123,12 @@ export class ProfilePage implements OnInit {
   ) {}
 
   async ngOnInit(): Promise<void> {
-    const currentUser = this.authService.getCurrentUser();
+    const currentUser = this.authService.getCurrentUser() as (OwnerProfile & { id?: number | string; id_compte?: number | string }) | null;
     if (currentUser) {
+      const normalizedOwnerId = Number(currentUser.id ?? currentUser.id_compte ?? this.owner.id_compte);
       this.owner = {
         ...this.owner,
-        id_compte: currentUser.id,
+        id_compte: normalizedOwnerId,
         nom: currentUser.nom || this.owner.nom,
         email: currentUser.email || this.owner.email,
         telephone: currentUser.telephone || this.owner.telephone,
@@ -553,13 +554,13 @@ export class ProfilePage implements OnInit {
   }
 
   private async loadOwnerParkings(selectedParkingId?: number): Promise<void> {
-    const ownerId = this.owner.id_compte;
+    const ownerId = Number(this.owner.id_compte);
     const [parkings, places] = await Promise.all([
       firstValueFrom(this.parkingService.getParkings()),
       firstValueFrom(this.placeService.getPlaces()),
     ]);
 
-    const ownerParkings = parkings.filter((parking) => parking.owner_id === ownerId);
+    const ownerParkings = parkings.filter((parking) => Number(parking.owner_id) === ownerId);
     this.parkings = ownerParkings.map((parking) => this.mapParking(parking, places));
 
     const targetId = selectedParkingId ?? this.selectedParking?.id_park;

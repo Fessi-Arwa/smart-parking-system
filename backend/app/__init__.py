@@ -39,6 +39,7 @@ def create_app():
     from .routes.admin import admin_bp
     from .routes.ai import ai_bp
     from .routes.auth import auth_bp
+    from .routes.etage import etage_bp
     from .routes.health import health_bp
     from .routes.parking import parking_bp
     from .routes.place import place_bp
@@ -51,6 +52,7 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
     app.register_blueprint(ai_bp, url_prefix="/api/ai")
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
+    app.register_blueprint(etage_bp, url_prefix="/api/etages")
     app.register_blueprint(health_bp, url_prefix="/api/health")
     app.register_blueprint(parking_bp, url_prefix="/api/parkings")
     app.register_blueprint(place_bp, url_prefix="/api/places")
