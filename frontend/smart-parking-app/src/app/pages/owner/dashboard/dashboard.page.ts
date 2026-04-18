@@ -107,6 +107,7 @@ interface RevenueBar {
 })
 export class DashboardPage implements OnInit {
   private readonly dashboardParkingLimit = 3;
+  private readonly ownerSubscriptionAlertWindowDays = 5;
   parkings: OwnerParking[] = [];
   reservations: ReservationHistoryDto[] = [];
   subscriptions: SubscriptionDto[] = [];
@@ -555,6 +556,8 @@ export class DashboardPage implements OnInit {
   }
 
   get notificationItems(): HeaderNotificationItem[] {
+    const ownerSubscriptionNotifications = this.getOwnerSubscriptionNotifications();
+
     const parkingValidatedNotification =
       this.workflowState?.ownerStatus === 'accepte' &&
       this.workflowState?.parkingStatus === 'valide' &&
@@ -593,26 +596,21 @@ export class DashboardPage implements OnInit {
         tone: 'warning' as const,
       }));
 
-    const reservationNotifications = this.todayReservations.slice(0, 3).map((reservation) => ({
-      title: 'Reservation du jour',
-      description: `${reservation.userName} - ${reservation.parkingName} - ${reservation.time}`,
-      timestamp: 'Aujourd hui',
+    const reservationNotifications = this.getRecentReservations(3).map((reservation) => ({
+      title: 'Nouvelle reservation',
+      description: `${reservation.conducteur?.nom || 'Conducteur'} - ${reservation.parking?.nom || 'Parking'}`,
+      timestamp: this.formatOwnerNotificationTimestamp(reservation.date_debut),
       icon: 'car-sport-outline',
       tone: 'success' as const,
     }));
 
-    const subscriptionNotifications =
-      this.stats.activeSubscriptions > 0
-        ? [
-            {
-              title: 'Abonnements actifs',
-              description: `${this.stats.activeSubscriptions} abonnements actifs sur vos parkings`,
-              timestamp: 'Aujourd hui',
-              icon: 'card-outline',
-              tone: 'info' as const,
-            },
-          ]
-        : [];
+    const subscriptionNotifications = this.getRecentPlaceSubscriptions(3).map((subscription) => ({
+      title: 'Nouvel abonnement de place',
+      description: `${subscription.parking?.nom || 'Parking'} - Place ${subscription.place?.zone || 'A'}-${subscription.place?.num_place || '--'}`,
+      timestamp: this.formatOwnerNotificationTimestamp(subscription.created_at || subscription.date_debut),
+      icon: 'card-outline',
+      tone: 'info' as const,
+    }));
 
     const aiNotifications =
       this.aiSources.length > 0
@@ -628,6 +626,7 @@ export class DashboardPage implements OnInit {
         : [];
 
     return [
+      ...ownerSubscriptionNotifications,
       ...parkingValidatedNotification,
       ...workflowNotification,
       ...maintenanceNotifications,
@@ -856,6 +855,112 @@ export class DashboardPage implements OnInit {
     return value.toLocaleTimeString('fr-FR', {
       hour: '2-digit',
       minute: '2-digit',
+    });
+  }
+
+  private getOwnerSubscriptionNotifications(): HeaderNotificationItem[] {
+    if (!this.workflowState?.hasParking || !this.workflowState?.parkingName) {
+      return [];
+    }
+
+    if (this.workflowState.subscriptionStatus === 'expire') {
+      return [
+        {
+          title: 'Abonnement parking expire',
+          description: `${this.workflowState.parkingName} n est plus couvert par un abonnement actif.`,
+          timestamp: this.workflowState.subscriptionEndDate
+            ? this.formatOwnerNotificationTimestamp(this.workflowState.subscriptionEndDate)
+            : 'Mise a jour recente',
+          icon: 'alert-circle-outline',
+          tone: 'alert',
+        },
+      ];
+    }
+
+    const remainingDays = this.getOwnerSubscriptionRemainingDays();
+    if (
+      this.workflowState.subscriptionStatus === 'actif' &&
+      remainingDays !== null &&
+      remainingDays >= 0 &&
+      remainingDays <= this.ownerSubscriptionAlertWindowDays
+    ) {
+      return [
+        {
+          title: 'Abonnement parking bientot termine',
+          description: `${this.workflowState.parkingName} expire dans ${remainingDays} jour${remainingDays > 1 ? 's' : ''}.`,
+          timestamp: this.workflowState.subscriptionEndDate
+            ? this.formatOwnerNotificationTimestamp(this.workflowState.subscriptionEndDate)
+            : 'Mise a jour recente',
+          icon: 'notifications-outline',
+          tone: 'warning',
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  private getOwnerSubscriptionRemainingDays(): number | null {
+    const endDateValue = this.workflowState?.subscriptionEndDate;
+    if (!endDateValue) {
+      return null;
+    }
+
+    const endDate = new Date(endDateValue);
+    if (Number.isNaN(endDate.getTime())) {
+      return null;
+    }
+
+    endDate.setHours(23, 59, 59, 999);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diffMs = endDate.getTime() - today.getTime();
+    return Math.ceil(diffMs / 86400000);
+  }
+
+  private getRecentReservations(limit: number): ReservationHistoryDto[] {
+    return [...this.reservations]
+      .sort((a, b) => new Date(b.date_debut).getTime() - new Date(a.date_debut).getTime())
+      .slice(0, limit);
+  }
+
+  private getRecentPlaceSubscriptions(limit: number): SubscriptionDto[] {
+    return [...this.subscriptions]
+      .sort((a, b) => {
+        const first = new Date(b.created_at || b.date_debut).getTime();
+        const second = new Date(a.created_at || a.date_debut).getTime();
+        return first - second;
+      })
+      .slice(0, limit);
+  }
+
+  private formatOwnerNotificationTimestamp(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'Mise a jour recente';
+    }
+
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / 3600000);
+
+    if (diffHours < 1) {
+      return 'Il y a moins d une heure';
+    }
+
+    if (diffHours < 24) {
+      return `Il y a ${diffHours} h`;
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) {
+      return `Il y a ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
+    }
+
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
     });
   }
 

@@ -1,4 +1,5 @@
 import enum
+from datetime import date as date_cls
 
 from sqlalchemy import CheckConstraint
 from sqlalchemy.sql import func
@@ -50,3 +51,22 @@ class Abonnement(ModelMixin, db.Model):
 
     def is_active(self):
         return self.statut == StatutAbonnement.actif
+
+    def sync_status_with_dates(self, today=None):
+        if self.statut == StatutAbonnement.suspendu:
+            return False
+
+        current_day = today or date_cls.today()
+
+        if self.date_fin and current_day > self.date_fin:
+            next_status = StatutAbonnement.expire
+        elif self.date_debut and current_day < self.date_debut:
+            next_status = StatutAbonnement.en_attente
+        else:
+            next_status = StatutAbonnement.actif
+
+        if self.statut != next_status:
+            self.statut = next_status
+            return True
+
+        return False

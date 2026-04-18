@@ -342,6 +342,46 @@
         <option *ngFor="let spot of availableReservationSpots" [value]="spot.id_place">{{ buildSpotLabel(spot) }}</option>
       </select>
     </label>
+    <div class="parking-structure-selector" *ngIf="selectedReservationStructure.length > 0">
+      <div class="parking-structure-selector__header">
+        <div>
+          <p class="eyebrow">Structure</p>
+          <h3>Choisissez une place sur le plan du parking</h3>
+        </div>
+        <span class="parking-structure-selector__hint">Les places libres sont sélectionnables</span>
+      </div>
+
+      <div class="parking-structure-selector__floors">
+        <article class="structure-floor-card" *ngFor="let floor of selectedReservationStructure">
+          <div class="structure-floor-card__header">
+            <strong>{{ floor.etage }}</strong>
+            <span>{{ floor.zones.length }} zone(s)</span>
+          </div>
+
+          <div class="structure-zone-card" *ngFor="let zone of floor.zones">
+            <div class="structure-zone-card__header">
+              <strong>Zone {{ zone.name }}</strong>
+              <span>{{ zone.spots.length }} place(s)</span>
+            </div>
+
+            <div class="structure-zone-card__spots">
+              <button
+                type="button"
+                class="structure-spot-btn"
+                *ngFor="let spot of zone.spots"
+                [class.is-available]="spot.etat === 'libre'"
+                [class.is-selected]="isReservationSpotSelected(spot.id_place)"
+                [class.is-unavailable]="spot.etat !== 'libre'"
+                [disabled]="spot.etat !== 'libre'"
+                (click)="selectReservationSpot(spot)">
+                <span>{{ spot.zone }}-{{ spot.num_place }}</span>
+                <small>{{ getSpotStatusLabel(spot.etat) }}</small>
+              </button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
     <label>
       <span>Date de début</span>
       <input formControlName="date_debut" type="datetime-local">
@@ -520,6 +560,46 @@
         <option *ngFor="let spot of availableSubscriptionSpots" [value]="spot.id_place">{{ buildSpotLabel(spot) }}</option>
       </select>
     </label>
+    <div class="parking-structure-selector" *ngIf="selectedSubscriptionStructure.length > 0">
+      <div class="parking-structure-selector__header">
+        <div>
+          <p class="eyebrow">Structure</p>
+          <h3>Choisissez la place de votre abonnement sur le plan du parking</h3>
+        </div>
+        <span class="parking-structure-selector__hint">Les places libres sont sélectionnables</span>
+      </div>
+
+      <div class="parking-structure-selector__floors">
+        <article class="structure-floor-card" *ngFor="let floor of selectedSubscriptionStructure">
+          <div class="structure-floor-card__header">
+            <strong>{{ floor.etage }}</strong>
+            <span>{{ floor.zones.length }} zone(s)</span>
+          </div>
+
+          <div class="structure-zone-card" *ngFor="let zone of floor.zones">
+            <div class="structure-zone-card__header">
+              <strong>Zone {{ zone.name }}</strong>
+              <span>{{ zone.spots.length }} place(s)</span>
+            </div>
+
+            <div class="structure-zone-card__spots">
+              <button
+                type="button"
+                class="structure-spot-btn"
+                *ngFor="let spot of zone.spots"
+                [class.is-available]="spot.etat === 'libre'"
+                [class.is-selected]="isSubscriptionSpotSelected(spot.id_place)"
+                [class.is-unavailable]="spot.etat !== 'libre'"
+                [disabled]="spot.etat !== 'libre'"
+                (click)="selectSubscriptionSpot(spot)">
+                <span>{{ spot.zone }}-{{ spot.num_place }}</span>
+                <small>{{ getSpotStatusLabel(spot.etat) }}</small>
+              </button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
     <label>
       <span>Type d’abonnement</span>
       <select formControlName="type">

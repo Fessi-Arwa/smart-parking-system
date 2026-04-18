@@ -8,6 +8,24 @@ import { ParkingDto, ParkingService } from '../../../services/parking.service';
 import { PlaceDto, PlaceService } from '../../../services/place.service';
 import { ToastService } from '../../../services/toast.service';
 
+interface ParkingStructureZoneDraft {
+  id: string;
+  name: string;
+  placeCount: number;
+}
+
+interface ParkingStructureFloorDraft {
+  id: string;
+  label: string;
+  zones: ParkingStructureZoneDraft[];
+}
+
+interface StructurePreviewZone {
+  floorLabel: string;
+  zoneName: string;
+  spots: Array<{ num_place: number; label: string }>;
+}
+
 @Component({
   selector: 'app-owner-parking-setup',
   templateUrl: './parking-setup.page.html',
@@ -20,7 +38,7 @@ export class ParkingSetupPage implements OnInit {
   isSavingParking = false;
   isLoadingParking = true;
   isLoadingPlaces = true;
-  isAddingPlace = false;
+  isGeneratingStructure = false;
   parking: ParkingDto | null = null;
   places: PlaceDto[] = [];
   parkingDraft = {
@@ -29,15 +47,11 @@ export class ParkingSetupPage implements OnInit {
     capacite: 1,
     prix_heure: 0,
   };
-  placeDraft = {
-    num_place: null as number | null,
-    zone: '',
-    etage: '',
-  };
+  structureDraft: ParkingStructureFloorDraft[] = [];
   setupChecklist = [
     'Verifier les informations saisies pendant l onboarding',
     'Ajuster la capacite selon la realite du site',
-    'Preparer la structuration des zones et des places',
+    'Definir la structure du parking par etage et par zone',
     'Valider cette etape avant le parametrage IA',
   ];
 
@@ -53,12 +67,14 @@ export class ParkingSetupPage implements OnInit {
     this.workflowState = await this.ownerWorkflowService.refresh();
     await this.loadParking();
     await this.loadPlaces();
+    this.initializeStructureDraft();
   }
 
   async refreshStatus(): Promise<void> {
     this.workflowState = await this.ownerWorkflowService.refresh();
     await this.loadParking();
     await this.loadPlaces();
+    this.initializeStructureDraft();
     const route = this.ownerWorkflowService.getNextRoute(this.workflowState);
     if (route !== '/owner/parking-setup') {
       await this.router.navigateByUrl(route);
@@ -101,7 +117,7 @@ export class ParkingSetupPage implements OnInit {
     }
 
     if (this.places.length === 0) {
-      this.toastService.show('Ajoutez au moins une place avant de terminer cette etape.', 'error');
+      this.toastService.show('Generez d abord la structure des places avant de terminer cette etape.', 'error');
       return;
     }
 
@@ -125,6 +141,85 @@ export class ParkingSetupPage implements OnInit {
     }
   }
 
+  addFloor(): void {
+    this.structureDraft = [
+      ...this.structureDraft,
+      this.createFloorDraft(`Etage ${this.structureDraft.length + 1}`),
+    ];
+  }
+
+  removeFloor(floorId: string): void {
+    if (this.structureDraft.length === 1) {
+      this.toastService.show('Gardez au moins un etage dans la structure.', 'error');
+      return;
+    }
+
+    this.structureDraft = this.structureDraft.filter((floor) => floor.id !== floorId);
+  }
+
+  addZone(floorId: string): void {
+    this.structureDraft = this.structureDraft.map((floor) =>
+      floor.id === floorId
+        ? {
+            ...floor,
+            zones: [
+              ...floor.zones,
+              this.createZoneDraft(`Zone ${String.fromCharCode(65 + floor.zones.length)}`),
+            ],
+          }
+        : floor
+    );
+  }
+
+  removeZone(floorId: string, zoneId: string): void {
+    this.structureDraft = this.structureDraft.map((floor) => {
+      if (floor.id !== floorId) {
+        return floor;
+      }
+
+      if (floor.zones.length === 1) {
+        this.toastService.show('Gardez au moins une zone par etage.', 'error');
+        return floor;
+      }
+
+      return {
+        ...floor,
+        zones: floor.zones.filter((zone) => zone.id !== zoneId),
+      };
+    });
+  }
+
+  async generateParkingStructure(): Promise<void> {
+    if (!this.workflowState.parkingId) {
+      this.toastService.show('Aucun parking owner n a ete trouve.', 'error');
+      return;
+    }
+
+    if (!this.isDraftValid()) {
+      this.toastService.show('Completez les informations du parking avant de generer la structure.', 'error');
+      return;
+    }
+
+    const structureError = this.getStructureValidationError();
+    if (structureError) {
+      this.toastService.show(structureError, 'error');
+      return;
+    }
+
+    this.isGeneratingStructure = true;
+
+    try {
+      await this.persistParkingDraft();
+      await this.replaceParkingPlacesWithGeneratedStructure();
+      this.toastService.show('Structure du parking generee avec succes.', 'success');
+    } catch (error) {
+      console.error('Erreur generation structure parking', error);
+      this.toastService.show('Impossible de generer la structure du parking.', 'error');
+    } finally {
+      this.isGeneratingStructure = false;
+    }
+  }
+
   private async loadParking(): Promise<void> {
     if (!this.workflowState?.parkingId) {
       this.isLoadingParking = false;
@@ -143,46 +238,6 @@ export class ParkingSetupPage implements OnInit {
       this.parking = null;
     } finally {
       this.isLoadingParking = false;
-    }
-  }
-
-  async addPlace(): Promise<void> {
-    if (!this.workflowState.parkingId) {
-      this.toastService.show('Aucun parking owner n a ete trouve.', 'error');
-      return;
-    }
-
-    if (!this.isPlaceDraftValid()) {
-      this.toastService.show('Renseignez au minimum un numero de place valide.', 'error');
-      return;
-    }
-
-    if (this.parking && this.places.length >= Number(this.parkingDraft.capacite)) {
-      this.toastService.show('La capacite du parking est deja atteinte.', 'error');
-      return;
-    }
-
-    this.isAddingPlace = true;
-
-    try {
-      const createdPlace = await firstValueFrom(
-        this.placeService.createPlace({
-          parking_id: this.workflowState.parkingId,
-          num_place: Number(this.placeDraft.num_place),
-          etat: 'libre',
-          zone: this.placeDraft.zone.trim() || undefined,
-          etage: this.placeDraft.etage.trim() || undefined,
-        })
-      );
-
-      this.places = [...this.places, createdPlace].sort((a, b) => a.num_place - b.num_place);
-      this.placeDraft = { num_place: null, zone: '', etage: '' };
-      this.toastService.show('Place ajoutee avec succes.', 'success');
-    } catch (error) {
-      console.error('Erreur ajout place', error);
-      this.toastService.show('Impossible d ajouter cette place. Verifiez le numero choisi.', 'error');
-    } finally {
-      this.isAddingPlace = false;
     }
   }
 
@@ -234,7 +289,7 @@ export class ParkingSetupPage implements OnInit {
   }
 
   get remainingPlaces(): number {
-    return Math.max(Number(this.parkingDraft.capacite || 0) - this.places.length, 0);
+    return Math.max(Number(this.parkingDraft.capacite || 0) - this.generatedCapacity, 0);
   }
 
   get zoneSummaries(): Array<{ zone: string; count: number }> {
@@ -267,6 +322,41 @@ export class ParkingSetupPage implements OnInit {
     return `${zonePrefix}${place.num_place}`;
   }
 
+  get generatedCapacity(): number {
+    return this.structureDraft.reduce(
+      (total, floor) =>
+        total +
+        floor.zones.reduce((floorTotal, zone) => floorTotal + Math.max(Number(zone.placeCount || 0), 0), 0),
+      0
+    );
+  }
+
+  get structurePreviewZones(): StructurePreviewZone[] {
+    const preview: StructurePreviewZone[] = [];
+    let currentNumber = 1;
+
+    this.structureDraft.forEach((floor) => {
+      floor.zones.forEach((zone) => {
+        const count = Math.max(Number(zone.placeCount || 0), 0);
+        const spots = Array.from({ length: count }, () => {
+          const numPlace = currentNumber++;
+          return {
+            num_place: numPlace,
+            label: `${zone.name.trim() || 'Zone'}-${numPlace}`,
+          };
+        });
+
+        preview.push({
+          floorLabel: floor.label.trim() || 'RDC',
+          zoneName: zone.name.trim() || 'Zone',
+          spots,
+        });
+      });
+    });
+
+    return preview;
+  }
+
   private async loadPlaces(): Promise<void> {
     if (!this.workflowState?.parkingId) {
       this.isLoadingPlaces = false;
@@ -286,10 +376,6 @@ export class ParkingSetupPage implements OnInit {
     } finally {
       this.isLoadingPlaces = false;
     }
-  }
-
-  private isPlaceDraftValid(): boolean {
-    return Number(this.placeDraft.num_place) > 0;
   }
 
   private buildColumns(): { left: PlaceDto[]; right: PlaceDto[] } {
@@ -319,5 +405,120 @@ export class ParkingSetupPage implements OnInit {
       left: sortedPlaces.filter((_, index) => index % 2 === 0),
       right: sortedPlaces.filter((_, index) => index % 2 === 1),
     };
+  }
+
+  private initializeStructureDraft(): void {
+    if (this.places.length > 0) {
+      this.structureDraft = this.buildDraftFromPlaces(this.places);
+    } else if (this.structureDraft.length === 0) {
+      this.structureDraft = [this.createFloorDraft('RDC')];
+    }
+  }
+
+  private buildDraftFromPlaces(places: PlaceDto[]): ParkingStructureFloorDraft[] {
+    const floorsMap = new Map<string, Map<string, number>>();
+
+    places.forEach((place) => {
+      const floorLabel = (place.etage || 'RDC').trim() || 'RDC';
+      const zoneName = (place.zone || 'A').trim() || 'A';
+      const floorZones = floorsMap.get(floorLabel) ?? new Map<string, number>();
+      floorZones.set(zoneName, (floorZones.get(zoneName) || 0) + 1);
+      floorsMap.set(floorLabel, floorZones);
+    });
+
+    return Array.from(floorsMap.entries()).map(([floorLabel, zones]) => ({
+      id: this.generateLocalId(),
+      label: floorLabel,
+      zones: Array.from(zones.entries()).map(([zoneName, placeCount]) => ({
+        id: this.generateLocalId(),
+        name: zoneName,
+        placeCount,
+      })),
+    }));
+  }
+
+  private createFloorDraft(label: string): ParkingStructureFloorDraft {
+    return {
+      id: this.generateLocalId(),
+      label,
+      zones: [this.createZoneDraft('Zone A')],
+    };
+  }
+
+  private createZoneDraft(name: string): ParkingStructureZoneDraft {
+    return {
+      id: this.generateLocalId(),
+      name,
+      placeCount: 1,
+    };
+  }
+
+  private generateLocalId(): string {
+    return Math.random().toString(36).slice(2, 10);
+  }
+
+  private getStructureValidationError(): string | null {
+    if (this.structureDraft.length === 0) {
+      return 'Ajoutez au moins un etage pour construire le parking.';
+    }
+
+    for (const floor of this.structureDraft) {
+      if (!floor.label.trim()) {
+        return 'Chaque etage doit avoir un nom ou un libelle.';
+      }
+
+      if (floor.zones.length === 0) {
+        return `Ajoutez au moins une zone pour l etage ${floor.label}.`;
+      }
+
+      for (const zone of floor.zones) {
+        if (!zone.name.trim()) {
+          return `Chaque zone de l etage ${floor.label} doit avoir un nom.`;
+        }
+
+        if (Number(zone.placeCount) <= 0) {
+          return `Le nombre de places de ${zone.name} doit etre superieur a zero.`;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private async replaceParkingPlacesWithGeneratedStructure(): Promise<void> {
+    if (!this.workflowState.parkingId) {
+      return;
+    }
+
+    const existingPlaces = [...this.places];
+    for (const place of existingPlaces) {
+      await firstValueFrom(this.placeService.deletePlace(place.id_place));
+    }
+
+    const generatedPlaces: PlaceDto[] = [];
+    let currentNumber = 1;
+
+    for (const floor of this.structureDraft) {
+      for (const zone of floor.zones) {
+        const zoneCount = Number(zone.placeCount);
+        for (let index = 0; index < zoneCount; index += 1) {
+          const createdPlace = await firstValueFrom(
+            this.placeService.createPlace({
+              parking_id: this.workflowState.parkingId,
+              num_place: currentNumber,
+              etat: 'libre',
+              zone: zone.name.trim(),
+              etage: floor.label.trim(),
+            })
+          );
+          generatedPlaces.push(createdPlace);
+          currentNumber += 1;
+        }
+      }
+    }
+
+    this.places = generatedPlaces.sort((a, b) => a.num_place - b.num_place);
+    this.parkingDraft.capacite = generatedPlaces.length;
+    await this.persistParkingDraft();
   }
 }
