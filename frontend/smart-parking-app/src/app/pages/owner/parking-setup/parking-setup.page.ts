@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { OwnerWorkflowState } from '../../../models/owner-workflow.model';
@@ -59,6 +59,7 @@ export class ParkingSetupPage implements OnInit {
     private ownerWorkflowService: OwnerWorkflowService,
     private parkingService: ParkingService,
     private placeService: PlaceService,
+    private route: ActivatedRoute,
     private router: Router,
     private toastService: ToastService
   ) {}
@@ -75,6 +76,9 @@ export class ParkingSetupPage implements OnInit {
     await this.loadParking();
     await this.loadPlaces();
     this.initializeStructureDraft();
+    if (this.hasRouteParkingSelection) {
+      return;
+    }
     const route = this.ownerWorkflowService.getNextRoute(this.workflowState);
     if (route !== '/owner/parking-setup') {
       await this.router.navigateByUrl(route);
@@ -82,7 +86,7 @@ export class ParkingSetupPage implements OnInit {
   }
 
   async saveParkingDetails(): Promise<void> {
-    if (!this.workflowState.parkingId) {
+    if (!this.activeParkingId) {
       this.toastService.show('Aucun parking owner n a ete trouve.', 'error');
       return;
     }
@@ -106,7 +110,7 @@ export class ParkingSetupPage implements OnInit {
   }
 
   async completeSetup(): Promise<void> {
-    if (!this.workflowState.parkingId) {
+    if (!this.activeParkingId) {
       this.toastService.show('Aucun parking owner n a ete trouve.', 'error');
       return;
     }
@@ -126,7 +130,7 @@ export class ParkingSetupPage implements OnInit {
     try {
       await this.persistParkingDraft();
       this.workflowState = await this.ownerWorkflowService.updateParkingSetupStatus(
-        this.workflowState.parkingId,
+        this.activeParkingId,
         'terminee'
       );
       this.toastService.show('Configuration parking marquee comme terminee.', 'success');
@@ -190,7 +194,7 @@ export class ParkingSetupPage implements OnInit {
   }
 
   async generateParkingStructure(): Promise<void> {
-    if (!this.workflowState.parkingId) {
+    if (!this.activeParkingId) {
       this.toastService.show('Aucun parking owner n a ete trouve.', 'error');
       return;
     }
@@ -221,7 +225,7 @@ export class ParkingSetupPage implements OnInit {
   }
 
   private async loadParking(): Promise<void> {
-    if (!this.workflowState?.parkingId) {
+    if (!this.activeParkingId) {
       this.isLoadingParking = false;
       this.parking = null;
       return;
@@ -230,7 +234,7 @@ export class ParkingSetupPage implements OnInit {
     this.isLoadingParking = true;
 
     try {
-      this.parking = await firstValueFrom(this.parkingService.getParking(this.workflowState.parkingId));
+      this.parking = await firstValueFrom(this.parkingService.getParking(this.activeParkingId));
       this.syncDraftFromParking(this.parking);
     } catch (error) {
       console.error('Erreur chargement parking owner', error);
@@ -253,12 +257,12 @@ export class ParkingSetupPage implements OnInit {
   }
 
   private async persistParkingDraft(): Promise<void> {
-    if (!this.workflowState.parkingId) {
+    if (!this.activeParkingId) {
       return;
     }
 
     const response = await firstValueFrom(
-      this.parkingService.updateParking(this.workflowState.parkingId, {
+      this.parkingService.updateParking(this.activeParkingId, {
         nom: this.parkingDraft.nom.trim(),
         adresse: this.parkingDraft.adresse.trim(),
         capacite: Number(this.parkingDraft.capacite),
@@ -358,7 +362,7 @@ export class ParkingSetupPage implements OnInit {
   }
 
   private async loadPlaces(): Promise<void> {
-    if (!this.workflowState?.parkingId) {
+    if (!this.activeParkingId) {
       this.isLoadingPlaces = false;
       this.places = [];
       return;
@@ -367,7 +371,7 @@ export class ParkingSetupPage implements OnInit {
     this.isLoadingPlaces = true;
 
     try {
-      const places = await firstValueFrom(this.placeService.getPlaces(this.workflowState.parkingId));
+      const places = await firstValueFrom(this.placeService.getPlaces(this.activeParkingId));
       this.places = [...places].sort((a, b) => a.num_place - b.num_place);
     } catch (error) {
       console.error('Erreur chargement places owner', error);
@@ -486,7 +490,7 @@ export class ParkingSetupPage implements OnInit {
   }
 
   private async replaceParkingPlacesWithGeneratedStructure(): Promise<void> {
-    if (!this.workflowState.parkingId) {
+    if (!this.activeParkingId) {
       return;
     }
 
@@ -504,7 +508,7 @@ export class ParkingSetupPage implements OnInit {
         for (let index = 0; index < zoneCount; index += 1) {
           const createdPlace = await firstValueFrom(
             this.placeService.createPlace({
-              parking_id: this.workflowState.parkingId,
+              parking_id: this.activeParkingId,
               num_place: currentNumber,
               etat: 'libre',
               zone: zone.name.trim(),
@@ -520,5 +524,17 @@ export class ParkingSetupPage implements OnInit {
     this.places = generatedPlaces.sort((a, b) => a.num_place - b.num_place);
     this.parkingDraft.capacite = generatedPlaces.length;
     await this.persistParkingDraft();
+  }
+
+  get activeParkingId(): number | null {
+    const routeParkingId = Number(this.route.snapshot.queryParamMap.get('parking'));
+    if (routeParkingId) {
+      return routeParkingId;
+    }
+    return this.workflowState?.parkingId ?? null;
+  }
+
+  get hasRouteParkingSelection(): boolean {
+    return Boolean(Number(this.route.snapshot.queryParamMap.get('parking')));
   }
 }

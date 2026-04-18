@@ -23,17 +23,14 @@ const routes: Routes = [
   },
   {
     path: 'subscription',
-    canActivate: [OwnerWorkflowGuard],
     component: SubscriptionPage,
   },
   {
     path: 'parking-setup',
-    canActivate: [OwnerWorkflowGuard],
     component: ParkingSetupPage,
   },
   {
     path: 'ai-setup',
-    canActivate: [OwnerWorkflowGuard],
     component: AiSetupPage,
   },
   {

@@ -590,6 +590,46 @@
   gap: 12px;
 }
 
+.parking-health-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.parking-health-card {
+  padding: 14px;
+  border-radius: 18px;
+  background: #eff6ff;
+  border: 1px solid rgba(59, 130, 246, 0.14);
+}
+
+.parking-health-card span {
+  display: block;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.parking-health-card strong {
+  display: block;
+  margin-top: 8px;
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 620;
+  letter-spacing: -0.03em;
+}
+
+.parking-health-card--warning {
+  background: #fff7ed;
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.parking-health-card--neutral {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
 .parking-list__more {
   display: inline-flex;
   align-items: center;
@@ -609,6 +649,19 @@
   border-radius: 18px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
+}
+
+.parking-card {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.parking-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(37, 99, 235, 0.2);
+  box-shadow: 0 14px 24px rgba(15, 23, 42, 0.05);
 }
 
 .workflow-step {
@@ -713,6 +766,18 @@
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, #1d4ed8, #38bdf8);
+}
+
+.parking-card__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  margin-top: 14px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .status-pill {
@@ -1025,6 +1090,10 @@
 }
 
 @media (max-width: 1180px) {
+  .parking-health-grid {
+    grid-template-columns: 1fr;
+  }
+
   .overview-grid,
   .analytics-grid,
   .dashboard-grid {

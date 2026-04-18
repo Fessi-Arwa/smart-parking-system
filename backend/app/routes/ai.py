@@ -3,7 +3,7 @@ from flask import Blueprint, current_app, jsonify, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from .. import db
-from ..models.compte import Compte, RoleCompte
+from ..models.compte import Compte, RoleCompte, StatutValidationOwner
 from ..models.detection import DetectionIA, DetectionPlace, DetectionVehicule
 from ..models.parking import Parking
 from ..services.video_ai_service import ParkingVideoAIService
@@ -42,7 +42,7 @@ def _parse_datetime(value):
     return datetime.fromisoformat(value)
 
 
-def _get_owner_user():
+def _get_owner_user(require_approved_owner=True):
     user_id = get_jwt_identity()
     user = Compte.query.get(int(user_id))
 
@@ -52,6 +52,9 @@ def _get_owner_user():
     if user.role != RoleCompte.owner:
         return None, (jsonify({"msg": "Seuls les owners peuvent utiliser ce module IA"}), 403)
 
+    if require_approved_owner and user.owner_status != StatutValidationOwner.accepte:
+        return None, (jsonify({"msg": "Le compte owner doit etre accepte pour acceder au module IA"}), 403)
+
     return user, None
 
 
@@ -59,18 +62,41 @@ def _get_owner_parking(user, parking_id):
     return Parking.query.filter_by(id_park=parking_id, owner_id=user.id_compte).first()
 
 
+def _get_admin_user():
+    user_id = get_jwt_identity()
+    user = Compte.query.get(int(user_id))
+
+    if not user:
+        return None, (jsonify({"msg": "Utilisateur introuvable"}), 404)
+
+    if user.role != RoleCompte.admin:
+        return None, (jsonify({"msg": "Acces reserve aux admins"}), 403)
+
+    return user, None
+
+
 def _get_video_service():
     return ParkingVideoAIService(current_app.config["UPLOAD_FOLDER"], current_app._get_current_object())
 
 
 @ai_bp.route("/", methods=["GET"])
+@jwt_required()
 def get_detections():
+    _, error_response = _get_admin_user()
+    if error_response:
+        return error_response
+
     detections = DetectionIA.query.order_by(DetectionIA.id_detect.desc()).all()
     return jsonify([_detection_to_dict(detection) for detection in detections])
 
 
 @ai_bp.route("/<int:detection_id>", methods=["GET"])
+@jwt_required()
 def get_detection(detection_id):
+    _, error_response = _get_admin_user()
+    if error_response:
+        return error_response
+
     detection = DetectionIA.query.get(detection_id)
     if not detection:
         return jsonify({"error": "Detection not found"}), 404
@@ -78,7 +104,12 @@ def get_detection(detection_id):
 
 
 @ai_bp.route("/place", methods=["POST"])
+@jwt_required()
 def create_place_detection():
+    _, error_response = _get_admin_user()
+    if error_response:
+        return error_response
+
     data = request.get_json() or {}
     if data.get("place_id") is None or data.get("etat_detecte") is None:
         return jsonify({"error": "place_id and etat_detecte are required"}), 400
@@ -102,7 +133,12 @@ def create_place_detection():
 
 
 @ai_bp.route("/vehicule", methods=["POST"])
+@jwt_required()
 def create_vehicle_detection():
+    _, error_response = _get_admin_user()
+    if error_response:
+        return error_response
+
     data = request.get_json() or {}
 
     detection = DetectionIA(
@@ -125,7 +161,12 @@ def create_vehicle_detection():
 
 
 @ai_bp.route("/<int:detection_id>", methods=["PUT"])
+@jwt_required()
 def update_detection(detection_id):
+    _, error_response = _get_admin_user()
+    if error_response:
+        return error_response
+
     detection = DetectionIA.query.get(detection_id)
     if not detection:
         return jsonify({"error": "Detection not found"}), 404
@@ -156,7 +197,12 @@ def update_detection(detection_id):
 
 
 @ai_bp.route("/<int:detection_id>", methods=["DELETE"])
+@jwt_required()
 def delete_detection(detection_id):
+    _, error_response = _get_admin_user()
+    if error_response:
+        return error_response
+
     detection = DetectionIA.query.get(detection_id)
     if not detection:
         return jsonify({"error": "Detection not found"}), 404
@@ -225,7 +271,16 @@ def get_video_batch_job(parking_id, job_id):
 
 
 @ai_bp.route("/parkings/<int:parking_id>/video-results/<result_id>/stream", methods=["GET"])
+@jwt_required()
 def stream_video_result(parking_id, result_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    parking = _get_owner_parking(user, parking_id)
+    if not parking:
+        return jsonify({"msg": "Parking introuvable"}), 404
+
     service = _get_video_service()
     output_path = service.resolve_output_path(parking_id, result_id)
     if not output_path:
@@ -235,7 +290,16 @@ def stream_video_result(parking_id, result_id):
 
 
 @ai_bp.route("/parkings/<int:parking_id>/video-results/<result_id>/download", methods=["GET"])
+@jwt_required()
 def download_video_result(parking_id, result_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    parking = _get_owner_parking(user, parking_id)
+    if not parking:
+        return jsonify({"msg": "Parking introuvable"}), 404
+
     service = _get_video_service()
     output_path = service.resolve_output_path(parking_id, result_id)
     if not output_path:

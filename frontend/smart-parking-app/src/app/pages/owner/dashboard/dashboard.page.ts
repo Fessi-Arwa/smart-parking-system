@@ -99,6 +99,12 @@ interface RevenueBar {
   subscriptionHeight: number;
 }
 
+interface DashboardParkingHealth {
+  pendingValidation: number;
+  lowCapacity: number;
+  maintenance: number;
+}
+
 @Component({
   selector: 'app-dashboard',
   templateUrl: './dashboard.page.html',
@@ -119,6 +125,7 @@ export class DashboardPage implements OnInit {
   selectedAiParkingId: number | null = null;
   private previewErrorIds = new Set<number>();
   private analysisVideoErrorIds = new Set<number>();
+  private sourceBlobs = new Map<number, string>(); // Stocke les blob URLs
 
   constructor(
     private authService: AuthService,
@@ -158,11 +165,28 @@ export class DashboardPage implements OnInit {
   }
 
   get visibleParkings(): OwnerParking[] {
-    return this.parkings.slice(0, this.dashboardParkingLimit);
+    return [...this.parkings]
+      .sort((left, right) => {
+        const scoreDiff = this.getParkingPriorityScore(right) - this.getParkingPriorityScore(left);
+        if (scoreDiff !== 0) {
+          return scoreDiff;
+        }
+
+        return this.getParkingOccupancyRate(right) - this.getParkingOccupancyRate(left);
+      })
+      .slice(0, this.dashboardParkingLimit);
   }
 
   get hiddenParkingsCount(): number {
     return Math.max(this.parkings.length - this.visibleParkings.length, 0);
+  }
+
+  get parkingHealth(): DashboardParkingHealth {
+    return {
+      pendingValidation: this.parkings.filter((parking) => parking.validationStatus === 'en_attente_validation').length,
+      lowCapacity: this.parkings.filter((parking) => parking.availableSpaces > 0 && parking.availableSpaces <= 5).length,
+      maintenance: this.parkings.filter((parking) => parking.status === 'maintenance').length,
+    };
   }
 
   get stats(): OwnerStats {
@@ -781,7 +805,10 @@ export class DashboardPage implements OnInit {
         : [];
 
       this.workflowState = workflowState;
-      this.parkings = ownerParkings.map((parking, index) => this.mapParking(parking, places, index));
+      const placesByParking = this.groupPlacesByParking(places);
+      this.parkings = ownerParkings.map((parking, index) =>
+        this.mapParking(parking, placesByParking.get(parking.id_park) ?? [], index)
+      );
       this.reservations = reservations;
       this.subscriptions = subscriptions;
 
@@ -805,13 +832,34 @@ export class DashboardPage implements OnInit {
           ? workflowState.parkingId
           : aiSourcesByParking[0]?.parkingId ?? null;
       this.selectedAiParkingId = preferredParkingId;
+
+      // Charger les blob URLs pour les vidéos
+      await this.loadBlobUrlsForSources();
     } finally {
       this.isLoading = false;
     }
   }
 
-  private mapParking(parking: ParkingDto, places: PlaceDto[], index: number): OwnerParking {
-    const parkingPlaces = places.filter((place) => place.parking_id === parking.id_park);
+  private async loadBlobUrlsForSources(): Promise<void> {
+    for (const source of this.aiSources) {
+      if (this.isVideoSource(source) && source.preview_url) {
+        try {
+          const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(source.id_source);
+          if (blobUrl) {
+            this.sourceBlobs.set(source.id_source, blobUrl);
+          }
+        } catch (error) {
+          console.warn(`Erreur lors du chargement du blob pour la source ${source.id_source}:`, error);
+        }
+      }
+    }
+  }
+
+  getSourceVideoUrl(source: ParkingAISource): string {
+    return this.sourceBlobs.get(source.id_source) || source.preview_url || '';
+  }
+
+  private mapParking(parking: ParkingDto, parkingPlaces: PlaceDto[], index: number): OwnerParking {
     const availableSpaces = parkingPlaces.length
       ? parkingPlaces.filter((place) => place.etat === 'libre').length
       : parking.capacite;
@@ -826,6 +874,43 @@ export class DashboardPage implements OnInit {
       validationStatus: parking.validation_status || 'brouillon',
       image: `assets/parking${(index % 3) + 1}.jpg`,
     };
+  }
+
+  private groupPlacesByParking(places: PlaceDto[]): Map<number, PlaceDto[]> {
+    const grouped = new Map<number, PlaceDto[]>();
+
+    places.forEach((place) => {
+      const collection = grouped.get(place.parking_id) ?? [];
+      collection.push(place);
+      grouped.set(place.parking_id, collection);
+    });
+
+    return grouped;
+  }
+
+  private getParkingPriorityScore(parking: OwnerParking): number {
+    let score = 0;
+
+    if (parking.validationStatus === 'rejete') {
+      score += 400;
+    } else if (parking.validationStatus === 'en_attente_validation') {
+      score += 300;
+    } else if (parking.validationStatus === 'brouillon') {
+      score += 180;
+    }
+
+    if (parking.status === 'maintenance') {
+      score += 220;
+    }
+
+    if (parking.availableSpaces === 0) {
+      score += 170;
+    } else if (parking.availableSpaces <= 5) {
+      score += 130;
+    }
+
+    score += this.getParkingOccupancyRate(parking);
+    return score;
   }
 
   private isToday(value: string): boolean {

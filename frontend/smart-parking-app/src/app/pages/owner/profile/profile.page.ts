@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from '../../../services/auth.service';
@@ -49,6 +49,13 @@ interface OwnerPortfolioStats {
   availableSpaces: number;
   occupancyRate: number;
   activeParkings: number;
+}
+
+interface ParkingPortfolioHealth {
+  pendingValidation: number;
+  rejected: number;
+  lowCapacity: number;
+  maintenance: number;
 }
 
 @Component({
@@ -119,7 +126,8 @@ export class ProfilePage implements OnInit {
     private parkingAiSourceService: ParkingAiSourceService,
     private ownerWorkflowService: OwnerWorkflowService,
     private toastService: ToastService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -135,6 +143,7 @@ export class ProfilePage implements OnInit {
     }
 
     await this.loadOwnerParkings();
+    await this.applyParkingSelectionFromRoute();
     this.workflowState = await this.ownerWorkflowService.refresh();
   }
 
@@ -160,19 +169,59 @@ export class ProfilePage implements OnInit {
     };
   }
 
+  get portfolioHealth(): ParkingPortfolioHealth {
+    return {
+      pendingValidation: this.parkings.filter((parking) => parking.validation_status === 'en_attente_validation').length,
+      rejected: this.parkings.filter((parking) => parking.validation_status === 'rejete').length,
+      lowCapacity: this.parkings.filter((parking) => parking.availableSpaces > 0 && parking.availableSpaces <= 5).length,
+      maintenance: this.parkings.filter((parking) => parking.statut === 'maintenance').length,
+    };
+  }
+
   get filteredParkings(): ParkingInfo[] {
     const search = this.parkingSearch.trim().toLowerCase();
-    return this.parkings.filter((parking) => {
-      const matchesStatus =
-        this.parkingStatusFilter === 'all' || parking.statut === this.parkingStatusFilter;
-      const matchesSearch =
-        !search ||
-        parking.nom.toLowerCase().includes(search) ||
-        parking.adresse.toLowerCase().includes(search) ||
-        parking.ville.toLowerCase().includes(search);
+    return this.parkings
+      .filter((parking) => {
+        const matchesStatus =
+          this.parkingStatusFilter === 'all' || parking.statut === this.parkingStatusFilter;
+        const matchesSearch =
+          !search ||
+          parking.nom.toLowerCase().includes(search) ||
+          parking.adresse.toLowerCase().includes(search) ||
+          parking.ville.toLowerCase().includes(search);
 
-      return matchesStatus && matchesSearch;
-    });
+        return matchesStatus && matchesSearch;
+      })
+      .sort((left, right) => {
+        const scoreDiff = this.getParkingPriorityScore(right) - this.getParkingPriorityScore(left);
+        if (scoreDiff !== 0) {
+          return scoreDiff;
+        }
+
+        const occupancyDiff = this.getParkingOccupancy(right) - this.getParkingOccupancy(left);
+        if (occupancyDiff !== 0) {
+          return occupancyDiff;
+        }
+
+        return left.nom.localeCompare(right.nom, 'fr', { sensitivity: 'base' });
+      });
+  }
+
+  get hasActiveParkingFilters(): boolean {
+    return Boolean(this.parkingSearch.trim()) || this.parkingStatusFilter !== 'all';
+  }
+
+  get filteredParkingSummary(): string {
+    const count = this.filteredParkings.length;
+    if (!count) {
+      return 'Aucun parking visible avec les filtres actuels.';
+    }
+
+    if (count === this.parkings.length && !this.hasActiveParkingFilters) {
+      return `${count} parking(s) classes par priorite operationnelle.`;
+    }
+
+    return `${count} parking(s) correspondent a la recherche ou au filtre.`;
   }
 
   get notificationItems(): HeaderNotificationItem[] {
@@ -337,6 +386,12 @@ export class ProfilePage implements OnInit {
     this.selectedParkingSources = [];
     this.previewErrorIds.clear();
     this.isEditingParking = false;
+    await this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { parking: parking.id_park },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
 
     try {
       this.selectedParkingSources = await this.parkingAiSourceService.getSources(parking.id_park);
@@ -351,10 +406,34 @@ export class ProfilePage implements OnInit {
     this.selectedParkingSources = [];
     this.previewErrorIds.clear();
     this.showAddParking = false;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { parking: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
-  async openAiSetup(): Promise<void> {
-    await this.router.navigateByUrl('/owner/ai-setup');
+  async openAiSetup(parking?: ParkingInfo | null): Promise<void> {
+    const targetParking = parking ?? this.selectedParking;
+    if (!targetParking) {
+      this.toastService.show('Vous ne pouvez pas acceder a la configuration IA pour le moment.', 'error');
+      return;
+    }
+    await this.router.navigate(['/owner/ai-setup'], {
+      queryParams: { parking: targetParking.id_park },
+    });
+  }
+
+  async openParkingSetup(parking?: ParkingInfo | null): Promise<void> {
+    const targetParking = parking ?? this.selectedParking;
+    if (!targetParking) {
+      this.toastService.show('Vous ne pouvez pas acceder a la configuration du parking pour le moment.', 'error');
+      return;
+    }
+    await this.router.navigate(['/owner/parking-setup'], {
+      queryParams: { parking: targetParking.id_park },
+    });
   }
 
   startEditParking(): void {
@@ -388,7 +467,11 @@ export class ProfilePage implements OnInit {
       this.workflowState = await this.ownerWorkflowService.refresh();
       this.isEditingParking = false;
       this.toastService.show(
-        'Parking mis a jour. Toute modification structurelle repasse en validation admin.',
+        this.workflowState?.parkingId === this.selectedParking.id_park &&
+        this.workflowState?.parkingStatus === 'valide' &&
+        this.workflowState?.parkingSetupStatus !== 'terminee'
+          ? 'Parking mis a jour. Vous pouvez poursuivre la configuration du parking.'
+          : 'Parking mis a jour. Toute modification structurelle repasse en validation admin.',
         'success'
       );
     } catch (error: any) {
@@ -540,8 +623,41 @@ export class ProfilePage implements OnInit {
     return Math.round(((parking.totalSpaces - parking.availableSpaces) / parking.totalSpaces) * 100);
   }
 
+  get canOpenParkingSetup(): boolean {
+    return Boolean(this.selectedParking);
+  }
+
+  get parkingSetupHint(): string {
+    if (!this.selectedParking) {
+      return 'Selectionnez un parking pour ouvrir sa configuration.';
+    }
+
+    return `Ouvrir la configuration detaillee de ${this.selectedParking.nom} pour gerer zones, etages et places.`;
+  }
+
+  get canOpenAiSetup(): boolean {
+    return Boolean(this.selectedParking);
+  }
+
+  get aiSetupHint(): string {
+    if (!this.selectedParking) {
+      return 'Selectionnez un parking pour ouvrir sa configuration IA.';
+    }
+
+    return `Ouvrir les sources IA de ${this.selectedParking.nom} pour images, videos, cameras et calibration.`;
+  }
+
   setParkingStatusFilter(status: 'all' | 'actif' | 'maintenance'): void {
     this.parkingStatusFilter = status;
+  }
+
+  clearParkingFilters(): void {
+    this.parkingSearch = '';
+    this.parkingStatusFilter = 'all';
+  }
+
+  trackByParking(_: number, parking: ParkingInfo): number {
+    return parking.id_park;
   }
 
   showPreview(source: ParkingAISource): boolean {
@@ -560,7 +676,8 @@ export class ProfilePage implements OnInit {
     ]);
 
     const ownerParkings = parkings.filter((parking) => parking.owner_id === ownerId);
-    this.parkings = ownerParkings.map((parking) => this.mapParking(parking, places));
+    const placesByParking = this.groupPlacesByParking(places);
+    this.parkings = ownerParkings.map((parking) => this.mapParking(parking, placesByParking.get(parking.id_park) ?? []));
 
     const targetId = selectedParkingId ?? this.selectedParking?.id_park;
     this.selectedParking = targetId
@@ -568,8 +685,7 @@ export class ProfilePage implements OnInit {
       : null;
   }
 
-  private mapParking(parking: ParkingDto, places: PlaceDto[]): ParkingInfo {
-    const parkingPlaces = places.filter((place) => place.parking_id === parking.id_park);
+  private mapParking(parking: ParkingDto, parkingPlaces: PlaceDto[]): ParkingInfo {
     const availableSpaces = parkingPlaces.length
       ? parkingPlaces.filter((place) => place.etat === 'libre').length
       : parking.capacite;
@@ -586,6 +702,57 @@ export class ProfilePage implements OnInit {
       availableSpaces,
       activeSubscriptions: 0,
     };
+  }
+
+  private async applyParkingSelectionFromRoute(): Promise<void> {
+    const requestedParkingId = Number(this.route.snapshot.queryParamMap.get('parking'));
+    if (!requestedParkingId) {
+      return;
+    }
+
+    const parking = this.parkings.find((item) => item.id_park === requestedParkingId);
+    if (!parking) {
+      return;
+    }
+
+    await this.selectParking(parking);
+  }
+
+  private groupPlacesByParking(places: PlaceDto[]): Map<number, PlaceDto[]> {
+    const grouped = new Map<number, PlaceDto[]>();
+
+    places.forEach((place) => {
+      const collection = grouped.get(place.parking_id) ?? [];
+      collection.push(place);
+      grouped.set(place.parking_id, collection);
+    });
+
+    return grouped;
+  }
+
+  private getParkingPriorityScore(parking: ParkingInfo): number {
+    let score = 0;
+
+    if (parking.validation_status === 'rejete') {
+      score += 400;
+    } else if (parking.validation_status === 'en_attente_validation') {
+      score += 300;
+    } else if (parking.validation_status === 'brouillon') {
+      score += 180;
+    }
+
+    if (parking.statut === 'maintenance') {
+      score += 220;
+    }
+
+    if (parking.availableSpaces === 0) {
+      score += 170;
+    } else if (parking.availableSpaces <= 5) {
+      score += 130;
+    }
+
+    score += this.getParkingOccupancy(parking);
+    return score;
   }
 
   private extractCity(address: string): string {

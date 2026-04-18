@@ -27,8 +27,8 @@
           Ajoutez maintenant les medias et flux de surveillance que le modele IA utilisera pour
           detecter les vehicules, estimer l occupation et assister la configuration finale du parking.
         </p>
-        <p class="owner-step__active-parking" *ngIf="workflowState?.parkingId">
-          Parking actif : #{{ workflowState.parkingId }}
+        <p class="owner-step__active-parking" *ngIf="activeParkingId">
+          Parking actif : #{{ activeParkingId }}
         </p>
       </div>
 
@@ -97,11 +97,11 @@
       <div class="sources-list" *ngIf="!isLoadingSources && aiSources.length > 0">
         <article class="source-card" *ngFor="let source of aiSources; trackBy: trackSource">
           <div class="source-card__preview" *ngIf="isImageSource(source) && source.preview_url">
-            <img [src]="source.preview_url" [alt]="source.label || source.original_name || 'Image IA'" />
+            <img [src]="getSourceMediaUrl(source)" [alt]="source.label || source.original_name || 'Image IA'" />
           </div>
 
           <div class="source-card__preview source-card__preview--video" *ngIf="isVideoSource(source) && source.preview_url">
-            <video [src]="source.preview_url" controls preload="metadata"></video>
+            <video [src]="getSourceMediaUrl(source)" controls preload="metadata"></video>
           </div>
 
           <div class="source-card__preview source-card__preview--camera" *ngIf="isCameraSource(source)">
@@ -115,7 +115,7 @@
             <p *ngIf="!source.stream_url">{{ source.original_name || source.mime_type }}</p>
 
             <div class="source-analysis source-analysis--success" *ngIf="hasProcessedAnalysis(source)">
-              <span class="source-analysis__badge">Analyse terminee</span>
+              <span class="source-analysis__badge">{{ isVideoSource(source) ? 'Video traitee' : 'Analyse terminee' }}</span>
               <strong *ngIf="getAnalysisSummary(source)">{{ getAnalysisSummary(source) }}</strong>
               <p *ngIf="getAnalysisMeta(source)">{{ getAnalysisMeta(source) }}</p>
               <p *ngIf="getSyncMeta(source)">{{ getSyncMeta(source) }}</p>
@@ -125,12 +125,12 @@
               </div>
 
               <div class="source-analysis__preview" *ngIf="isImageAnalysis(source)">
-                <img [src]="getAnalysisOutputUrl(source)!" [alt]="'Analyse ' + (source.label || source.original_name || 'IA')" />
+                <img [src]="getAnalysisMediaUrl(source)!" [alt]="'Analyse ' + (source.label || source.original_name || 'IA')" />
               </div>
 
               <div class="source-analysis__preview source-analysis__preview--video" *ngIf="showAnalysisVideo(source)">
                 <video
-                  [src]="getAnalysisOutputUrl(source)!"
+                  [src]="getAnalysisMediaUrl(source)!"
                   [poster]="getAnalysisPreviewUrl(source) || undefined"
                   controls
                   (error)="markAnalysisVideoError(source)"
@@ -147,7 +147,7 @@
                 [href]="getAnalysisOutputUrl(source)!"
                 target="_blank"
                 rel="noopener">
-                Ouvrir le resultat annote
+                Ouvrir la video traitee
               </a>
             </div>
 
@@ -241,7 +241,7 @@
           <div class="calibration-sidebar__empty-places" *ngIf="!hasCalibrationPlaces()">
             <strong>Aucune place disponible</strong>
             <p>
-              Le parking actif #{{ workflowState.parkingId }} n a encore aucune place enregistree.
+              Le parking actif #{{ activeParkingId }} n a encore aucune place enregistree.
               Ajoute d abord les places dans l etape Parking avant d affecter les slots.
             </p>
             <button class="owner-step__secondary" type="button" (click)="goToParkingSetup()">

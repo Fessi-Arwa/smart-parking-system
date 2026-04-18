@@ -213,6 +213,21 @@
         </ion-card-header>
 
         <ion-card-content>
+          <div class="parking-health-grid" *ngIf="parkings.length">
+            <article class="parking-health-card">
+              <span>En attente</span>
+              <strong>{{ parkingHealth.pendingValidation }}</strong>
+            </article>
+            <article class="parking-health-card parking-health-card--warning">
+              <span>Capacite faible</span>
+              <strong>{{ parkingHealth.lowCapacity }}</strong>
+            </article>
+            <article class="parking-health-card parking-health-card--neutral">
+              <span>Maintenance</span>
+              <strong>{{ parkingHealth.maintenance }}</strong>
+            </article>
+          </div>
+
           <div class="parking-list" *ngIf="parkings.length; else emptyParkings">
             <article class="parking-card" *ngFor="let parking of visibleParkings; trackBy: trackByParking">
               <div class="parking-card__top">
@@ -240,6 +255,14 @@
               <div class="parking-card__progress">
                 <span [style.width.%]="getParkingOccupancyRate(parking)"></span>
               </div>
+
+              <a
+                class="parking-card__link"
+                [routerLink]="['/owner/profile']"
+                [queryParams]="{ parking: parking.id }">
+                Ouvrir ce parking
+                <ion-icon name="arrow-forward-outline"></ion-icon>
+              </a>
             </article>
 
             <a *ngIf="hiddenParkingsCount > 0" class="parking-list__more" routerLink="/owner/profile">
@@ -347,7 +370,7 @@
                   </ng-template>
 
                   <div class="ai-source-card__preview ai-source-card__preview--video" *ngIf="isVideoSource(source) && showPreview(source); else videoFallback">
-                    <video [src]="source.preview_url" controls preload="metadata" (error)="markPreviewError(source)"></video>
+                    <video [src]="getSourceVideoUrl(source)" controls preload="metadata" (error)="markPreviewError(source)"></video>
                   </div>
 
                   <ng-template #videoFallback>

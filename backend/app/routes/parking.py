@@ -213,9 +213,18 @@ def update_parking(parking_id):
         return jsonify({"msg": "Un autre parking avec le meme nom et la meme adresse existe deja"}), 400
 
     if changed_structural_fields:
-        parking.validation_status = StatutValidationParking.en_attente_validation
-        parking.setup_status = StatutConfigurationParking.non_commencee
-        parking.ai_setup_status = StatutConfigurationIA.non_configuree
+        # Keep the workflow stable while the owner is still inside the dedicated
+        # parking-setup step. Otherwise every edit would send the parking back to
+        # admin review before step 3 can be completed.
+        is_setup_in_progress = (
+            parking.validation_status == StatutValidationParking.valide
+            and parking.setup_status != StatutConfigurationParking.terminee
+        )
+
+        if not is_setup_in_progress:
+            parking.validation_status = StatutValidationParking.en_attente_validation
+            parking.setup_status = StatutConfigurationParking.non_commencee
+            parking.ai_setup_status = StatutConfigurationIA.non_configuree
 
     db.session.commit()
     return jsonify({"msg": "Parking mis a jour avec succes", "parking": parking.to_dict()}), 200

@@ -255,6 +255,21 @@ export class ParkingAiSourceService {
     );
   }
 
+  async fetchProtectedMediaObjectUrl(mediaUrlOrSourceId: string | number): Promise<string> {
+    const mediaUrl =
+      typeof mediaUrlOrSourceId === 'number'
+        ? `${this.apiUrl}/ai-sources/${mediaUrlOrSourceId}/file`
+        : mediaUrlOrSourceId;
+    const blob = await firstValueFrom(
+      this.http.get(mediaUrl, {
+        headers: this.buildAuthHeaders(),
+        responseType: 'blob',
+      })
+    );
+
+    return URL.createObjectURL(blob);
+  }
+
   private buildAuthHeaders(): HttpHeaders {
     const token = this.authService.getToken();
     if (!token) {

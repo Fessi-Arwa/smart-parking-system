@@ -222,6 +222,8 @@ class ParkingVideoAIService:
         slot_votes = [{FREE_LABEL: 0, BUSY_LABEL: 0} for _ in slots]
         slot_confidence_sum = [0.0 for _ in slots]
         slot_inference_count = [0 for _ in slots]
+        latest_states = [BUSY_LABEL for _ in slots]
+        latest_confidences = [0.0 for _ in slots]
         processed_frames = 0
         frame_index = 0
 
@@ -236,9 +238,13 @@ class ParkingVideoAIService:
                     for slot_index, slot in enumerate(slots, start=1):
                         prediction = self._predict_slot(frame, slot)
                         class_mapping.update(prediction["class_mapping"])
-                        is_free = prediction["label"] == FREE_LABEL
+                        label = prediction["label"]
+                        confidence = float(prediction["confidence"])
+                        latest_states[slot_index - 1] = label
+                        latest_confidences[slot_index - 1] = confidence
+                        is_free = label == FREE_LABEL
                         slot_votes[slot_index - 1][FREE_LABEL if is_free else BUSY_LABEL] += 1
-                        slot_confidence_sum[slot_index - 1] += float(prediction["confidence"])
+                        slot_confidence_sum[slot_index - 1] += confidence
                         slot_inference_count[slot_index - 1] += 1
                     processed_frames += 1
                 frame_index += 1
@@ -248,10 +254,7 @@ class ParkingVideoAIService:
         if processed_frames == 0:
             raise RuntimeError("The uploaded video does not contain readable frames.")
 
-        final_states = [
-            FREE_LABEL if votes[FREE_LABEL] >= votes[BUSY_LABEL] else BUSY_LABEL
-            for votes in slot_votes
-        ]
+        final_states = list(latest_states)
         average_confidences = [
             round(slot_confidence_sum[index] / slot_inference_count[index], 4)
             if slot_inference_count[index] > 0
@@ -300,14 +303,28 @@ class ParkingVideoAIService:
             raise RuntimeError(f"Unable to reopen video for rendering: {source_filename}")
 
         try:
+            render_frame_index = 0
+            render_states = [BUSY_LABEL for _ in slots]
+            render_confidences = [0.0 for _ in slots]
             while True:
                 ok, frame = render_cap.read()
                 if not ok:
                     break
 
+                should_infer = render_frame_index % self.frame_stride == 0
+                if should_infer:
+                    for slot_index, slot in enumerate(slots, start=1):
+                        prediction = self._predict_slot(frame, slot)
+                        label = prediction["label"]
+                        confidence = float(prediction["confidence"])
+                        render_states[slot_index - 1] = label
+                        render_confidences[slot_index - 1] = confidence
+
+                current_free = sum(label == FREE_LABEL for label in render_states)
+                current_occupied = len(render_states) - current_free
                 for slot_index, slot in enumerate(slots, start=1):
-                    label = final_states[slot_index - 1]
-                    confidence = average_confidences[slot_index - 1]
+                    label = render_states[slot_index - 1]
+                    confidence = render_confidences[slot_index - 1]
                     is_free = label == FREE_LABEL
                     self._draw_slot(
                         frame=frame,
@@ -318,8 +335,9 @@ class ParkingVideoAIService:
                         is_free=is_free,
                     )
 
-                self._draw_header(frame, free, occupied, total)
+                self._draw_header(frame, current_free, current_occupied, total, "Smart Parking Real-time Analysis")
                 writer.write(frame)
+                render_frame_index += 1
         finally:
             render_cap.release()
             writer.release()

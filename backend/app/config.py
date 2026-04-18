@@ -29,3 +29,7 @@ class Config:
         "UPLOAD_FOLDER",
         str(Path(__file__).resolve().parents[1] / "uploads"),
     )
+    # Limites de stockage (en bytes)
+    MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # 500 MB par fichier
+    MAX_TOTAL_UPLOADS = 20 * 1024 * 1024 * 1024  # 20 GB total
+    UPLOAD_RETENTION_DAYS = 30  # Nettoyer les fichiers après 30 jours

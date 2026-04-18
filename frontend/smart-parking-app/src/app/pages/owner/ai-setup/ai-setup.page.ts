@@ -1,5 +1,5 @@
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { OwnerWorkflowState } from '../../../models/owner-workflow.model';
@@ -45,6 +45,10 @@ export class AiSetupPage implements OnInit, OnDestroy {
   private draftRect: { x: number; y: number; w: number; h: number } | null = null;
   private pollingTimer: ReturnType<typeof setInterval> | null = null;
   private analysisVideoErrorIds = new Set<number>();
+  private objectUrls = new Set<string>();
+  private sourceBlobs = new Map<number, string>();
+  private analysisBlobs = new Map<number, string>();
+  private analysisPreviewBlobs = new Map<number, string>();
   aiTasks = [
     'Ajouter des images statiques du parking',
     'Deposer des videos pour analyser circulation et occupation',
@@ -56,6 +60,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
     private ownerWorkflowService: OwnerWorkflowService,
     private parkingAiSourceService: ParkingAiSourceService,
     private placeService: PlaceService,
+    private route: ActivatedRoute,
     private router: Router,
     private toastService: ToastService
   ) {
@@ -69,11 +74,15 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopPolling();
+    this.revokeObjectUrls();
   }
 
   async refreshStatus(): Promise<void> {
     this.workflowState = await this.ownerWorkflowService.refresh();
     await this.loadSources();
+    if (this.hasRouteParkingSelection) {
+      return;
+    }
     const route = this.ownerWorkflowService.getNextRoute(this.workflowState);
     if (route !== '/owner/ai-setup') {
       await this.router.navigateByUrl(route);
@@ -82,7 +91,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
   async onImageSelected(event: Event): Promise<void> {
     const files = this.extractFiles(event);
-    if (files.length === 0 || !this.workflowState.parkingId) {
+    if (files.length === 0 || !this.activeParkingId) {
       return;
     }
 
@@ -91,6 +100,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
     try {
       const result = await this.uploadSources(files, 'image');
       const createdSources = result.sources;
+      await this.loadBlobUrlsForSpecificSources(createdSources);
       this.aiSources = [...createdSources, ...this.aiSources];
       this.notifyUploadResult(result, 'image');
     } catch (error) {
@@ -104,7 +114,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
   async onVideoSelected(event: Event): Promise<void> {
     const files = this.extractFiles(event);
-    if (files.length === 0 || !this.workflowState.parkingId) {
+    if (files.length === 0 || !this.activeParkingId) {
       return;
     }
 
@@ -113,6 +123,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
     try {
       const result = await this.uploadSources(files, 'video');
       const createdSources = result.sources;
+      await this.loadBlobUrlsForSpecificSources(createdSources);
       this.aiSources = [...createdSources, ...this.aiSources];
       this.notifyUploadResult(result, 'video');
     } catch (error) {
@@ -125,7 +136,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   async addCamera(): Promise<void> {
-    if (!this.workflowState.parkingId) {
+    if (!this.activeParkingId) {
       this.toastService.show('Aucun parking owner n a ete trouve.', 'error');
       return;
     }
@@ -139,7 +150,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     try {
       const source = await this.parkingAiSourceService.createCameraSource(
-        this.workflowState.parkingId,
+        this.activeParkingId,
         {
           label: this.cameraDraft.label.trim() || 'Camera surveillance',
           stream_url: this.cameraDraft.streamUrl.trim(),
@@ -169,7 +180,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   async activateAiSetup(): Promise<void> {
-    if (!this.workflowState.parkingId) {
+    if (!this.activeParkingId) {
       this.toastService.show('Aucun parking owner n a ete trouve.', 'error');
       return;
     }
@@ -183,7 +194,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     try {
       this.workflowState = await this.ownerWorkflowService.updateAiSetupStatus(
-        this.workflowState.parkingId,
+        this.activeParkingId,
         'active'
       );
       this.toastService.show('Configuration IA activee avec succes.', 'success');
@@ -211,8 +222,8 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   async openCalibration(source: ParkingAISource): Promise<void> {
-    const calibrationImageUrl = source.calibration_preview_url || source.preview_url || null;
-    if (!this.workflowState.parkingId || !calibrationImageUrl || this.isCameraSource(source)) {
+    const calibrationMediaUrl = source.calibration_preview_url || source.preview_url || null;
+    if (!this.activeParkingId || !calibrationMediaUrl || this.isCameraSource(source)) {
       this.toastService.show('Choisissez une image ou une video exploitable pour calibrer les places.', 'error');
       return;
     }
@@ -220,18 +231,20 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.isLoadingCalibration = true;
     try {
       const [places, slotsResponse] = await Promise.all([
-        firstValueFrom(this.placeService.getPlaces(this.workflowState.parkingId)),
-        this.parkingAiSourceService.getParkingSlots(this.workflowState.parkingId),
+        firstValueFrom(this.placeService.getPlaces(this.activeParkingId)),
+        this.parkingAiSourceService.getParkingSlots(this.activeParkingId),
       ]);
       this.calibrationPlaces = (places || []).sort((a, b) => a.num_place - b.num_place);
       this.calibrationSlots = [...slotsResponse.slots].sort((a, b) => a.slot_index - b.slot_index);
       this.calibrationUsesCustomSlots = slotsResponse.uses_custom_slots;
       this.calibrationSource = source;
-      this.calibrationImageUrl = calibrationImageUrl;
-      this.calibrationImage.src = calibrationImageUrl;
+      this.replaceCalibrationImageUrl(
+        await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(calibrationMediaUrl)
+      );
+      this.calibrationImage.src = this.calibrationImageUrl || '';
       if (this.calibrationPlaces.length === 0) {
         this.toastService.show(
-          `Aucune place n est encore creee pour le parking #${this.workflowState.parkingId}. Termine d abord l etape parking.`,
+          `Aucune place n est encore creee pour le parking #${this.activeParkingId}. Termine d abord l etape parking.`,
           'info'
         );
       }
@@ -275,7 +288,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
   closeCalibration(): void {
     this.calibrationSource = null;
-    this.calibrationImageUrl = null;
+    this.replaceCalibrationImageUrl(null);
     this.calibrationSlots = [];
     this.draftRect = null;
     this.dragStart = null;
@@ -354,11 +367,13 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   async goToParkingSetup(): Promise<void> {
-    await this.router.navigateByUrl('/owner/parking-setup');
+    await this.router.navigate(['/owner/parking-setup'], {
+      queryParams: this.activeParkingId ? { parking: this.activeParkingId } : {},
+    });
   }
 
   async saveCalibration(): Promise<void> {
-    if (!this.workflowState.parkingId || !this.calibrationSource) {
+    if (!this.activeParkingId || !this.calibrationSource) {
       return;
     }
     if (this.calibrationSlots.length === 0) {
@@ -376,7 +391,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     this.isSavingCalibration = true;
     try {
-      await this.parkingAiSourceService.saveParkingSlots(this.workflowState.parkingId, this.calibrationSlots);
+      await this.parkingAiSourceService.saveParkingSlots(this.activeParkingId, this.calibrationSlots);
       const updatedSource = await this.parkingAiSourceService.reanalyzeSource(this.calibrationSource.id_source);
       this.aiSources = this.aiSources.map((source) =>
         source.id_source === updatedSource.id_source ? updatedSource : source
@@ -468,8 +483,12 @@ export class AiSetupPage implements OnInit, OnDestroy {
     return source.analysis?.output_url || null;
   }
 
+  getAnalysisMediaUrl(source: ParkingAISource): string | null {
+    return this.analysisBlobs.get(source.id_source) || this.getAnalysisOutputUrl(source);
+  }
+
   getAnalysisPreviewUrl(source: ParkingAISource): string | null {
-    return source.analysis?.output_preview_url || null;
+    return this.analysisPreviewBlobs.get(source.id_source) || source.analysis?.output_preview_url || null;
   }
 
   isImageAnalysis(source: ParkingAISource): boolean {
@@ -527,7 +546,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   private async loadSources(): Promise<void> {
-    if (!this.workflowState?.parkingId) {
+    if (!this.activeParkingId) {
       this.aiSources = [];
       this.isLoadingSources = false;
       return;
@@ -536,7 +555,8 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.isLoadingSources = true;
 
     try {
-      this.aiSources = await this.parkingAiSourceService.getSources(this.workflowState.parkingId);
+      this.aiSources = await this.parkingAiSourceService.getSources(this.activeParkingId);
+      await this.loadBlobUrlsForSources();
       this.syncPollingState();
     } catch (error) {
       console.error('Erreur chargement sources IA', error);
@@ -546,6 +566,53 @@ export class AiSetupPage implements OnInit, OnDestroy {
     } finally {
       this.isLoadingSources = false;
     }
+  }
+
+  private async loadBlobUrlsForSources(): Promise<void> {
+    await this.loadBlobUrlsForSpecificSources(this.aiSources);
+  }
+
+  private async loadBlobUrlsForSpecificSources(sources: ParkingAISource[]): Promise<void> {
+    for (const source of sources) {
+      if ((this.isVideoSource(source) || this.isImageSource(source)) && source.preview_url) {
+        try {
+          const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(source.id_source);
+          if (blobUrl) {
+            this.replaceBlobUrl(this.sourceBlobs, source.id_source, blobUrl);
+          }
+        } catch (error) {
+          console.warn(`Erreur lors du chargement du blob pour la source ${source.id_source}:`, error);
+        }
+      }
+
+      const analysisOutputUrl = this.getAnalysisOutputUrl(source);
+      if (analysisOutputUrl) {
+        try {
+          const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(analysisOutputUrl);
+          if (blobUrl) {
+            this.replaceBlobUrl(this.analysisBlobs, source.id_source, blobUrl);
+          }
+        } catch (error) {
+          console.warn(`Erreur lors du chargement du resultat analyse pour ${source.id_source}:`, error);
+        }
+      }
+
+      const analysisPreviewUrl = source.analysis?.output_preview_url;
+      if (analysisPreviewUrl) {
+        try {
+          const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(analysisPreviewUrl);
+          if (blobUrl) {
+            this.replaceBlobUrl(this.analysisPreviewBlobs, source.id_source, blobUrl);
+          }
+        } catch (error) {
+          console.warn(`Erreur lors du chargement de la preview analyse pour ${source.id_source}:`, error);
+        }
+      }
+    }
+  }
+
+  getSourceMediaUrl(source: ParkingAISource): string {
+    return this.sourceBlobs.get(source.id_source) || source.preview_url || '';
   }
 
   private extractFiles(event: Event): File[] {
@@ -623,7 +690,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
     files: File[],
     sourceType: 'image' | 'video'
   ): Promise<{ sources: ParkingAISource[]; failures: string[] }> {
-    if (!this.workflowState.parkingId) {
+    if (!this.activeParkingId) {
       return { sources: [], failures: [] };
     }
 
@@ -632,7 +699,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
     for (const file of files) {
       try {
         const source = await this.parkingAiSourceService.uploadSource(
-          this.workflowState.parkingId,
+          this.activeParkingId,
           file,
           sourceType,
           file.name
@@ -712,5 +779,49 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     clearInterval(this.pollingTimer);
     this.pollingTimer = null;
+  }
+
+  private replaceCalibrationImageUrl(nextUrl: string | null): void {
+    if (this.calibrationImageUrl && this.objectUrls.has(this.calibrationImageUrl)) {
+      URL.revokeObjectURL(this.calibrationImageUrl);
+      this.objectUrls.delete(this.calibrationImageUrl);
+    }
+
+    this.calibrationImageUrl = nextUrl;
+
+    if (nextUrl) {
+      this.objectUrls.add(nextUrl);
+    }
+  }
+
+  private revokeObjectUrls(): void {
+    this.objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    this.objectUrls.clear();
+    this.sourceBlobs.clear();
+    this.analysisBlobs.clear();
+    this.analysisPreviewBlobs.clear();
+  }
+
+  private replaceBlobUrl(target: Map<number, string>, sourceId: number, nextUrl: string): void {
+    const previousUrl = target.get(sourceId);
+    if (previousUrl && this.objectUrls.has(previousUrl)) {
+      URL.revokeObjectURL(previousUrl);
+      this.objectUrls.delete(previousUrl);
+    }
+
+    target.set(sourceId, nextUrl);
+    this.objectUrls.add(nextUrl);
+  }
+
+  get activeParkingId(): number | null {
+    const routeParkingId = Number(this.route.snapshot.queryParamMap.get('parking'));
+    if (routeParkingId) {
+      return routeParkingId;
+    }
+    return this.workflowState?.parkingId ?? null;
+  }
+
+  get hasRouteParkingSelection(): boolean {
+    return Boolean(Number(this.route.snapshot.queryParamMap.get('parking')));
   }
 }

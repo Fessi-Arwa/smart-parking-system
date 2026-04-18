@@ -65,6 +65,7 @@
           <span>Prochaine priorite</span>
           <strong>{{ portfolioNextActionTitle }}</strong>
         </div>
+
       </div>
     </section>
 
@@ -115,6 +116,25 @@
         </ion-card-header>
 
         <ion-card-content>
+          <div class="parking-health-grid" *ngIf="parkings.length">
+            <article class="parking-health-card">
+              <span>Dossiers en attente</span>
+              <strong>{{ portfolioHealth.pendingValidation }}</strong>
+            </article>
+            <article class="parking-health-card parking-health-card--warning">
+              <span>Capacite faible</span>
+              <strong>{{ portfolioHealth.lowCapacity }}</strong>
+            </article>
+            <article class="parking-health-card parking-health-card--danger">
+              <span>A corriger</span>
+              <strong>{{ portfolioHealth.rejected }}</strong>
+            </article>
+            <article class="parking-health-card parking-health-card--neutral">
+              <span>Maintenance</span>
+              <strong>{{ portfolioHealth.maintenance }}</strong>
+            </article>
+          </div>
+
           <div class="workflow-banner" *ngIf="!canCreateParking">
             <ion-icon name="time-outline"></ion-icon>
             <p>La creation de parking sera disponible apres validation du compte owner par l admin.</p>
@@ -148,8 +168,15 @@
             </div>
           </div>
 
+          <div class="parking-toolbar parking-toolbar--summary" *ngIf="!selectedParking && !showAddParking && parkings.length">
+            <p>{{ filteredParkingSummary }}</p>
+            <button class="btn-outline" type="button" *ngIf="hasActiveParkingFilters" (click)="clearParkingFilters()">
+              Reinitialiser
+            </button>
+          </div>
+
           <div *ngIf="!selectedParking && !showAddParking" class="parking-list">
-            <article *ngFor="let parking of filteredParkings" class="parking-item" (click)="selectParking(parking)">
+            <article *ngFor="let parking of filteredParkings; trackBy: trackByParking" class="parking-item" (click)="selectParking(parking)">
               <div class="parking-item__top">
                 <div class="parking-item__identity">
                   <div class="parking-icon">
@@ -195,6 +222,21 @@
               <div class="parking-progress">
                 <span [style.width.%]="getParkingOccupancy(parking)"></span>
               </div>
+
+              <div class="parking-item__actions">
+                <button
+                  class="btn-outline btn-outline--compact"
+                  type="button"
+                  (click)="openParkingSetup(parking); $event.stopPropagation()">
+                  Configurer
+                </button>
+                <button
+                  class="btn-outline btn-outline--compact"
+                  type="button"
+                  (click)="openAiSetup(parking); $event.stopPropagation()">
+                  IA
+                </button>
+              </div>
             </article>
 
             <div *ngIf="filteredParkings.length === 0" class="empty-state">
@@ -216,7 +258,10 @@
                 <button class="icon-btn" type="button" (click)="startEditParking()">
                   <ion-icon name="create-outline"></ion-icon>
                 </button>
-                <button class="icon-btn danger" type="button" (click)="confirmDelete(selectedParking)">
+                <button class="icon-btn" type="button" (click)="openParkingSetup()" [disabled]="!canOpenParkingSetup">
+                  <ion-icon name="construct-outline"></ion-icon>
+                </button>
+                <button class="icon-btn danger" type="button" (click)="confirmDelete(selectedParking); $event.stopPropagation()">
                   <ion-icon name="trash-outline"></ion-icon>
                 </button>
               </div>
@@ -275,15 +320,28 @@
               </div>
             </div>
 
+            <div class="parking-setup-card">
+              <div>
+                <p class="section-kicker">Configuration parking</p>
+                <strong>Structurer le parking avant l activation IA</strong>
+                <p>{{ parkingSetupHint }}</p>
+              </div>
+              <button
+                class="btn-primary parking-setup-card__action"
+                type="button"
+                (click)="openParkingSetup()"
+                [disabled]="!canOpenParkingSetup">
+                Ouvrir la configuration parking
+              </button>
+            </div>
+
             <div class="ai-shortcut-card">
               <div>
                 <p class="section-kicker">Module IA</p>
                 <strong>Ajouter des images, videos ou cameras pour ce parking</strong>
-                <p>
-                  L ajout de sources et leur traitement IA se font dans l ecran dedie a la configuration IA.
-                </p>
+                <p>{{ aiSetupHint }}</p>
               </div>
-              <button class="btn-primary ai-shortcut-card__action" type="button" (click)="openAiSetup()">
+              <button class="btn-primary ai-shortcut-card__action" type="button" (click)="openAiSetup()" [disabled]="!canOpenAiSetup">
                 Ouvrir la configuration IA
               </button>
             </div>
