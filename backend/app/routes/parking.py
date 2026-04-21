@@ -85,9 +85,6 @@ def create_parking():
     if user.role != RoleCompte.owner:
         return jsonify({"msg": "Seuls les owners peuvent ajouter un parking"}), 403
 
-    if user.owner_status != StatutValidationOwner.accepte:
-        return jsonify({"msg": "Le compte owner doit etre accepte avant de creer un parking"}), 403
-
     nom = _normalize_text(data.get("nom"))
     adresse = _normalize_text(data.get("adresse"))
     required_fields = {

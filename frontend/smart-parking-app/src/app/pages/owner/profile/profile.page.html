@@ -62,6 +62,11 @@
           {{ profilePrimaryActionLabel }}
         </button>
       </section>
+
+      <div class="workflow-banner workflow-banner--info" *ngIf="workflowState?.ownerStatus !== 'accepte' && parkings.length === 0">
+        <ion-icon name="information-circle-outline"></ion-icon>
+        <p>Vous pouvez deja ajouter votre premier parking. Il sera visible par l admin et attendra la validation du compte owner.</p>
+      </div>
     </section>
 
     <section class="profile-grid">

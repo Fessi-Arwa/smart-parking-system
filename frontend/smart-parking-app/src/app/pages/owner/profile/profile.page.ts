@@ -227,6 +227,31 @@ export class ProfilePage implements OnInit {
   }
 
   get notificationItems(): HeaderNotificationItem[] {
+    const ownerApprovalNotifications =
+      this.workflowState?.ownerStatus === 'accepte'
+        ? [
+            {
+              title: 'Compte owner accepte',
+              description: this.workflowState.hasParking
+                ? 'Votre compte est valide. Vous pouvez maintenant suivre la validation du parking.'
+                : 'Votre compte est valide. Ajoutez maintenant votre premier parking.',
+              timestamp: 'Validation admin',
+              icon: 'checkmark-done-outline',
+              tone: 'success' as const,
+            },
+          ]
+        : this.workflowState?.ownerStatus === 'refuse'
+          ? [
+              {
+                title: 'Compte owner refuse',
+                description: 'Le compte owner a ete refuse. Verifiez vos informations ou contactez l admin.',
+                timestamp: 'Decision admin',
+                icon: 'alert-circle-outline',
+                tone: 'alert' as const,
+              },
+            ]
+          : [];
+
     const parkingValidatedNotification =
       this.workflowState?.ownerStatus === 'accepte' &&
       this.workflowState?.parkingStatus === 'valide' &&
@@ -262,7 +287,35 @@ export class ProfilePage implements OnInit {
         tone: 'alert' as const,
       }));
 
-    return [...parkingValidatedNotification, ...maintenanceNotifications, ...lowCapacityNotifications].slice(0, 5);
+    const parkingReviewNotifications = this.parkings
+      .filter((parking) =>
+        parking.validation_status === 'en_attente_validation' || parking.validation_status === 'rejete'
+      )
+      .slice(0, 2)
+      .map((parking) => ({
+        title:
+          parking.validation_status === 'rejete'
+            ? 'Parking a corriger'
+            : 'Parking en attente de validation',
+        description: `${parking.nom} - ${this.getParkingNextStep(parking)}`,
+        timestamp: `Parking #${parking.id_park}`,
+        icon:
+          parking.validation_status === 'rejete'
+            ? 'close-circle-outline'
+            : 'time-outline',
+        tone:
+          parking.validation_status === 'rejete'
+            ? 'alert' as const
+            : 'warning' as const,
+      }));
+
+    return [
+      ...ownerApprovalNotifications,
+      ...parkingValidatedNotification,
+      ...parkingReviewNotifications,
+      ...maintenanceNotifications,
+      ...lowCapacityNotifications,
+    ].slice(0, 5);
   }
 
   get notificationsCount(): number {
@@ -282,7 +335,7 @@ export class ProfilePage implements OnInit {
   }
 
   get canCreateParking(): boolean {
-    return this.workflowState?.ownerStatus === 'accepte';
+    return true;
   }
 
   get pendingReviewParking(): ParkingInfo | null {
@@ -306,8 +359,8 @@ export class ProfilePage implements OnInit {
   }
 
   get newParkingWorkflowHint(): string {
-    if (!this.canCreateParking) {
-      return 'Le compte owner doit etre valide avant toute creation de parking.';
+    if (this.workflowState?.ownerStatus !== 'accepte') {
+      return 'Vous pouvez deja enregistrer le parking. Il sera simplement bloque jusqu a la validation du compte owner.';
     }
 
     if (this.pendingReviewParking) {
@@ -318,7 +371,10 @@ export class ProfilePage implements OnInit {
   }
 
   get portfolioNextActionTitle(): string {
-    if (!this.canCreateParking) {
+    if (this.workflowState?.ownerStatus !== 'accepte' && this.parkings.length === 0) {
+      return 'Ajouter le premier parking pendant la verification';
+    }
+    if (this.workflowState?.ownerStatus !== 'accepte') {
       return 'Attendre la validation du compte owner';
     }
     if (this.pendingReviewParking) {
@@ -337,7 +393,10 @@ export class ProfilePage implements OnInit {
   }
 
   get profilePrimaryActionLabel(): string {
-    if (!this.canCreateParking) {
+    if (this.workflowState?.ownerStatus !== 'accepte' && this.parkings.length === 0) {
+      return 'Ajouter un parking';
+    }
+    if (this.workflowState?.ownerStatus !== 'accepte') {
       return 'Suivre la validation';
     }
     if (this.workflowState?.parkingStatus === 'valide' && this.workflowState?.subscriptionStatus !== 'actif') {
@@ -356,7 +415,12 @@ export class ProfilePage implements OnInit {
   }
 
   async handleProfilePrimaryAction(): Promise<void> {
-    if (!this.canCreateParking) {
+    if (this.workflowState?.ownerStatus !== 'accepte' && this.parkings.length === 0) {
+      this.openAddParking();
+      return;
+    }
+
+    if (this.workflowState?.ownerStatus !== 'accepte') {
       await this.router.navigate(['/owner/pending']);
       return;
     }
@@ -572,14 +636,6 @@ export class ProfilePage implements OnInit {
   }
 
   openAddParking(): void {
-    if (!this.canCreateParking) {
-      this.toastService.show(
-        'Le compte owner doit etre accepte avant de creer un parking.',
-        'error'
-      );
-      return;
-    }
-
     this.showAddParking = true;
     this.selectedParking = null;
     this.newParkingData = {
@@ -594,14 +650,6 @@ export class ProfilePage implements OnInit {
   }
 
   async addParking(): Promise<void> {
-    if (!this.canCreateParking) {
-      this.toastService.show(
-        'Le compte owner doit etre accepte avant de creer un parking.',
-        'error'
-      );
-      return;
-    }
-
     const validationMessage = this.getNewParkingValidationMessage();
     if (validationMessage) {
       this.toastService.show(validationMessage, 'error');

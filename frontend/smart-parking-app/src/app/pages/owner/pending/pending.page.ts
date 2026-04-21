@@ -47,6 +47,10 @@ export class PendingPage implements OnInit {
   }
 
   get pendingTitle(): string {
+    if (this.waitingOnOwnerApproval && !this.workflowState?.hasParking) {
+      return 'Compte en verification, parking a preparer';
+    }
+
     if (this.waitingOnOwnerApproval) {
       return 'Validation du compte owner en attente';
     }
@@ -63,8 +67,12 @@ export class PendingPage implements OnInit {
   }
 
   get pendingDescription(): string {
+    if (this.waitingOnOwnerApproval && !this.workflowState?.hasParking) {
+      return "Votre compte owner est en attente, mais vous pouvez deja enregistrer votre premier parking pour gagner du temps.";
+    }
+
     if (this.waitingOnOwnerApproval) {
-      return "Votre compte owner a bien ete cree. L admin doit d abord valider votre profil avant que vous puissiez enregistrer un parking.";
+      return "Votre compte owner est en attente de validation. Votre parking restera bloque jusqu a la decision de l admin.";
     }
 
     if (this.waitingOnParkingCreation) {
@@ -82,7 +90,7 @@ export class PendingPage implements OnInit {
   }
 
   get pendingParkingLabel(): string | null {
-    if (!this.waitingOnParkingApproval || !this.workflowState?.parkingId) {
+    if (!this.workflowState?.parkingId) {
       return null;
     }
 
@@ -90,6 +98,10 @@ export class PendingPage implements OnInit {
   }
 
   get primaryActionLabel(): string {
+    if (this.waitingOnOwnerApproval && !this.workflowState?.hasParking) {
+      return 'Ajouter mon parking';
+    }
+
     if (this.waitingOnParkingCreation) {
       return 'Creer mon parking';
     }
@@ -98,6 +110,11 @@ export class PendingPage implements OnInit {
   }
 
   async handlePrimaryAction(): Promise<void> {
+    if (this.waitingOnOwnerApproval && !this.workflowState?.hasParking) {
+      await this.router.navigate(['/owner/profile']);
+      return;
+    }
+
     if (this.waitingOnParkingCreation) {
       await this.router.navigate(['/owner/profile']);
       return;

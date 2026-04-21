@@ -354,6 +354,16 @@ export class DashboardPage implements OnInit {
       };
     }
 
+    if (this.workflowState.ownerStatus !== 'accepte' && !this.workflowState.hasParking) {
+      return {
+        title: 'Ajouter votre premier parking',
+        description: 'Preparez deja votre parking pendant que le compte owner attend la validation admin.',
+        icon: 'add-circle-outline',
+        route: '/owner/profile',
+        tone: 'primary',
+      };
+    }
+
     if (this.workflowState.ownerStatus !== 'accepte' || this.workflowState.parkingStatus !== 'valide') {
       return {
         title: 'Verifier la validation',
@@ -582,6 +592,31 @@ export class DashboardPage implements OnInit {
   get notificationItems(): HeaderNotificationItem[] {
     const ownerSubscriptionNotifications = this.getOwnerSubscriptionNotifications();
 
+    const ownerApprovalNotifications =
+      this.workflowState?.ownerStatus === 'accepte'
+        ? [
+            {
+              title: 'Compte owner accepte',
+              description: this.workflowState.hasParking
+                ? 'Le compte owner est valide. Le parking peut maintenant etre traite par l admin.'
+                : 'Le compte owner est valide. Ajoutez maintenant votre premier parking.',
+              timestamp: 'Validation admin',
+              icon: 'checkmark-done-outline',
+              tone: 'success' as const,
+            },
+          ]
+        : this.workflowState?.ownerStatus === 'refuse'
+          ? [
+              {
+                title: 'Compte owner refuse',
+                description: 'Le compte owner a ete refuse. Verifiez le dossier ou contactez l admin.',
+                timestamp: 'Decision admin',
+                icon: 'alert-circle-outline',
+                tone: 'alert' as const,
+              },
+            ]
+          : [];
+
     const parkingValidatedNotification =
       this.workflowState?.ownerStatus === 'accepte' &&
       this.workflowState?.parkingStatus === 'valide' &&
@@ -609,6 +644,20 @@ export class DashboardPage implements OnInit {
             },
           ]
         : [];
+
+    const parkingReviewNotifications = this.parkings
+      .filter((parking) => parking.validationStatus === 'en_attente_validation' || parking.validationStatus === 'rejete')
+      .slice(0, 2)
+      .map((parking) => ({
+        title:
+          parking.validationStatus === 'rejete'
+            ? 'Parking a corriger'
+            : 'Parking en attente de validation',
+        description: `${parking.name} attend une action admin.`,
+        timestamp: parking.validationStatus === 'rejete' ? 'Dossier retourne' : 'File admin',
+        icon: parking.validationStatus === 'rejete' ? 'close-circle-outline' : 'time-outline',
+        tone: parking.validationStatus === 'rejete' ? 'alert' as const : 'warning' as const,
+      }));
 
     const maintenanceNotifications = this.parkings
       .filter((parking) => parking.status === 'maintenance')
@@ -650,8 +699,10 @@ export class DashboardPage implements OnInit {
         : [];
 
     return [
+      ...ownerApprovalNotifications,
       ...ownerSubscriptionNotifications,
       ...parkingValidatedNotification,
+      ...parkingReviewNotifications,
       ...workflowNotification,
       ...maintenanceNotifications,
       ...reservationNotifications,
