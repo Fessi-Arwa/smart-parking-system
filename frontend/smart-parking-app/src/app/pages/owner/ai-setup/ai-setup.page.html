@@ -23,12 +23,9 @@
       <div>
         <span class="owner-step__eyebrow">Etape 4</span>
         <h1>Configurer les sources du module IA</h1>
-        <p>
-          Ajoutez maintenant les medias et flux de surveillance que le modele IA utilisera pour
-          detecter les vehicules, estimer l occupation et assister la configuration finale du parking.
-        </p>
+        <p>Ajoutez les sources utiles, calibrez puis activez l IA.</p>
         <p class="owner-step__active-parking" *ngIf="activeParkingId">
-          Parking actif : #{{ activeParkingId }}
+          Parking actif : {{ activeParkingLabel }}
         </p>
       </div>
 
@@ -44,17 +41,64 @@
       </div>
     </section>
 
-    <div class="ai-grid">
-      <article class="ai-grid__item" *ngFor="let item of aiTasks">
-        <strong>{{ item }}</strong>
+    <section class="ai-readiness">
+      <article>
+        <span>Etat IA</span>
+        <strong>{{ workflowState.aiSetupStatus || 'non_configuree' }}</strong>
       </article>
-    </div>
+      <article>
+        <span>Sources chargees</span>
+        <strong>{{ aiSources.length }}</strong>
+      </article>
+      <article>
+        <span>Videos prêtes</span>
+        <strong>{{ videoSourcesCount }}</strong>
+      </article>
+      <article>
+        <span>Parking cible</span>
+        <strong>{{ activeParkingOption?.name || activeParkingId || 'Aucun' }}</strong>
+      </article>
+    </section>
+
+    <section class="parking-switcher" *ngIf="ownerParkings.length > 0">
+      <div class="parking-switcher__header">
+        <div>
+          <h2>Choisir le parking a configurer</h2>
+          <p>
+            Chaque parking possede ses propres sources, sa propre calibration et sa propre activation IA.
+          </p>
+        </div>
+        <span class="parking-switcher__tag">{{ ownerParkings.length }} parking(s)</span>
+      </div>
+
+      <div class="parking-switcher__grid">
+        <button
+          class="parking-switcher__card"
+          type="button"
+          *ngFor="let parking of ownerParkings"
+          [class.is-active]="isSelectedParking(parking.id)"
+          (click)="selectParking(parking.id)">
+          <div>
+            <strong>{{ parking.name }}</strong>
+            <p>{{ parking.address }}</p>
+          </div>
+          <span>{{ getParkingStateLabel(parking) }}</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="wizard-focus">
+      <span>Action actuelle</span>
+      <strong *ngIf="aiSources.length === 0">Ajouter au moins une source IA.</strong>
+      <strong *ngIf="aiSources.length > 0 && !calibrationSource">Verifier les sources puis activer l IA.</strong>
+      <strong *ngIf="calibrationSource">Terminer la calibration avant l activation.</strong>
+    </section>
 
     <section class="ai-panel">
       <div class="ai-panel__header">
         <div>
           <h2>Sources IA du parking</h2>
-          <p>Vous pouvez melanger images, videos et cameras de surveillance.</p>
+          <p>Images, videos ou cameras.</p>
         </div>
         <span class="ai-panel__tag">{{ aiSources.length }} source(s)</span>
       </div>
@@ -63,13 +107,13 @@
         <label class="ai-upload-card">
           <input type="file" accept="image/*" multiple (change)="onImageSelected($event)" hidden />
           <strong>{{ isUploadingImage ? 'Upload images...' : 'Ajouter des images' }}</strong>
-          <span>JPEG, PNG ou autres vues statiques du parking</span>
+          <span>Vues statiques du parking</span>
         </label>
 
         <label class="ai-upload-card">
           <input type="file" accept="video/*" multiple (change)="onVideoSelected($event)" hidden />
           <strong>{{ isUploadingVideo ? 'Upload videos...' : 'Ajouter des videos' }}</strong>
-          <span>Plusieurs sequences video pour detection et calibration</span>
+          <span>Sequences pour analyse et calibration</span>
         </label>
       </div>
 
@@ -113,6 +157,11 @@
             <strong>{{ source.label || source.original_name || 'Source IA' }}</strong>
             <p *ngIf="source.stream_url">{{ source.stream_url }}</p>
             <p *ngIf="!source.stream_url">{{ source.original_name || source.mime_type }}</p>
+            <div class="source-card__tags">
+              <span *ngIf="isImageSource(source)">Calibration</span>
+              <span *ngIf="isVideoSource(source)">Analyse video</span>
+              <span *ngIf="isCameraSource(source)">Surveillance</span>
+            </div>
 
             <div class="source-analysis source-analysis--success" *ngIf="hasProcessedAnalysis(source)">
               <span class="source-analysis__badge">{{ isVideoSource(source) ? 'Video traitee' : 'Analyse terminee' }}</span>
@@ -143,8 +192,8 @@
 
               <a
                 class="source-analysis__link"
-                *ngIf="getAnalysisOutputUrl(source)"
-                [href]="getAnalysisOutputUrl(source)!"
+                *ngIf="getAnalysisMediaUrl(source)"
+                [href]="getAnalysisMediaUrl(source)!"
                 target="_blank"
                 rel="noopener">
                 Ouvrir la video traitee
@@ -190,10 +239,11 @@
               {{ isReanalyzingSource(source.id_source) ? 'Retraitement...' : 'Reanalyser' }}
             </button>
           </div>
-
-          <button class="source-card__delete" type="button" (click)="removeSource(source.id_source)">
-            Supprimer
-          </button>
+          <div class="source-card__aside">
+            <button class="source-card__delete" type="button" (click)="removeSource(source.id_source)">
+              Supprimer
+            </button>
+          </div>
         </article>
       </div>
 
@@ -212,7 +262,7 @@
       </div>
 
       <p class="small-note">
-        Dessinez un rectangle par place directement sur l image, associez chaque slot a une place, puis sauvegardez.
+        Dessinez un slot, associez-le a une place, puis sauvegardez.
       </p>
 
       <div class="calibration-layout" *ngIf="!isLoadingCalibration; else loadingCalibration">
@@ -228,8 +278,8 @@
 
         <aside class="calibration-sidebar">
           <div class="calibration-sidebar__meta">
-            <span *ngIf="calibrationUsesCustomSlots">Configuration parking personnalisee active</span>
-            <span *ngIf="!calibrationUsesCustomSlots">Aucune calibration parking enregistree pour le moment</span>
+              <span *ngIf="calibrationUsesCustomSlots">Configuration parking personnalisee active</span>
+            <span *ngIf="!calibrationUsesCustomSlots">Aucune calibration enregistree</span>
           </div>
 
           <p class="calibration-sidebar__warning" *ngIf="hasCalibrationDuplicates()">
@@ -297,12 +347,9 @@
         class="owner-step__primary"
         type="button"
         (click)="activateAiSetup()"
-        [disabled]="isSubmitting || isLoadingSources"
+        [disabled]="!canActivateAi || !!calibrationSource"
       >
-        {{ isSubmitting ? 'Activation...' : 'Activer la configuration IA' }}
-      </button>
-      <button class="owner-step__primary" type="button" (click)="refreshStatus()">
-        Actualiser le statut
+        {{ aiPrimaryActionLabel }}
       </button>
     </div>
   </div>

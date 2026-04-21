@@ -22,11 +22,8 @@
     <section class="owner-hero">
       <div>
         <span class="owner-step__eyebrow">Etape 2</span>
-        <h1>Activer l abonnement de l application</h1>
-        <p>
-          Votre dossier a ete valide. Il ne reste plus qu a activer l abonnement applicatif pour
-          debloquer la configuration complete du parking.
-        </p>
+        <h1>Activer l abonnement</h1>
+        <p>Un seul pack pour debloquer le parking et la configuration IA.</p>
         <p class="owner-step__active-parking" *ngIf="workflowState?.parkingId">
           Parking actif : #{{ workflowState.parkingId }}
         </p>
@@ -38,23 +35,24 @@
       </article>
     </section>
 
-    <section class="subscription-grid">
+    <section class="wizard-focus">
+      <span>Action actuelle</span>
+      <strong>Confirmer le paiement pour passer a la configuration du parking.</strong>
+    </section>
+
+    <section class="subscription-strip">
       <article class="plan-card">
         <div>
           <strong>Pack Smart Parking</strong>
-          <p>Dashboard owner, gestion des places, reservations, abonnement app et preparation IA.</p>
+          <p>Parking, places, dashboard et IA.</p>
         </div>
         <span>49 TND / mois</span>
       </article>
-
-      <article class="feature-card">
-        <strong>Inclus dans cette etape</strong>
-        <ul>
-          <li>Deblocage du parametrage parking</li>
-          <li>Acces a la gestion des places</li>
-          <li>Preparation du module IA</li>
-        </ul>
-      </article>
+      <div class="subscription-strip__chips">
+        <span>Parking setup</span>
+        <span>Gestion des places</span>
+        <span>Preparation IA</span>
+      </div>
     </section>
 
     <section class="payment-card">
@@ -88,7 +86,6 @@
       <div class="payment-form" *ngIf="paymentMode === 'en_ligne'">
         <label>
           Nom du porteur de la carte
-          <small>Entrez le nom ecrit sur la carte bancaire.</small>
           <input
             type="text"
             [(ngModel)]="paymentData.cardHolder"
@@ -97,7 +94,6 @@
         </label>
         <label>
           Numero de carte
-          <small>Entrez uniquement les chiffres de la carte.</small>
           <input
             type="text"
             [(ngModel)]="paymentData.cardNumber"
@@ -110,7 +106,6 @@
         <div class="payment-form__row">
           <label>
             Mois d expiration
-            <small>Choisissez le mois.</small>
             <select [(ngModel)]="paymentData.expiryMonth" [class.is-invalid]="isFieldInvalid('expiryMonth')">
               <option value="">Mois</option>
               <option *ngFor="let month of expiryMonths" [value]="month">{{ month }}</option>
@@ -118,7 +113,6 @@
           </label>
           <label>
             Annee d expiration
-            <small>Choisissez l annee.</small>
             <select [(ngModel)]="paymentData.expiryYear" [class.is-invalid]="isFieldInvalid('expiryYear')">
               <option value="">Annee</option>
               <option *ngFor="let year of expiryYears" [value]="year">{{ year }}</option>
@@ -127,7 +121,6 @@
         </div>
         <label>
           Code de securite
-          <small>Les 3 ou 4 chiffres de verification de la carte.</small>
           <input
             type="text"
             [(ngModel)]="paymentData.cvv"
@@ -139,12 +132,12 @@
         </label>
         <div class="payment-help">
           <ion-icon name="information-circle-outline"></ion-icon>
-          <span>Exemple valide : carte `1111222233334444`, expiration `04 / 27`, code `123`.</span>
+          <span>Exemple test : 1111222233334444 | 04 / 27 | 123</span>
         </div>
       </div>
 
       <div class="payment-note" *ngIf="paymentMode === 'sur_place'">
-        L abonnement sera cree en attente. L admin pourra verifier et activer votre plan apres validation.
+        L abonnement sera cree en attente de validation.
       </div>
     </section>
 
@@ -155,10 +148,7 @@
         (click)="activateSubscription()"
         [disabled]="isSubmitting"
       >
-        {{ isSubmitting ? 'Soumission...' : 'Payer et soumettre l abonnement' }}
-      </button>
-      <button class="owner-step__primary" type="button" (click)="refreshStatus()">
-        Actualiser le statut
+        {{ isSubmitting ? 'Soumission...' : 'Confirmer et continuer' }}
       </button>
     </div>
   </div>

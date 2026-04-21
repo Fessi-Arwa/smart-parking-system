@@ -22,8 +22,8 @@
     <section class="owner-hero">
       <div>
         <span class="owner-step__eyebrow">Etape 3</span>
-        <h1>Finaliser la configuration du parking</h1>
-        <p class="owner-step__intro">Verifiez les informations, dessinez la structure puis passez a l IA.</p>
+        <h1>Configurer le parking</h1>
+        <p class="owner-step__intro">Verifier, structurer, generer les places.</p>
       </div>
 
       <div class="owner-hero__stats">
@@ -38,6 +38,18 @@
       </div>
     </section>
 
+    <section class="setup-hints" *ngIf="!isLoadingParking && parking">
+      <span>1. Verifier les infos</span>
+      <span>2. Ajouter etages et zones</span>
+      <span>3. {{ places.length === 0 ? 'Generer les places' : 'Terminer' }}</span>
+    </section>
+
+    <section class="wizard-focus" *ngIf="!isLoadingParking && parking">
+      <span>Action actuelle</span>
+      <strong *ngIf="places.length === 0">Generer les places a partir de la structure.</strong>
+      <strong *ngIf="places.length > 0">Valider cette etape et passer a l IA.</strong>
+    </section>
+
     <section class="parking-panel parking-panel--loading" *ngIf="isLoadingParking">
       <p>Chargement du parking owner...</p>
     </section>
@@ -46,7 +58,7 @@
       <div class="parking-panel__header">
         <div>
           <h2>{{ parking.nom }}</h2>
-          <p class="parking-panel__subtle">Informations generales</p>
+          <p class="parking-panel__subtle">Informations de base</p>
         </div>
         <span class="parking-panel__tag">Parking #{{ parking.id_park }}</span>
       </div>
@@ -78,7 +90,7 @@
       <div class="parking-panel__header">
         <div>
           <h2>Structure du parking</h2>
-          <p class="parking-panel__subtle">Etages, zones et nombre de places</p>
+          <p class="parking-panel__subtle">Etages, zones, places</p>
         </div>
         <span class="parking-panel__tag">
           {{ generatedCapacity }} places prevues
@@ -137,13 +149,6 @@
       </div>
 
       <div class="layout-shell" *ngIf="structurePreviewZones.length > 0">
-        <div class="layout-toolbar">
-          <button class="layout-toolbar__button" type="button" (click)="generateParkingStructure()" [disabled]="isGeneratingStructure">
-            <ion-icon name="create-outline"></ion-icon>
-            {{ isGeneratingStructure ? 'Generation...' : 'Generer la structure' }}
-          </button>
-        </div>
-
         <div class="structure-preview-grid">
           <article class="preview-zone-card" *ngFor="let preview of structurePreviewZones">
             <div class="preview-zone-card__header">
@@ -198,26 +203,23 @@
       </div>
 
       <div class="parking-panel--empty" *ngIf="!isLoadingPlaces && places.length === 0">
-        <p>Aucune place n a encore ete generee pour ce parking.</p>
+        <p>Aucune place generee.</p>
       </div>
     </section>
 
     <section class="parking-panel parking-panel--empty" *ngIf="!isLoadingParking && !parking">
       <h2>Aucun parking charge</h2>
-      <p>
-        Le workflow owner attend un parking cree pendant l onboarding. Retournez au formulaire
-        d ajout du parking si necessaire.
-      </p>
+      <p>Retournez au profil owner pour creer un parking.</p>
     </section>
 
     <div class="owner-step__actions">
       <button
         class="owner-step__primary"
         type="button"
-        (click)="completeSetup()"
-        [disabled]="isSubmitting || isLoadingParking || !parking || isGeneratingStructure"
+        (click)="handlePrimaryAction()"
+        [disabled]="isPrimaryActionDisabled"
       >
-        {{ isSubmitting ? 'Enregistrement...' : 'Terminer la configuration' }}
+        {{ primaryActionLabel }}
       </button>
     </div>
   </div>

@@ -37,38 +37,23 @@
       </article>
     </section>
 
-    <div class="owner-step__status-grid">
-      <article class="owner-step__status-card">
-        <strong>Compte owner</strong>
-        <span>{{ workflowState.ownerStatus }}</span>
-      </article>
-      <article class="owner-step__status-card">
-        <strong>Parking</strong>
-        <span>{{ workflowState.parkingStatus }}</span>
-      </article>
-      <article class="owner-step__status-card">
-        <strong>Abonnement app</strong>
-        <span>{{ workflowState.subscriptionStatus }}</span>
-      </article>
+    <div class="owner-step__status-inline">
+      <span>Compte : {{ workflowState.ownerStatus }}</span>
+      <span>Parking : {{ workflowState.parkingStatus }}</span>
+      <span>Abonnement : {{ workflowState.subscriptionStatus }}</span>
     </div>
 
-    <div class="owner-step__status-grid owner-step__status-grid--next" *ngIf="waitingOnOwnerApproval || waitingOnParkingCreation || waitingOnParkingApproval">
-      <article class="owner-step__status-card owner-step__status-card--accent" *ngIf="waitingOnOwnerApproval">
-        <strong>Prochaine action</strong>
-        <span>Attendre la validation du compte owner par l admin</span>
-      </article>
-      <article class="owner-step__status-card owner-step__status-card--accent" *ngIf="waitingOnParkingCreation">
-        <strong>Prochaine action</strong>
-        <span>Creer le premier parking depuis le profil owner</span>
-      </article>
-      <article class="owner-step__status-card owner-step__status-card--accent" *ngIf="waitingOnParkingApproval">
-        <strong>Prochaine action</strong>
-        <span>Attendre la validation du parking par l admin</span>
-      </article>
-    </div>
+    <article class="owner-step__next-action" *ngIf="waitingOnOwnerApproval || waitingOnParkingCreation || waitingOnParkingApproval">
+      <strong>Prochaine action</strong>
+      <span *ngIf="waitingOnOwnerApproval">Attendre la validation du compte.</span>
+      <span *ngIf="waitingOnParkingCreation">Creer le premier parking.</span>
+      <span *ngIf="waitingOnParkingApproval">Attendre la validation du parking.</span>
+    </article>
 
     <div class="owner-step__actions">
-      <button class="owner-step__secondary" type="button" (click)="refreshStatus()">Actualiser</button>
+      <button class="owner-step__primary" type="button" (click)="handlePrimaryAction()">
+        {{ primaryActionLabel }}
+      </button>
     </div>
   </div>
 </ion-content>

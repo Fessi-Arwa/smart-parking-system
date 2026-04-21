@@ -31,44 +31,6 @@
   width: 100%;
 }
 
-.owner-ribbon {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 14px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
-}
-
-.owner-ribbon__label {
-  color: #0f172a;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.owner-ribbon__steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.owner-ribbon__steps span {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 10px;
-  border-radius: 999px;
-  background: #f8fafc;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 600;
-}
-
 .overview-header {
   display: flex;
   align-items: flex-start;
@@ -233,6 +195,34 @@
   font-weight: 620;
 }
 
+.wizard-focus {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+  border: 1px solid rgba(59, 130, 246, 0.14);
+}
+
+.wizard-focus span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.wizard-focus strong {
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 620;
+}
+
+.wizard-focus__action {
+  width: fit-content;
+}
+
 
 .profile-grid {
   display: grid;
@@ -395,63 +385,6 @@
   display: grid;
   gap: 12px;
   margin-bottom: 16px;
-}
-
-.parking-toolbar--summary {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-}
-
-.parking-toolbar--summary p {
-  margin: 0;
-  color: #64748b;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.parking-health-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.parking-health-card {
-  padding: 14px;
-  border-radius: 18px;
-  background: #eff6ff;
-  border: 1px solid rgba(59, 130, 246, 0.14);
-}
-
-.parking-health-card span {
-  display: block;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.parking-health-card strong {
-  display: block;
-  margin-top: 8px;
-  color: #0f172a;
-  font-size: 22px;
-  font-weight: 620;
-  letter-spacing: -0.03em;
-}
-
-.parking-health-card--warning {
-  background: #fff7ed;
-  border-color: rgba(245, 158, 11, 0.2);
-}
-
-.parking-health-card--danger {
-  background: #fff1f2;
-  border-color: rgba(239, 68, 68, 0.18);
-}
-
-.parking-health-card--neutral {
-  background: #f8fafc;
-  border-color: #e2e8f0;
 }
 
 .parking-search {
@@ -1172,10 +1105,6 @@
 }
 
 @media (max-width: 980px) {
-  .parking-health-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .profile-grid {
     grid-template-columns: 1fr;
   }
@@ -1191,13 +1120,7 @@
     padding: 14px 12px 92px;
   }
 
-  .parking-toolbar--summary,
-  .parking-health-grid {
-    grid-template-columns: 1fr;
-  }
-
   .overview-header,
-  .owner-ribbon,
   .hero-card__identity,
   .parking-item__top,
   .detail-nav,

@@ -48,12 +48,6 @@ export class ParkingSetupPage implements OnInit {
     prix_heure: 0,
   };
   structureDraft: ParkingStructureFloorDraft[] = [];
-  setupChecklist = [
-    'Verifier les informations saisies pendant l onboarding',
-    'Ajuster la capacite selon la realite du site',
-    'Definir la structure du parking par etage et par zone',
-    'Valider cette etape avant le parametrage IA',
-  ];
 
   constructor(
     private ownerWorkflowService: OwnerWorkflowService,
@@ -143,6 +137,15 @@ export class ParkingSetupPage implements OnInit {
     } finally {
       this.isSubmitting = false;
     }
+  }
+
+  async handlePrimaryAction(): Promise<void> {
+    if (this.places.length === 0) {
+      await this.generateParkingStructure();
+      return;
+    }
+
+    await this.completeSetup();
   }
 
   addFloor(): void {
@@ -294,6 +297,22 @@ export class ParkingSetupPage implements OnInit {
 
   get remainingPlaces(): number {
     return Math.max(Number(this.parkingDraft.capacite || 0) - this.generatedCapacity, 0);
+  }
+
+  get primaryActionLabel(): string {
+    if (this.isGeneratingStructure) {
+      return 'Generation...';
+    }
+
+    if (this.isSubmitting) {
+      return 'Enregistrement...';
+    }
+
+    return this.places.length === 0 ? 'Generer les places' : 'Terminer et continuer';
+  }
+
+  get isPrimaryActionDisabled(): boolean {
+    return this.isLoadingParking || !this.parking || this.isGeneratingStructure || this.isSubmitting;
   }
 
   get zoneSummaries(): Array<{ zone: string; count: number }> {

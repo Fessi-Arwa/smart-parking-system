@@ -88,4 +88,21 @@ export class PendingPage implements OnInit {
 
     return `Parking #${this.workflowState.parkingId}`;
   }
+
+  get primaryActionLabel(): string {
+    if (this.waitingOnParkingCreation) {
+      return 'Creer mon parking';
+    }
+
+    return 'Verifier a nouveau';
+  }
+
+  async handlePrimaryAction(): Promise<void> {
+    if (this.waitingOnParkingCreation) {
+      await this.router.navigate(['/owner/profile']);
+      return;
+    }
+
+    await this.refreshStatus();
+  }
 }

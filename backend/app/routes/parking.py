@@ -8,6 +8,7 @@ from ..models.parking import (
     Parking,
     StatutConfigurationIA,
     StatutConfigurationParking,
+    StatutParking,
     StatutValidationParking,
 )
 
@@ -105,6 +106,12 @@ def create_parking():
     except (TypeError, ValueError):
         return jsonify({"msg": "capacite et prix_heure doivent etre numeriques"}), 400
 
+    raw_statut = _normalize_text(data.get("statut")) or StatutParking.actif.value
+    try:
+        statut = StatutParking(raw_statut)
+    except ValueError:
+        return jsonify({"msg": "statut invalide"}), 400
+
     if capacite <= 0 or prix_heure < 0:
         return jsonify({"msg": "capacite doit etre superieure a 0 et prix_heure doit etre positif"}), 400
 
@@ -118,6 +125,7 @@ def create_parking():
         adresse=adresse,
         capacite=capacite,
         prix_heure=prix_heure,
+        statut=statut,
         validation_status=StatutValidationParking.en_attente_validation,
         setup_status=StatutConfigurationParking.non_commencee,
         ai_setup_status=StatutConfigurationIA.non_configuree,
@@ -165,13 +173,14 @@ def update_parking(parking_id):
         return jsonify({"msg": "Seuls les owners peuvent modifier leur parking"}), 403
 
     data = request.get_json() or {}
-    tracked_fields = ("nom", "adresse", "capacite", "prix_heure")
+    tracked_fields = ("nom", "adresse", "capacite", "prix_heure", "statut")
     changed_structural_fields = False
     next_values = {
         "nom": parking.nom,
         "adresse": parking.adresse,
         "capacite": parking.capacite,
         "prix_heure": float(parking.prix_heure),
+        "statut": parking.statut,
     }
 
     for field in tracked_fields:
@@ -197,6 +206,11 @@ def update_parking(parking_id):
                 return jsonify({"msg": "prix_heure doit etre numerique"}), 400
             if value < 0:
                 return jsonify({"msg": "prix_heure doit etre positif"}), 400
+        elif field == "statut":
+            try:
+                value = StatutParking(_normalize_text(value))
+            except ValueError:
+                return jsonify({"msg": "statut invalide"}), 400
 
         if getattr(parking, field) != value:
             changed_structural_fields = True

@@ -170,13 +170,15 @@ export class ParkingAiSourceService {
     parkingId: number,
     payload: { label?: string; stream_url: string }
   ): Promise<ParkingAISource> {
-    return firstValueFrom(
+    const source = await firstValueFrom(
       this.http.post<ParkingAISource>(
         `${this.apiUrl}/parkings/${parkingId}/ai-sources/camera`,
         payload,
         { headers: this.buildAuthHeaders() }
       )
     );
+
+    return this.normalizeSource(source);
   }
 
   async deleteSource(sourceId: number): Promise<void> {

@@ -7,23 +7,11 @@
     class="profile-content"
     [class.blur-background]="isEditingProfile || showAddParking || isEditingParking || showDeleteConfirm">
     <section class="overview-shell">
-      <div class="owner-ribbon">
-        <span class="owner-ribbon__label">Workflow owner</span>
-        <div class="owner-ribbon__steps">
-          <span>1. Validation</span>
-          <span>2. Abonnement</span>
-          <span>3. Parking</span>
-          <span>4. IA</span>
-        </div>
-      </div>
-
       <div class="overview-header">
         <div>
           <p class="overview-kicker">Owner profile</p>
           <h1>Profil proprietaire</h1>
-          <p class="overview-subtitle">
-            Gere tes informations, ton portefeuille de parkings et leur niveau d'exploitation.
-          </p>
+          <p class="overview-subtitle">Un seul endroit pour avancer dans le workflow owner.</p>
         </div>
 
         <button class="logout-btn" type="button" (click)="logout()">
@@ -65,8 +53,15 @@
           <span>Prochaine priorite</span>
           <strong>{{ portfolioNextActionTitle }}</strong>
         </div>
-
       </div>
+
+      <section class="wizard-focus">
+        <span>Action actuelle</span>
+        <strong>{{ portfolioNextActionTitle }}</strong>
+        <button class="btn-primary wizard-focus__action" type="button" (click)="handleProfilePrimaryAction()">
+          {{ profilePrimaryActionLabel }}
+        </button>
+      </section>
     </section>
 
     <section class="profile-grid">
@@ -116,25 +111,6 @@
         </ion-card-header>
 
         <ion-card-content>
-          <div class="parking-health-grid" *ngIf="parkings.length">
-            <article class="parking-health-card">
-              <span>Dossiers en attente</span>
-              <strong>{{ portfolioHealth.pendingValidation }}</strong>
-            </article>
-            <article class="parking-health-card parking-health-card--warning">
-              <span>Capacite faible</span>
-              <strong>{{ portfolioHealth.lowCapacity }}</strong>
-            </article>
-            <article class="parking-health-card parking-health-card--danger">
-              <span>A corriger</span>
-              <strong>{{ portfolioHealth.rejected }}</strong>
-            </article>
-            <article class="parking-health-card parking-health-card--neutral">
-              <span>Maintenance</span>
-              <strong>{{ portfolioHealth.maintenance }}</strong>
-            </article>
-          </div>
-
           <div class="workflow-banner" *ngIf="!canCreateParking">
             <ion-icon name="time-outline"></ion-icon>
             <p>La creation de parking sera disponible apres validation du compte owner par l admin.</p>
@@ -164,15 +140,8 @@
             <div class="parking-filters">
               <button type="button" [class.is-active]="parkingStatusFilter === 'all'" (click)="setParkingStatusFilter('all')">Tous</button>
               <button type="button" [class.is-active]="parkingStatusFilter === 'actif'" (click)="setParkingStatusFilter('actif')">Actifs</button>
-              <button type="button" [class.is-active]="parkingStatusFilter === 'maintenance'" (click)="setParkingStatusFilter('maintenance')">Maintenance</button>
+              <button type="button" [class.is-active]="parkingStatusFilter === 'inactif'" (click)="setParkingStatusFilter('inactif')">Maintenance</button>
             </div>
-          </div>
-
-          <div class="parking-toolbar parking-toolbar--summary" *ngIf="!selectedParking && !showAddParking && parkings.length">
-            <p>{{ filteredParkingSummary }}</p>
-            <button class="btn-outline" type="button" *ngIf="hasActiveParkingFilters" (click)="clearParkingFilters()">
-              Reinitialiser
-            </button>
           </div>
 
           <div *ngIf="!selectedParking && !showAddParking" class="parking-list">
@@ -227,14 +196,8 @@
                 <button
                   class="btn-outline btn-outline--compact"
                   type="button"
-                  (click)="openParkingSetup(parking); $event.stopPropagation()">
-                  Configurer
-                </button>
-                <button
-                  class="btn-outline btn-outline--compact"
-                  type="button"
-                  (click)="openAiSetup(parking); $event.stopPropagation()">
-                  IA
+                  (click)="selectParking(parking); $event.stopPropagation()">
+                  Ouvrir
                 </button>
               </div>
             </article>
@@ -323,7 +286,7 @@
             <div class="parking-setup-card">
               <div>
                 <p class="section-kicker">Configuration parking</p>
-                <strong>Structurer le parking avant l activation IA</strong>
+                <strong>Etape suivante pour ce parking</strong>
                 <p>{{ parkingSetupHint }}</p>
               </div>
               <button
@@ -338,7 +301,7 @@
             <div class="ai-shortcut-card">
               <div>
                 <p class="section-kicker">Module IA</p>
-                <strong>Ajouter des images, videos ou cameras pour ce parking</strong>
+                <strong>Derniere etape du workflow</strong>
                 <p>{{ aiSetupHint }}</p>
               </div>
               <button class="btn-primary ai-shortcut-card__action" type="button" (click)="openAiSetup()" [disabled]="!canOpenAiSetup">
@@ -475,7 +438,7 @@
             <ion-icon name="checkmark-circle-outline"></ion-icon>
             Actif
           </button>
-          <button class="status-option" type="button" [class.active]="newParkingData.statut === 'maintenance'" (click)="newParkingData.statut = 'maintenance'">
+          <button class="status-option" type="button" [class.active]="newParkingData.statut === 'inactif'" (click)="newParkingData.statut = 'inactif'">
             <ion-icon name="construct-outline"></ion-icon>
             Maintenance
           </button>
@@ -558,7 +521,7 @@
             <ion-icon name="checkmark-circle-outline"></ion-icon>
             Actif
           </button>
-          <button class="status-option" type="button" [class.active]="editParkingData.statut === 'maintenance'" (click)="editParkingData.statut = 'maintenance'">
+          <button class="status-option" type="button" [class.active]="editParkingData.statut === 'inactif'" (click)="editParkingData.statut = 'inactif'">
             <ion-icon name="construct-outline"></ion-icon>
             Maintenance
           </button>

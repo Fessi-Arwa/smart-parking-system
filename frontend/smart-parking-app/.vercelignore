@@ -1,0 +1,8 @@
+.angular
+node_modules
+www
+.vscode
+coverage
+dist
+tmp
+*.log

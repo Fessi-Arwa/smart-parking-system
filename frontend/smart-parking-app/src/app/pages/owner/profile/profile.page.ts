@@ -36,8 +36,10 @@ export interface ParkingInfo {
   adresse: string;
   ville: string;
   prix_heure: number;
-  statut: string;
+  statut: 'actif' | 'inactif';
   validation_status?: string;
+  setup_status?: string;
+  ai_setup_status?: string;
   totalSpaces: number;
   availableSpaces: number;
   activeSubscriptions: number;
@@ -77,7 +79,7 @@ export class ProfilePage implements OnInit {
 
   parkings: ParkingInfo[] = [];
   parkingSearch = '';
-  parkingStatusFilter: 'all' | 'actif' | 'maintenance' = 'all';
+  parkingStatusFilter: 'all' | 'actif' | 'inactif' = 'all';
 
   isEditingProfile = false;
   showAddParking = false;
@@ -174,7 +176,7 @@ export class ProfilePage implements OnInit {
       pendingValidation: this.parkings.filter((parking) => parking.validation_status === 'en_attente_validation').length,
       rejected: this.parkings.filter((parking) => parking.validation_status === 'rejete').length,
       lowCapacity: this.parkings.filter((parking) => parking.availableSpaces > 0 && parking.availableSpaces <= 5).length,
-      maintenance: this.parkings.filter((parking) => parking.statut === 'maintenance').length,
+      maintenance: this.parkings.filter((parking) => parking.statut === 'inactif').length,
     };
   }
 
@@ -241,7 +243,7 @@ export class ProfilePage implements OnInit {
         : [];
 
     const maintenanceNotifications = this.parkings
-      .filter((parking) => parking.statut === 'maintenance')
+      .filter((parking) => parking.statut === 'inactif')
       .map((parking) => ({
         title: 'Parking en maintenance',
         description: `${parking.nom} est actuellement indisponible`,
@@ -334,6 +336,57 @@ export class ProfilePage implements OnInit {
     return 'Completer la configuration du portefeuille';
   }
 
+  get profilePrimaryActionLabel(): string {
+    if (!this.canCreateParking) {
+      return 'Suivre la validation';
+    }
+    if (this.workflowState?.parkingStatus === 'valide' && this.workflowState?.subscriptionStatus !== 'actif') {
+      return 'Activer l abonnement';
+    }
+    if (this.selectedParking) {
+      if (this.canOpenAiSetup) {
+        return 'Ouvrir l IA';
+      }
+      return 'Configurer ce parking';
+    }
+    if (this.parkings.length === 0) {
+      return 'Ajouter un parking';
+    }
+    return 'Ouvrir le parking prioritaire';
+  }
+
+  async handleProfilePrimaryAction(): Promise<void> {
+    if (!this.canCreateParking) {
+      await this.router.navigate(['/owner/pending']);
+      return;
+    }
+
+    if (this.workflowState?.parkingStatus === 'valide' && this.workflowState?.subscriptionStatus !== 'actif') {
+      await this.router.navigate(['/owner/subscription']);
+      return;
+    }
+
+    if (this.selectedParking) {
+      if (this.canOpenAiSetup) {
+        await this.openAiSetup();
+        return;
+      }
+
+      await this.openParkingSetup();
+      return;
+    }
+
+    if (this.parkings.length === 0) {
+      this.openAddParking();
+      return;
+    }
+
+    const topParking = this.filteredParkings[0] ?? this.parkings[0];
+    if (topParking) {
+      await this.selectParking(topParking);
+    }
+  }
+
   logout(): void {
     this.authService.logout();
   }
@@ -420,6 +473,14 @@ export class ProfilePage implements OnInit {
       this.toastService.show('Vous ne pouvez pas acceder a la configuration IA pour le moment.', 'error');
       return;
     }
+    if (targetParking.validation_status !== 'valide') {
+      this.toastService.show('Le parking doit d abord etre valide par l admin avant la configuration IA.', 'error');
+      return;
+    }
+    if (targetParking.setup_status !== 'terminee') {
+      this.toastService.show('Terminez d abord la configuration parking avant d ouvrir le module IA.', 'error');
+      return;
+    }
     await this.router.navigate(['/owner/ai-setup'], {
       queryParams: { parking: targetParking.id_park },
     });
@@ -459,6 +520,7 @@ export class ProfilePage implements OnInit {
       adresse: this.buildAddress(this.editParkingData.adresse, this.editParkingData.ville),
       capacite: this.editParkingData.totalSpaces,
       prix_heure: this.editParkingData.prix_heure,
+      statut: this.editParkingData.statut,
     };
 
     try {
@@ -549,8 +611,9 @@ export class ProfilePage implements OnInit {
     const payload: CreateParkingPayload = {
       nom: this.newParkingData.nom!.trim(),
       adresse: this.buildAddress(this.newParkingData.adresse, this.newParkingData.ville),
-      capacite: this.newParkingData.totalSpaces || 20,
-      prix_heure: this.newParkingData.prix_heure || 2.5,
+      capacite: this.newParkingData.totalSpaces ?? 20,
+      prix_heure: this.newParkingData.prix_heure ?? 2.5,
+      statut: this.newParkingData.statut,
     };
 
     try {
@@ -636,18 +699,27 @@ export class ProfilePage implements OnInit {
   }
 
   get canOpenAiSetup(): boolean {
-    return Boolean(this.selectedParking);
+    return Boolean(
+      this.selectedParking &&
+      this.selectedParking.validation_status === 'valide' &&
+      this.selectedParking.setup_status === 'terminee'
+    );
   }
 
   get aiSetupHint(): string {
     if (!this.selectedParking) {
       return 'Selectionnez un parking pour ouvrir sa configuration IA.';
     }
-
+    if (this.selectedParking.validation_status !== 'valide') {
+      return 'Le parking doit etre valide par l admin avant la configuration IA.';
+    }
+    if (this.selectedParking.setup_status !== 'terminee') {
+      return 'Terminez d abord la configuration parking pour debloquer l IA.';
+    }
     return `Ouvrir les sources IA de ${this.selectedParking.nom} pour images, videos, cameras et calibration.`;
   }
 
-  setParkingStatusFilter(status: 'all' | 'actif' | 'maintenance'): void {
+  setParkingStatusFilter(status: 'all' | 'actif' | 'inactif'): void {
     this.parkingStatusFilter = status;
   }
 
@@ -698,6 +770,8 @@ export class ProfilePage implements OnInit {
       prix_heure: Number(parking.prix_heure),
       statut: parking.statut,
       validation_status: parking.validation_status || 'brouillon',
+      setup_status: parking.setup_status || 'non_commencee',
+      ai_setup_status: parking.ai_setup_status || 'non_configuree',
       totalSpaces: parking.capacite,
       availableSpaces,
       activeSubscriptions: 0,
@@ -741,7 +815,7 @@ export class ProfilePage implements OnInit {
       score += 180;
     }
 
-    if (parking.statut === 'maintenance') {
+    if (parking.statut === 'inactif') {
       score += 220;
     }
 

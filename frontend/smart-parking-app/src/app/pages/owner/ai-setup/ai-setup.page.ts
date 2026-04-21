@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { OwnerWorkflowState } from '../../../models/owner-workflow.model';
+import { AuthService } from '../../../services/auth.service';
 import { OwnerWorkflowService } from '../../../services/owner-workflow.service';
 import { PlaceDto, PlaceService } from '../../../services/place.service';
 import {
@@ -11,7 +12,16 @@ import {
   ParkingAISlot,
   ParkingAiSourceService,
 } from '../../../services/parking-ai-source.service';
+import { ParkingDto, ParkingService } from '../../../services/parking.service';
 import { ToastService } from '../../../services/toast.service';
+
+interface OwnerAiParkingOption {
+  id: number;
+  name: string;
+  address: string;
+  setupStatus: string;
+  aiSetupStatus: string;
+}
 
 @Component({
   selector: 'app-owner-ai-setup',
@@ -22,6 +32,7 @@ import { ToastService } from '../../../services/toast.service';
 export class AiSetupPage implements OnInit, OnDestroy {
   @ViewChild('calibrationCanvas') calibrationCanvasRef?: ElementRef<HTMLCanvasElement>;
   workflowState!: OwnerWorkflowState;
+  ownerParkings: OwnerAiParkingOption[] = [];
   isSubmitting = false;
   isLoadingSources = true;
   isUploadingImage = false;
@@ -49,16 +60,13 @@ export class AiSetupPage implements OnInit, OnDestroy {
   private sourceBlobs = new Map<number, string>();
   private analysisBlobs = new Map<number, string>();
   private analysisPreviewBlobs = new Map<number, string>();
-  aiTasks = [
-    'Ajouter des images statiques du parking',
-    'Deposer des videos pour analyser circulation et occupation',
-    'Connecter une ou plusieurs cameras de surveillance',
-    'Laisser le modele IA exploiter ces sources pour la detection',
-  ];
+  private routeParkingId: number | null = null;
 
   constructor(
+    private authService: AuthService,
     private ownerWorkflowService: OwnerWorkflowService,
     private parkingAiSourceService: ParkingAiSourceService,
+    private parkingService: ParkingService,
     private placeService: PlaceService,
     private route: ActivatedRoute,
     private router: Router,
@@ -68,7 +76,14 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   async ngOnInit(): Promise<void> {
+    this.routeParkingId = this.parseParkingId(this.route.snapshot.queryParamMap.get('parking'));
     this.workflowState = await this.ownerWorkflowService.refresh();
+    await this.loadOwnerParkings();
+    await this.ensureSelectedParking();
+    if (!this.activeParkingId) {
+      await this.router.navigateByUrl(this.ownerWorkflowService.getNextRoute(this.workflowState));
+      return;
+    }
     await this.loadSources();
   }
 
@@ -79,6 +94,8 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
   async refreshStatus(): Promise<void> {
     this.workflowState = await this.ownerWorkflowService.refresh();
+    await this.loadOwnerParkings();
+    await this.ensureSelectedParking();
     await this.loadSources();
     if (this.hasRouteParkingSelection) {
       return;
@@ -171,6 +188,10 @@ export class AiSetupPage implements OnInit, OnDestroy {
   async removeSource(sourceId: number): Promise<void> {
     try {
       await this.parkingAiSourceService.deleteSource(sourceId);
+      if (this.calibrationSource?.id_source === sourceId) {
+        this.closeCalibration();
+      }
+      this.revokeSourceSpecificObjectUrls(sourceId);
       this.aiSources = this.aiSources.filter((source) => source.id_source !== sourceId);
       this.toastService.show('Source IA supprimee.', 'success');
     } catch (error) {
@@ -203,7 +224,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
       await this.router.navigateByUrl(route);
     } catch (error) {
       console.error('Erreur activation configuration IA', error);
-      this.toastService.show('Impossible d activer la configuration IA.', 'error');
+      this.toastService.show(this.getErrorMessage(error, 'Impossible d activer la configuration IA.'), 'error');
     } finally {
       this.isSubmitting = false;
     }
@@ -265,6 +286,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.reanalyzingSourceIds.add(source.id_source);
     try {
       const updatedSource = await this.parkingAiSourceService.reanalyzeSource(source.id_source);
+      await this.loadBlobUrlsForSpecificSources([updatedSource]);
       this.aiSources = this.aiSources.map((item) =>
         item.id_source === updatedSource.id_source ? updatedSource : item
       );
@@ -366,6 +388,69 @@ export class AiSetupPage implements OnInit, OnDestroy {
     return this.calibrationPlaces.length > 0;
   }
 
+  async selectParking(parkingId: number): Promise<void> {
+    if (parkingId === this.activeParkingId) {
+      return;
+    }
+
+    this.routeParkingId = parkingId;
+    this.closeCalibration();
+    await this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { parking: parkingId },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+    await this.loadSources();
+  }
+
+  isSelectedParking(parkingId: number): boolean {
+    return this.activeParkingId === parkingId;
+  }
+
+  get activeParkingOption(): OwnerAiParkingOption | null {
+    if (!this.activeParkingId) {
+      return null;
+    }
+
+    return this.ownerParkings.find((parking) => parking.id === this.activeParkingId) ?? null;
+  }
+
+  get activeParkingLabel(): string {
+    const parking = this.activeParkingOption;
+    if (!parking) {
+      return this.activeParkingId ? `Parking #${this.activeParkingId}` : 'Aucun parking';
+    }
+
+    return `${parking.name} (#${parking.id})`;
+  }
+
+  get canSwitchParking(): boolean {
+    return this.ownerParkings.length > 1;
+  }
+
+  get canActivateAi(): boolean {
+    return this.aiSources.length > 0 && !this.isLoadingSources && !this.isSubmitting;
+  }
+
+  get aiPrimaryActionLabel(): string {
+    if (this.isSubmitting) {
+      return 'Activation...';
+    }
+
+    return this.aiSources.length === 0 ? 'Ajoutez une source pour continuer' : 'Activer et continuer';
+  }
+
+  getParkingStateLabel(parking: OwnerAiParkingOption): string {
+    if (parking.aiSetupStatus === 'active') {
+      return 'IA active';
+    }
+    if (parking.setupStatus === 'terminee') {
+      return 'Pret pour IA';
+    }
+    return 'Parking a finaliser';
+  }
+
   async goToParkingSetup(): Promise<void> {
     await this.router.navigate(['/owner/parking-setup'], {
       queryParams: this.activeParkingId ? { parking: this.activeParkingId } : {},
@@ -393,6 +478,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
     try {
       await this.parkingAiSourceService.saveParkingSlots(this.activeParkingId, this.calibrationSlots);
       const updatedSource = await this.parkingAiSourceService.reanalyzeSource(this.calibrationSource.id_source);
+      await this.loadBlobUrlsForSpecificSources([updatedSource]);
       this.aiSources = this.aiSources.map((source) =>
         source.id_source === updatedSource.id_source ? updatedSource : source
       );
@@ -547,6 +633,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
   private async loadSources(): Promise<void> {
     if (!this.activeParkingId) {
+      this.closeCalibration();
       this.aiSources = [];
       this.isLoadingSources = false;
       return;
@@ -813,15 +900,75 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.objectUrls.add(nextUrl);
   }
 
+  private revokeSourceSpecificObjectUrls(sourceId: number): void {
+    const collections = [this.sourceBlobs, this.analysisBlobs, this.analysisPreviewBlobs];
+    collections.forEach((collection) => {
+      const currentUrl = collection.get(sourceId);
+      if (currentUrl && this.objectUrls.has(currentUrl)) {
+        URL.revokeObjectURL(currentUrl);
+        this.objectUrls.delete(currentUrl);
+      }
+      collection.delete(sourceId);
+    });
+    this.analysisVideoErrorIds.delete(sourceId);
+  }
+
   get activeParkingId(): number | null {
-    const routeParkingId = Number(this.route.snapshot.queryParamMap.get('parking'));
-    if (routeParkingId) {
-      return routeParkingId;
+    if (this.routeParkingId) {
+      return this.routeParkingId;
     }
     return this.workflowState?.parkingId ?? null;
   }
 
   get hasRouteParkingSelection(): boolean {
-    return Boolean(Number(this.route.snapshot.queryParamMap.get('parking')));
+    return Boolean(this.routeParkingId);
+  }
+
+  private async loadOwnerParkings(): Promise<void> {
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser?.id) {
+      this.ownerParkings = [];
+      return;
+    }
+
+    const parkings = await firstValueFrom(this.parkingService.getParkings());
+    this.ownerParkings = parkings
+      .filter((parking) => parking.owner_id === currentUser.id)
+      .map((parking) => this.mapOwnerParking(parking));
+  }
+
+  private async ensureSelectedParking(): Promise<void> {
+    const activeParkingId = this.activeParkingId;
+    if (activeParkingId && this.ownerParkings.some((parking) => parking.id === activeParkingId)) {
+      return;
+    }
+
+    const fallbackParkingId = this.ownerParkings[0]?.id ?? null;
+    if (!fallbackParkingId) {
+      return;
+    }
+
+    this.routeParkingId = fallbackParkingId;
+    await this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { parking: fallbackParkingId },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  private mapOwnerParking(parking: ParkingDto): OwnerAiParkingOption {
+    return {
+      id: parking.id_park,
+      name: parking.nom,
+      address: parking.adresse,
+      setupStatus: parking.setup_status || 'non_commencee',
+      aiSetupStatus: parking.ai_setup_status || 'non_configuree',
+    };
+  }
+
+  private parseParkingId(value: string | null): number | null {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
 }
