@@ -47,6 +47,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   calibrationSource: ParkingAISource | null = null;
   calibrationUsesCustomSlots = false;
   calibrationImageUrl: string | null = null;
+  calibrationWarning: string | null = null;
   cameraDraft = {
     label: '',
     streamUrl: '',
@@ -256,9 +257,18 @@ export class AiSetupPage implements OnInit, OnDestroy {
         this.parkingAiSourceService.getParkingSlots(this.activeParkingId),
       ]);
       this.calibrationPlaces = (places || []).sort((a, b) => a.num_place - b.num_place);
-      this.calibrationSlots = [...slotsResponse.slots].sort((a, b) => a.slot_index - b.slot_index);
+      this.calibrationSlots = this.autoAssignCalibrationSlots(
+        [...slotsResponse.slots].sort((a, b) => a.slot_index - b.slot_index)
+      );
       this.calibrationUsesCustomSlots = slotsResponse.uses_custom_slots;
+      this.calibrationWarning = slotsResponse.warning || null;
       this.calibrationSource = source;
+      if (slotsResponse.auto_assigned_count) {
+        this.toastService.show(
+          `${slotsResponse.auto_assigned_count} slot(s) ont ete associes automatiquement aux places existantes.`,
+          'info'
+        );
+      }
       this.replaceCalibrationImageUrl(
         await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(calibrationMediaUrl)
       );
@@ -312,6 +322,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.calibrationSource = null;
     this.replaceCalibrationImageUrl(null);
     this.calibrationSlots = [];
+    this.calibrationWarning = null;
     this.draftRect = null;
     this.dragStart = null;
   }
@@ -342,11 +353,13 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.draftRect = null;
 
     if (rect.w >= 12 && rect.h >= 12) {
+      const nextPlace = this.getNextAvailableCalibrationPlaceId();
       this.calibrationSlots = [
         ...this.calibrationSlots,
         {
           slot_index: this.calibrationSlots.length + 1,
-          place_id: 0,
+          place_id: nextPlace,
+          place_number: this.getCalibrationPlaceNumber(nextPlace),
           ...rect,
         },
       ];
@@ -358,7 +371,9 @@ export class AiSetupPage implements OnInit, OnDestroy {
   updateCalibrationPlace(slotIndex: number, value: string): void {
     const placeId = Number(value || 0);
     this.calibrationSlots = this.calibrationSlots.map((slot, index) =>
-      index === slotIndex ? { ...slot, place_id: placeId } : slot
+      index === slotIndex
+        ? { ...slot, place_id: placeId || null, place_number: this.getCalibrationPlaceNumber(placeId || null) }
+        : slot
     );
     this.redrawCalibrationCanvas();
   }
@@ -370,13 +385,23 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.redrawCalibrationCanvas();
   }
 
-  getCalibrationPlaceLabel(placeId: number): string {
+  getCalibrationPlaceLabel(placeId: number | null | undefined): string {
     const place = this.calibrationPlaces.find((item) => item.id_place === placeId);
     return place ? `Place ${place.num_place}` : 'Non assignee';
   }
 
+  getCalibrationPlaceNumber(placeId: number | null | undefined): number | null {
+    if (!placeId) {
+      return null;
+    }
+    const place = this.calibrationPlaces.find((item) => item.id_place === placeId);
+    return place?.num_place ?? null;
+  }
+
   hasCalibrationDuplicates(): boolean {
-    const used = this.calibrationSlots.map((slot) => slot.place_id).filter((value) => value > 0);
+    const used = this.calibrationSlots
+      .map((slot) => slot.place_id)
+      .filter((value): value is number => typeof value === 'number' && value > 0);
     return new Set(used).size !== used.length;
   }
 
@@ -476,7 +501,8 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     this.isSavingCalibration = true;
     try {
-      await this.parkingAiSourceService.saveParkingSlots(this.activeParkingId, this.calibrationSlots);
+      const savedSlots = await this.parkingAiSourceService.saveParkingSlots(this.activeParkingId, this.calibrationSlots);
+      this.calibrationSlots = this.autoAssignCalibrationSlots(savedSlots.slots);
       const updatedSource = await this.parkingAiSourceService.reanalyzeSource(this.calibrationSource.id_source);
       await this.loadBlobUrlsForSpecificSources([updatedSource]);
       this.aiSources = this.aiSources.map((source) =>
@@ -485,6 +511,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
       this.syncPollingState();
       this.calibrationSource = updatedSource;
       this.calibrationUsesCustomSlots = true;
+      this.calibrationWarning = savedSlots.warning || null;
       this.toastService.show(
         this.isVideoSource(updatedSource)
           ? 'Calibration enregistree. Le traitement video est relance en arriere-plan.'
@@ -606,7 +633,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
     return rows.map((item) => {
       const parts = [
         `S${item.slot_index}`,
-        item.place_id ? `P${item.place_id}` : null,
+        item.place_number ? `Place ${item.place_number}` : item.place_id ? `P${item.place_id}` : null,
         item.label,
         item.average_confidence !== undefined && item.average_confidence !== null
           ? `${Math.round(item.average_confidence * 100)}%`
@@ -771,6 +798,57 @@ export class AiSetupPage implements OnInit, OnDestroy {
       w: Math.abs(end.x - start.x),
       h: Math.abs(end.y - start.y),
     };
+  }
+
+  private autoAssignCalibrationSlots(slots: ParkingAISlot[]): ParkingAISlot[] {
+    const availablePlaces = [...this.calibrationPlaces];
+    const placesById = new Map(availablePlaces.map((place) => [place.id_place, place]));
+    const usedPlaceIds = new Set<number>();
+
+    const normalized = slots.map((slot, index) => {
+      let placeId = slot.place_id ?? null;
+      let placeNumber = slot.place_number ?? this.getCalibrationPlaceNumber(placeId);
+
+      if (placeId && placesById.has(placeId) && !usedPlaceIds.has(placeId)) {
+        usedPlaceIds.add(placeId);
+        return {
+          ...slot,
+          slot_index: index + 1,
+          place_id: placeId,
+          place_number: placeNumber,
+        };
+      }
+
+      const nextPlace = availablePlaces.find((place) => !usedPlaceIds.has(place.id_place)) || null;
+      if (!nextPlace) {
+        return {
+          ...slot,
+          slot_index: index + 1,
+          place_id: null,
+          place_number: null,
+        };
+      }
+
+      usedPlaceIds.add(nextPlace.id_place);
+      return {
+        ...slot,
+        slot_index: index + 1,
+        place_id: nextPlace.id_place,
+        place_number: nextPlace.num_place,
+      };
+    });
+
+    return normalized;
+  }
+
+  private getNextAvailableCalibrationPlaceId(): number | null {
+    const usedPlaceIds = new Set(
+      this.calibrationSlots
+        .map((slot) => slot.place_id)
+        .filter((value): value is number => Boolean(value))
+    );
+    const nextPlace = this.calibrationPlaces.find((place) => !usedPlaceIds.has(place.id_place));
+    return nextPlace?.id_place ?? null;
   }
 
   private async uploadSources(

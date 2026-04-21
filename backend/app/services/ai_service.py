@@ -14,6 +14,7 @@ from flask import current_app
 from .. import db
 from ..models.place import Place, StatutPlace
 from ..models.parking_ai_source import ParkingAISource, TypeSourceIA
+from .slot_mapping_service import assign_slots_to_places
 from .video_ai_service import (
     BUSY_LABEL,
     FREE_LABEL,
@@ -340,6 +341,10 @@ class ParkingSourceAIService:
 
     def _analyze_image(self, source: ParkingAISource, file_path: Path) -> ParkingSourceAnalysisResult:
         slots, slots_path = self.video_service.get_slots(source.parking_id)
+        slot_mapping = self._ensure_slot_mapping(source.parking_id, slots)
+        slots = slot_mapping["slots"]
+        if slot_mapping["changed"]:
+            slots_path = self.video_service.get_slots_config_path(source.parking_id)
         self._log_debug(
             "image-process-start parking_id=%s source_id=%s file=%s model=%s slots=%s imgsz=%s padding=%s total_slots=%s",
             source.parking_id,
@@ -391,10 +396,12 @@ class ParkingSourceAIService:
             raise RuntimeError("Impossible d'ecrire l'image annotee.")
 
         sync_result = self._sync_places_with_slots(source.parking_id, slots, slot_states)
+        sync_warning = self._merge_warnings(slot_mapping.get("warning"), sync_result["warning"])
         slot_debug = [
             {
                 "slot_index": index,
                 "place_id": slot.get("place_id"),
+                "place_number": slot.get("place_number"),
                 "label": state,
                 "average_confidence": None,
                 "x": slot["x"],
@@ -421,13 +428,15 @@ class ParkingSourceAIService:
             slots_path=str(slots_path),
             sync_mode=sync_result["mode"],
             synced_places=sync_result["synced_places"],
-            sync_warning=sync_result["warning"],
+            sync_warning=sync_warning,
             output_path=str(output_path),
             output_filename=output_filename,
             output_mimetype="image/jpeg",
         )
 
     def _analyze_video(self, source: ParkingAISource, file_path: Path) -> ParkingSourceAnalysisResult:
+        slots, _ = self.video_service.get_slots(source.parking_id)
+        slot_mapping = self._ensure_slot_mapping(source.parking_id, slots)
         video_result = self.video_service.process_video(
             parking_id=source.parking_id,
             input_path=file_path,
@@ -437,6 +446,7 @@ class ParkingSourceAIService:
         preview_path = self._extract_video_output_preview(source.parking_id, source.id_source, output_path)
         slots, _ = self.video_service.get_slots(source.parking_id)
         sync_result = self._sync_places_with_slots(source.parking_id, slots, video_result.slot_states)
+        sync_warning = self._merge_warnings(slot_mapping.get("warning"), sync_result["warning"])
 
         return ParkingSourceAnalysisResult(
             source_id=source.id_source,
@@ -456,7 +466,7 @@ class ParkingSourceAIService:
             slots_path=video_result.slots_path,
             sync_mode=sync_result["mode"],
             synced_places=sync_result["synced_places"],
-            sync_warning=sync_result["warning"],
+            sync_warning=sync_warning,
             output_path=str(output_path) if output_path else None,
             output_filename=video_result.output_filename,
             output_mimetype="video/mp4",
@@ -553,6 +563,19 @@ class ParkingSourceAIService:
             "synced_places": synced_places,
             "warning": " ".join(warning_parts) if warning_parts else None,
         }
+
+    def _ensure_slot_mapping(self, parking_id: int, slots: list[dict[str, Any]]) -> dict[str, Any]:
+        mapping = assign_slots_to_places(parking_id, slots)
+        if mapping["changed"]:
+            self.video_service.save_parking_slots(parking_id, mapping["slots"])
+        return mapping
+
+    @staticmethod
+    def _merge_warnings(*warnings: str | None) -> str | None:
+        parts = [warning.strip() for warning in warnings if warning and warning.strip()]
+        if not parts:
+            return None
+        return " ".join(dict.fromkeys(parts))
 
     def _ensure_storage(self) -> None:
         for directory in (self.analysis_root, self.output_root, self.calibration_root):
@@ -688,11 +711,16 @@ class ParkingSourceAIService:
     ) -> None:
         x, y, w, h = slot["x"], slot["y"], slot["w"], slot["h"]
         color = (46, 204, 113) if is_free else (52, 73, 94)
+        slot_label = (
+            f"Place {slot.get('place_number')}"
+            if slot.get("place_number")
+            else (f"P{slot.get('place_id')}" if slot.get("place_id") else f"S{slot_index}")
+        )
         cv2.rectangle(frame, (x, y), (x + w, y + h), color, 3)
         cv2.rectangle(frame, (x, max(0, y - 28)), (x + 190, y), color, -1)
         cv2.putText(
             frame,
-            f"P{slot_index} {label} {confidence:.2f}",
+            f"{slot_label} {label} {confidence:.2f}",
             (x + 8, max(18, y - 8)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.55,

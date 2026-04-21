@@ -18,8 +18,8 @@ from ..models.parking import (
     StatutConfigurationParking,
     StatutValidationParking,
 )
-from ..models.place import Place
 from ..services.ai_service import ParkingSourceAIService
+from ..services.slot_mapping_service import assign_slots_to_places
 from ..services.video_ai_service import ParkingVideoAIService
 from ..utils.storage_manager import StorageManager
 
@@ -605,12 +605,24 @@ def get_ai_slots(parking_id):
         return ai_error
 
     service = _get_ai_source_service().video_service
-    slots = service.get_saved_parking_slots(parking.id_park)
+    saved_slots = service.get_saved_parking_slots(parking.id_park)
+    uses_custom_slots = bool(saved_slots)
+    slots = saved_slots
+    if not slots:
+        slots, _ = service.get_slots(parking.id_park)
+
+    slot_mapping = assign_slots_to_places(parking.id_park, slots)
+    if slot_mapping["changed"]:
+        service.save_parking_slots(parking.id_park, slot_mapping["slots"])
+        uses_custom_slots = True
+
     return jsonify(
         {
-            "slots": slots,
+            "slots": slot_mapping["slots"],
             "slots_path": str(service.get_slots_config_path(parking.id_park)),
-            "uses_custom_slots": bool(slots),
+            "uses_custom_slots": uses_custom_slots,
+            "warning": slot_mapping["warning"],
+            "auto_assigned_count": slot_mapping["auto_assigned_count"],
         }
     ), 200
 
@@ -637,48 +649,22 @@ def save_ai_slots(parking_id):
     if not isinstance(raw_slots, list) or not raw_slots:
         return jsonify({"msg": "Ajoutez au moins un slot a sauvegarder"}), 400
 
-    valid_place_ids = {
-        place.id_place
-        for place in Place.query.filter_by(parking_id=parking.id_park).all()
-    }
-
-    normalized_slots = []
-    seen_place_ids = set()
-    for index, slot in enumerate(raw_slots, start=1):
-        if not isinstance(slot, dict):
-            return jsonify({"msg": f"Le slot #{index} est invalide"}), 400
-
-        try:
-            place_id = int(slot["place_id"])
-            x = int(slot["x"])
-            y = int(slot["y"])
-            w = int(slot["w"])
-            h = int(slot["h"])
-        except (KeyError, TypeError, ValueError):
-            return jsonify({"msg": f"Le slot #{index} doit contenir place_id, x, y, w et h"}), 400
-
-        if place_id not in valid_place_ids:
-            return jsonify({"msg": f"Le place_id {place_id} n appartient pas a ce parking"}), 400
-        if place_id in seen_place_ids:
-            return jsonify({"msg": f"Le place_id {place_id} est utilise plusieurs fois"}), 400
-        if w <= 0 or h <= 0:
-            return jsonify({"msg": f"Le slot #{index} doit avoir une largeur et une hauteur positives"}), 400
-
-        seen_place_ids.add(place_id)
-        normalized_slots.append(
-            {
-                "slot_index": index,
-                "place_id": place_id,
-                "x": x,
-                "y": y,
-                "w": w,
-                "h": h,
-            }
-        )
+    try:
+        normalized = assign_slots_to_places(parking.id_park, raw_slots)
+    except ValueError as exc:
+        return jsonify({"msg": str(exc)}), 400
 
     service = _get_ai_source_service().video_service
-    slots_path = service.save_parking_slots(parking.id_park, normalized_slots)
-    return jsonify({"slots": normalized_slots, "slots_path": str(slots_path)}), 200
+    slots_path = service.save_parking_slots(parking.id_park, normalized["slots"])
+    return jsonify(
+        {
+            "slots": normalized["slots"],
+            "slots_path": str(slots_path),
+            "uses_custom_slots": True,
+            "warning": normalized["warning"],
+            "auto_assigned_count": normalized["auto_assigned_count"],
+        }
+    ), 200
 
 
 @owner_workflow_bp.route("/ai-sources/<int:source_id>", methods=["DELETE"])

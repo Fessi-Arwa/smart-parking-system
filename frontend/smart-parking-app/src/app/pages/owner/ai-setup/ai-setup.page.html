@@ -262,7 +262,7 @@
       </div>
 
       <p class="small-note">
-        Dessinez un slot, associez-le a une place, puis sauvegardez.
+        Dessinez les slots. Les places existantes sont affectees automatiquement, puis vous pouvez ajuster si besoin.
       </p>
 
       <div class="calibration-layout" *ngIf="!isLoadingCalibration; else loadingCalibration">
@@ -285,8 +285,11 @@
           <p class="calibration-sidebar__warning" *ngIf="hasCalibrationDuplicates()">
             Une meme place est selectionnee plusieurs fois. Corrige les doublons avant sauvegarde.
           </p>
+          <p class="calibration-sidebar__warning" *ngIf="!hasCalibrationDuplicates() && calibrationWarning">
+            {{ calibrationWarning }}
+          </p>
           <p class="calibration-sidebar__warning" *ngIf="!hasCalibrationDuplicates() && hasUnassignedCalibrationSlots()">
-            Chaque slot doit etre associe a une place avant de lancer le retraitement.
+            Certains slots depassent le nombre de places disponibles. Ajuste la calibration ou ajoute des places.
           </p>
           <div class="calibration-sidebar__empty-places" *ngIf="!hasCalibrationPlaces()">
             <strong>Aucune place disponible</strong>

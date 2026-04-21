@@ -86,10 +86,19 @@ def load_slots(slots_path: Path) -> list[dict[str, int | None]]:
             if place_id <= 0:
                 raise ValueError(f"Slot #{index} must have a positive place_id.")
 
+        place_number_value = slot.get("place_number")
+        place_number = None
+        if place_number_value not in (None, ""):
+            try:
+                place_number = int(place_number_value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Slot #{index} has an invalid place_number.") from exc
+
         normalized.append(
             {
                 "slot_index": index,
                 "place_id": place_id,
+                "place_number": place_number,
                 "x": x,
                 "y": y,
                 "w": w,
@@ -653,12 +662,17 @@ class ParkingVideoAIService:
     ) -> None:
         x, y, w, h = slot["x"], slot["y"], slot["w"], slot["h"]
         color = (46, 204, 113) if is_free else (52, 73, 94)
+        slot_label = (
+            f"Place {slot.get('place_number')}"
+            if slot.get("place_number")
+            else (f"P{slot.get('place_id')}" if slot.get("place_id") else f"S{slot_index}")
+        )
 
         cv2.rectangle(frame, (x, y), (x + w, y + h), color, 3)
         cv2.rectangle(frame, (x, max(0, y - 28)), (x + 190, y), color, -1)
         cv2.putText(
             frame,
-            f"P{slot_index} {label} {confidence:.2f}",
+            f"{slot_label} {label} {confidence:.2f}",
             (x + 8, max(18, y - 8)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.55,

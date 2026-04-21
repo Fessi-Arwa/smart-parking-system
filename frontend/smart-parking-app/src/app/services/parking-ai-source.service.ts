@@ -38,6 +38,7 @@ export interface ParkingAISourceAnalysis {
   slot_debug?: Array<{
     slot_index: number;
     place_id?: number | null;
+    place_number?: number | null;
     label: string;
     average_confidence?: number | null;
     free_votes?: number | null;
@@ -59,7 +60,8 @@ export interface ParkingAISourceAnalysis {
 
 export interface ParkingAISlot {
   slot_index: number;
-  place_id: number;
+  place_id: number | null;
+  place_number?: number | null;
   x: number;
   y: number;
   w: number;
@@ -70,6 +72,8 @@ export interface ParkingAISlotsResponse {
   slots: ParkingAISlot[];
   slots_path: string;
   uses_custom_slots: boolean;
+  warning?: string | null;
+  auto_assigned_count?: number | null;
 }
 
 export interface ParkingVideoBatchResult {
