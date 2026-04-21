@@ -4,6 +4,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
+from sqlalchemy import inspect, text
 from .config import Config
 
 try:
@@ -15,6 +16,166 @@ except ModuleNotFoundError:
 db = SQLAlchemy()
 jwt = JWTManager()
 migrate = Migrate() if Migrate else None
+
+
+def _ensure_runtime_schema_compatibility(app):
+    inspector = inspect(db.engine)
+
+    def has_table(table_name):
+        return inspector.has_table(table_name)
+
+    def get_columns(table_name):
+        if not has_table(table_name):
+            return set()
+        return {column["name"] for column in inspector.get_columns(table_name)}
+
+    def add_column_if_missing(table_name, column_name, ddl):
+        columns = get_columns(table_name)
+        if column_name in columns:
+            return
+        db.session.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {ddl}"))
+        db.session.commit()
+
+    try:
+        db.create_all()
+
+        add_column_if_missing(
+            "comptes",
+            "owner_status",
+            "owner_status VARCHAR(30) NOT NULL DEFAULT 'en_attente'",
+        )
+        add_column_if_missing(
+            "comptes",
+            "created_at",
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        )
+        add_column_if_missing(
+            "comptes",
+            "updated_at",
+            "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        )
+
+        add_column_if_missing(
+            "parking",
+            "capacite",
+            "capacite INTEGER NOT NULL DEFAULT 0",
+        )
+        add_column_if_missing(
+            "parking",
+            "validation_status",
+            "validation_status VARCHAR(40) NOT NULL DEFAULT 'brouillon'",
+        )
+        add_column_if_missing(
+            "parking",
+            "setup_status",
+            "setup_status VARCHAR(40) NOT NULL DEFAULT 'non_commencee'",
+        )
+        add_column_if_missing(
+            "parking",
+            "ai_setup_status",
+            "ai_setup_status VARCHAR(40) NOT NULL DEFAULT 'non_configuree'",
+        )
+        add_column_if_missing(
+            "parking",
+            "created_at",
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        )
+
+        add_column_if_missing(
+            "abonnement",
+            "created_at",
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        )
+        add_column_if_missing(
+            "abonnement",
+            "statut",
+            "statut VARCHAR(20) NOT NULL DEFAULT 'en_attente'",
+        )
+        add_column_if_missing(
+            "abonnement",
+            "tarif",
+            "tarif NUMERIC(10,2) NOT NULL DEFAULT 0",
+        )
+
+        add_column_if_missing(
+            "place",
+            "etage_id",
+            "etage_id BIGINT",
+        )
+        add_column_if_missing(
+            "place",
+            "zone",
+            "zone VARCHAR(100)",
+        )
+        add_column_if_missing(
+            "place",
+            "etage",
+            "etage VARCHAR(50)",
+        )
+        add_column_if_missing(
+            "place",
+            "created_at",
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        )
+
+        add_column_if_missing(
+            "etage",
+            "code",
+            "code VARCHAR(50)",
+        )
+        add_column_if_missing(
+            "etage",
+            "description",
+            "description TEXT",
+        )
+        add_column_if_missing(
+            "etage",
+            "total_places",
+            "total_places INTEGER NOT NULL DEFAULT 0",
+        )
+        add_column_if_missing(
+            "etage",
+            "created_at",
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        )
+
+        db.session.execute(
+            text(
+                """
+                UPDATE comptes
+                SET owner_status = CASE
+                    WHEN role = 'owner' THEN 'en_attente'
+                    ELSE 'accepte'
+                END
+                WHERE owner_status IS NULL OR owner_status = ''
+                """
+            )
+        )
+        db.session.execute(
+            text(
+                """
+                UPDATE parking
+                SET validation_status = COALESCE(NULLIF(validation_status, ''), 'en_attente_validation'),
+                    setup_status = COALESCE(NULLIF(setup_status, ''), 'non_commencee'),
+                    ai_setup_status = COALESCE(NULLIF(ai_setup_status, ''), 'non_configuree'),
+                    statut = COALESCE(NULLIF(statut, ''), 'actif'),
+                    capacite = COALESCE(capacite, 0)
+                """
+            )
+        )
+        db.session.execute(
+            text(
+                """
+                UPDATE abonnement
+                SET statut = COALESCE(NULLIF(statut, ''), 'en_attente'),
+                    tarif = COALESCE(tarif, 0)
+                """
+            )
+        )
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.warning("Database compatibility bootstrap skipped: %s", exc)
 
 def create_app():
     app = Flask(__name__)
@@ -33,6 +194,9 @@ def create_app():
 
     # Ensure SQLAlchemy loads every model metadata on startup.
     from . import models  # noqa: F401
+
+    with app.app_context():
+        _ensure_runtime_schema_compatibility(app)
 
     # routes
     from .routes.abonnement import abonnement_bp

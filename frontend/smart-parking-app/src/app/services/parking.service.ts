@@ -23,6 +23,7 @@ export interface CreateParkingPayload {
   adresse: string;
   capacite: number;
   prix_heure: number;
+  statut?: 'actif' | 'inactif';
 }
 
 export interface CreateParkingResponse {
@@ -35,6 +36,7 @@ export interface UpdateParkingPayload {
   adresse?: string;
   capacite?: number;
   prix_heure?: number;
+  statut?: 'actif' | 'inactif';
 }
 
 @Injectable({

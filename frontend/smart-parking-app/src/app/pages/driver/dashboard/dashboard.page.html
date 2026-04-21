@@ -348,7 +348,13 @@
           <p class="eyebrow">Structure</p>
           <h3>Choisissez une place sur le plan du parking</h3>
         </div>
-        <span class="parking-structure-selector__hint">Les places libres sont sélectionnables</span>
+        <span class="parking-structure-selector__hint">Mise a jour auto selon l etat detecte des places</span>
+      </div>
+
+      <div class="parking-structure-selector__legend">
+        <span class="parking-legend parking-legend--free">Libre</span>
+        <span class="parking-legend parking-legend--occupied">Occupee</span>
+        <span class="parking-legend parking-legend--reserved">Reservee</span>
       </div>
 
       <div class="parking-structure-selector__floors">
@@ -370,6 +376,8 @@
                 class="structure-spot-btn"
                 *ngFor="let spot of zone.spots"
                 [class.is-available]="spot.etat === 'libre'"
+                [class.is-occupied]="getSpotVisualState(spot.etat) === 'occupee'"
+                [class.is-reserved]="getSpotVisualState(spot.etat) === 'reservee'"
                 [class.is-selected]="isReservationSpotSelected(spot.id_place)"
                 [class.is-unavailable]="spot.etat !== 'libre'"
                 [disabled]="spot.etat !== 'libre'"

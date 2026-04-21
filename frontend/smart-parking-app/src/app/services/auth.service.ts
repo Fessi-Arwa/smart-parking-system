@@ -11,6 +11,7 @@ export interface User {
   email: string;
   telephone?: string;
   role?: 'conducteur' | 'owner' | 'admin';
+  owner_status?: 'en_attente' | 'accepte' | 'refuse' | 'suspendu' | null;
 }
 
 export interface UpdateProfilePayload {

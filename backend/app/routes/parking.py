@@ -8,6 +8,7 @@ from ..models.parking import (
     Parking,
     StatutConfigurationIA,
     StatutConfigurationParking,
+    StatutParking,
     StatutValidationParking,
 )
 
@@ -44,6 +45,18 @@ def _find_owner_duplicate_parking(owner_id, nom, adresse, exclude_id=None):
     if exclude_id is not None:
         query = query.filter(Parking.id_park != exclude_id)
     return query.first()
+
+
+def _parse_parking_status(raw_value):
+    normalized_value = _normalize_text(raw_value).lower()
+    if not normalized_value:
+        return None
+    if normalized_value == "maintenance":
+        normalized_value = StatutParking.inactif.value
+    try:
+        return StatutParking(normalized_value)
+    except ValueError:
+        return None
 
 
 @parking_bp.route("/", methods=["GET"])
@@ -105,6 +118,10 @@ def create_parking():
     except (TypeError, ValueError):
         return jsonify({"msg": "capacite et prix_heure doivent etre numeriques"}), 400
 
+    statut = _parse_parking_status(data.get("statut"))
+    if data.get("statut") is not None and statut is None:
+        return jsonify({"msg": "statut invalide"}), 400
+
     if capacite <= 0 or prix_heure < 0:
         return jsonify({"msg": "capacite doit etre superieure a 0 et prix_heure doit etre positif"}), 400
 
@@ -118,6 +135,7 @@ def create_parking():
         adresse=adresse,
         capacite=capacite,
         prix_heure=prix_heure,
+        statut=statut or StatutParking.actif,
         validation_status=StatutValidationParking.en_attente_validation,
         setup_status=StatutConfigurationParking.non_commencee,
         ai_setup_status=StatutConfigurationIA.non_configuree,
@@ -165,13 +183,14 @@ def update_parking(parking_id):
         return jsonify({"msg": "Seuls les owners peuvent modifier leur parking"}), 403
 
     data = request.get_json() or {}
-    tracked_fields = ("nom", "adresse", "capacite", "prix_heure")
+    tracked_fields = ("nom", "adresse", "capacite", "prix_heure", "statut")
     changed_structural_fields = False
     next_values = {
         "nom": parking.nom,
         "adresse": parking.adresse,
         "capacite": parking.capacite,
         "prix_heure": float(parking.prix_heure),
+        "statut": parking.statut.value if hasattr(parking.statut, "value") else str(parking.statut),
     }
 
     for field in tracked_fields:
@@ -197,11 +216,15 @@ def update_parking(parking_id):
                 return jsonify({"msg": "prix_heure doit etre numerique"}), 400
             if value < 0:
                 return jsonify({"msg": "prix_heure doit etre positif"}), 400
+        elif field == "statut":
+            value = _parse_parking_status(value)
+            if value is None:
+                return jsonify({"msg": "statut invalide"}), 400
 
         if getattr(parking, field) != value:
             changed_structural_fields = True
             setattr(parking, field, value)
-        next_values[field] = value
+        next_values[field] = value.value if hasattr(value, "value") else value
 
     duplicate = _find_owner_duplicate_parking(
         user.id_compte,
