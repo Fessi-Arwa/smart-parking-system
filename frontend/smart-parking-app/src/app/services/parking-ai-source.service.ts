@@ -170,11 +170,11 @@ export class ParkingAiSourceService {
     label?: string,
     onProgress?: (progress: ParkingAiUploadProgress) => void
   ): Promise<ParkingAISource> {
-    if (sourceType === 'video') {
+    if (sourceType === 'video' || sourceType === 'image') {
       try {
         return await this.uploadSourceDirectToStorage(parkingId, file, sourceType, label, onProgress);
       } catch (error) {
-        console.warn('Upload direct indisponible, fallback vers upload backend classique.', error);
+        console.warn(`Upload direct ${sourceType} indisponible, fallback vers upload backend classique.`, error);
       }
     }
 
@@ -223,7 +223,7 @@ export class ParkingAiSourceService {
   private async uploadSourceDirectToStorage(
     parkingId: number,
     file: File,
-    sourceType: 'video',
+    sourceType: 'image' | 'video',
     label?: string,
     onProgress?: (progress: ParkingAiUploadProgress) => void
   ): Promise<ParkingAISource> {

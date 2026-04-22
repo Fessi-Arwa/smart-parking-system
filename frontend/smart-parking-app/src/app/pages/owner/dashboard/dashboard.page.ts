@@ -893,7 +893,7 @@ export class DashboardPage implements OnInit {
 
   private async loadBlobUrlsForSources(): Promise<void> {
     for (const source of this.aiSources) {
-      if (this.isVideoSource(source) && source.preview_url) {
+      if ((this.isVideoSource(source) || this.isImageSource(source)) && source.preview_url) {
         try {
           const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(source.id_source);
           if (blobUrl) {
@@ -906,8 +906,12 @@ export class DashboardPage implements OnInit {
     }
   }
 
-  getSourceVideoUrl(source: ParkingAISource): string {
+  getSourceMediaUrl(source: ParkingAISource): string {
     return this.sourceBlobs.get(source.id_source) || source.preview_url || '';
+  }
+
+  getSourceVideoUrl(source: ParkingAISource): string {
+    return this.getSourceMediaUrl(source);
   }
 
   private mapParking(parking: ParkingDto, parkingPlaces: PlaceDto[], index: number): OwnerParking {

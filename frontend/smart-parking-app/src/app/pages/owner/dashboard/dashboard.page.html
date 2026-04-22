@@ -283,7 +283,7 @@
                 <article class="ai-source-card" *ngFor="let source of activeGroup.sources; trackBy: trackBySource">
                   <div class="ai-source-card__preview" *ngIf="isImageSource(source) && showPreview(source); else imageFallback">
                     <img
-                      [src]="source.preview_url"
+                      [src]="getSourceMediaUrl(source)"
                       [alt]="source.label || source.original_name || 'Image IA'"
                       (error)="markPreviewError(source)" />
                   </div>

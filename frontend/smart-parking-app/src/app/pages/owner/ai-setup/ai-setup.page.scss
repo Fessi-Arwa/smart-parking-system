@@ -552,6 +552,11 @@
   border: 1px solid rgba(8, 145, 178, 0.14);
 }
 
+.source-analysis--warning {
+  background: linear-gradient(180deg, #fff7ed 0%, #fffbeb 100%);
+  border: 1px solid rgba(245, 158, 11, 0.24);
+}
+
 .source-analysis__badge {
   display: inline-flex;
   width: fit-content;
@@ -578,6 +583,11 @@
 .source-analysis__badge--processing {
   background: #ccfbf1;
   color: #0f766e;
+}
+
+.source-analysis__badge--warning {
+  background: #fed7aa;
+  color: #9a3412;
 }
 
 .source-analysis strong {
@@ -631,6 +641,19 @@
   background: #0f766e;
   color: #f8fafc;
   text-decoration: none;
+  font-weight: 700;
+}
+
+.source-analysis__action {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 0.95rem;
+  border: 0;
+  border-radius: 999px;
+  background: #c2410c;
+  color: #fff7ed;
   font-weight: 700;
 }
 

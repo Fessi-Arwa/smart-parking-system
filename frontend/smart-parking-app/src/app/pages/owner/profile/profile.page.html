@@ -331,6 +331,40 @@
 
             <div class="detail-media">
               <div class="detail-media__header">
+                <p class="section-kicker">Sources image du parking</p>
+                <strong>{{ selectedParkingImages.length }}</strong>
+              </div>
+
+              <div class="video-grid" *ngIf="selectedParkingImages.length > 0; else emptyParkingImages">
+                <article class="video-card" *ngFor="let source of selectedParkingImages">
+                  <div class="video-card__preview" *ngIf="showPreview(source); else imageFallback">
+                    <img [src]="getSourceMediaUrl(source)" [alt]="source.label || source.original_name || 'Image du parking'" (error)="markPreviewError(source)" />
+                  </div>
+
+                  <ng-template #imageFallback>
+                    <div class="video-card__preview video-card__preview--fallback">
+                      <ion-icon name="image-outline"></ion-icon>
+                      <span>Apercu image indisponible</span>
+                    </div>
+                  </ng-template>
+
+                  <div class="video-card__body">
+                    <strong>{{ source.label || source.original_name || 'Image du parking' }}</strong>
+                    <p>{{ source.original_name || source.mime_type || 'Source image' }}</p>
+                  </div>
+                </article>
+              </div>
+
+              <ng-template #emptyParkingImages>
+                <div class="empty-state empty-state--compact">
+                  <ion-icon name="image-outline"></ion-icon>
+                  <p>Aucune image n a encore ete ajoutee pour ce parking.</p>
+                </div>
+              </ng-template>
+            </div>
+
+            <div class="detail-media">
+              <div class="detail-media__header">
                 <p class="section-kicker">Sources video du parking</p>
                 <strong>{{ selectedParkingVideos.length }}</strong>
               </div>
@@ -338,7 +372,7 @@
               <div class="video-grid" *ngIf="selectedParkingVideos.length > 0; else emptyParkingVideos">
                 <article class="video-card" *ngFor="let source of selectedParkingVideos">
                   <div class="video-card__preview" *ngIf="showPreview(source); else videoFallback">
-                    <video [src]="source.preview_url" controls preload="metadata" (error)="markPreviewError(source)"></video>
+                    <video [src]="getSourceVideoUrl(source)" controls preload="metadata" (error)="markPreviewError(source)"></video>
                   </div>
 
                   <ng-template #videoFallback>

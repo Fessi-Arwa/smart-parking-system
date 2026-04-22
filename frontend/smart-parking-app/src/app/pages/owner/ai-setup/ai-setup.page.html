@@ -147,13 +147,30 @@
 
       <div class="sources-list" *ngIf="!isLoadingSources && aiSources.length > 0">
         <article class="source-card" *ngFor="let source of aiSources; trackBy: trackSource">
-          <div class="source-card__preview" *ngIf="isImageSource(source) && source.preview_url">
-            <img [src]="getSourceMediaUrl(source)" [alt]="source.label || source.original_name || 'Image IA'" />
+          <div class="source-card__preview" *ngIf="isImageSource(source) && showSourcePreview(source); else imageFallback">
+            <img
+              [src]="getSourceMediaUrl(source)"
+              [alt]="source.label || source.original_name || 'Image IA'"
+              (error)="markSourcePreviewError(source)" />
           </div>
 
-          <div class="source-card__preview source-card__preview--video" *ngIf="isVideoSource(source) && source.preview_url">
-            <video [src]="getSourceMediaUrl(source)" controls preload="metadata"></video>
+          <ng-template #imageFallback>
+            <div class="source-card__preview source-card__preview--fallback" *ngIf="isImageSource(source)">
+              <ion-icon name="image-outline"></ion-icon>
+              <span>Apercu image indisponible</span>
+            </div>
+          </ng-template>
+
+          <div class="source-card__preview source-card__preview--video" *ngIf="isVideoSource(source) && showSourcePreview(source); else videoFallback">
+            <video [src]="getSourceMediaUrl(source)" controls preload="metadata" (error)="markSourcePreviewError(source)"></video>
           </div>
+
+          <ng-template #videoFallback>
+            <div class="source-card__preview source-card__preview--fallback" *ngIf="isVideoSource(source)">
+              <ion-icon name="videocam-outline"></ion-icon>
+              <span>Apercu video indisponible</span>
+            </div>
+          </ng-template>
 
           <div class="source-card__preview source-card__preview--camera" *ngIf="isCameraSource(source)">
             <ion-icon name="videocam-outline"></ion-icon>
@@ -168,6 +185,24 @@
               <span *ngIf="isImageSource(source)">Calibration</span>
               <span *ngIf="isVideoSource(source)">Analyse video</span>
               <span *ngIf="isCameraSource(source)">Surveillance</span>
+            </div>
+
+            <div class="source-analysis source-analysis--warning" *ngIf="!isCameraSource(source) && !showSourcePreview(source)">
+              <span class="source-analysis__badge source-analysis__badge--warning">Apercu indisponible</span>
+              <strong>Le fichier existe, mais son apercu ne s est pas charge correctement.</strong>
+              <p>Recharge le media protege pour l afficher dans la configuration IA.</p>
+              <button class="source-analysis__action" type="button" (click)="retrySourcePreview(source)">
+                Recharger l apercu
+              </button>
+            </div>
+
+            <div class="source-analysis source-analysis--warning" *ngIf="isVideoSource(source) && !hasCalibrationPlaces()">
+              <span class="source-analysis__badge source-analysis__badge--warning">Places manquantes</span>
+              <strong>La video est disponible, mais aucune place n existe encore pour ce parking.</strong>
+              <p>Ajoute d abord les places dans l etape Parking pour pouvoir calibrer les slots et lancer l analyse correctement.</p>
+              <button class="source-analysis__action" type="button" (click)="goToParkingSetup()">
+                Ouvrir l etape parking
+              </button>
             </div>
 
             <div class="source-analysis source-analysis--success" *ngIf="hasProcessedAnalysis(source)">
@@ -223,7 +258,7 @@
               <button
                 class="source-analysis__link"
                 type="button"
-                *ngIf="!isCameraSource(source) && source.calibration_preview_url"
+                *ngIf="canCalibrateSource(source)"
                 (click)="openCalibration(source)">
                 Calibrer les places sur cette capture
               </button>
@@ -232,7 +267,7 @@
             <button
               class="owner-step__secondary"
               type="button"
-              *ngIf="!isCameraSource(source) && source.calibration_preview_url"
+              *ngIf="canCalibrateSource(source)"
               (click)="openCalibration(source)">
               {{ isVideoSource(source) ? 'Calibrer a partir de la video' : 'Calibration des places' }}
             </button>

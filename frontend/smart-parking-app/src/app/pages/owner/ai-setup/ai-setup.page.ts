@@ -61,6 +61,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   private draftRect: { x: number; y: number; w: number; h: number } | null = null;
   private pollingTimer: ReturnType<typeof setInterval> | null = null;
   private analysisVideoErrorIds = new Set<number>();
+  private previewErrorIds = new Set<number>();
   private objectUrls = new Set<string>();
   private sourceBlobs = new Map<number, string>();
   private analysisBlobs = new Map<number, string>();
@@ -121,9 +122,8 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     try {
       const result = await this.uploadSources(files, 'image');
-      const createdSources = result.sources;
-      await this.loadBlobUrlsForSpecificSources(createdSources);
-      this.aiSources = [...createdSources, ...this.aiSources];
+      await this.loadSources();
+      this.attachLocalPreviewUrlsByMatchingFiles(result.uploadedFiles, 'image');
       this.notifyUploadResult(result, 'image');
     } catch (error) {
       console.error('Erreur upload image IA', error);
@@ -147,9 +147,8 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     try {
       const result = await this.uploadSources(files, 'video');
-      const createdSources = result.sources;
-      await this.loadBlobUrlsForSpecificSources(createdSources);
-      this.aiSources = [...createdSources, ...this.aiSources];
+      await this.loadSources();
+      this.attachLocalPreviewUrlsByMatchingFiles(result.uploadedFiles, 'video');
       this.notifyUploadResult(result, 'video');
     } catch (error) {
       console.error('Erreur upload video IA', error);
@@ -253,8 +252,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   async openCalibration(source: ParkingAISource): Promise<void> {
-    const calibrationMediaUrl = source.calibration_preview_url || source.preview_url || null;
-    if (!this.activeParkingId || !calibrationMediaUrl || this.isCameraSource(source)) {
+    if (!this.activeParkingId || this.isCameraSource(source) || !this.canCalibrateSource(source)) {
       this.toastService.show('Choisissez une image ou une video exploitable pour calibrer les places.', 'error');
       return;
     }
@@ -278,9 +276,20 @@ export class AiSetupPage implements OnInit, OnDestroy {
           'info'
         );
       }
-      this.replaceCalibrationImageUrl(
-        await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(calibrationMediaUrl)
-      );
+
+      if (this.isVideoSource(source) && !source.calibration_preview_url) {
+        const sourceMediaUrl = this.getSourceMediaUrl(source);
+        if (!sourceMediaUrl) {
+          throw new Error('Aucune video exploitable pour la calibration.');
+        }
+        this.replaceCalibrationImageUrl(await this.extractVideoFrameUrl(sourceMediaUrl));
+      } else {
+        const calibrationMediaUrl = source.calibration_preview_url || source.id_source;
+        this.replaceCalibrationImageUrl(
+          await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(calibrationMediaUrl)
+        );
+      }
+
       this.calibrationImage.src = this.calibrationImageUrl || '';
       if (this.calibrationPlaces.length === 0) {
         this.toastService.show(
@@ -646,6 +655,35 @@ export class AiSetupPage implements OnInit, OnDestroy {
     return this.isVideoAnalysis(source) && !this.showAnalysisVideo(source);
   }
 
+  showSourcePreview(source: ParkingAISource): boolean {
+    return !!this.getSourceMediaUrl(source) && !this.previewErrorIds.has(source.id_source);
+  }
+
+  markSourcePreviewError(source: ParkingAISource): void {
+    this.previewErrorIds.add(source.id_source);
+  }
+
+  async retrySourcePreview(source: ParkingAISource): Promise<void> {
+    this.previewErrorIds.delete(source.id_source);
+    await this.loadBlobUrlsForSpecificSources([source]);
+  }
+
+  hasSourceMedia(source: ParkingAISource): boolean {
+    return Boolean(this.sourceBlobs.get(source.id_source) || source.preview_url);
+  }
+
+  canCalibrateSource(source: ParkingAISource): boolean {
+    if (this.isCameraSource(source)) {
+      return false;
+    }
+
+    if (this.isImageSource(source)) {
+      return this.hasSourceMedia(source);
+    }
+
+    return Boolean(source.calibration_preview_url || this.hasSourceMedia(source));
+  }
+
   getAnalysisError(source: ParkingAISource): string | null {
     return source.analysis?.error || null;
   }
@@ -710,7 +748,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
   private async loadBlobUrlsForSpecificSources(sources: ParkingAISource[]): Promise<void> {
     for (const source of sources) {
-      if ((this.isVideoSource(source) || this.isImageSource(source)) && source.preview_url) {
+      if (this.isVideoSource(source) || this.isImageSource(source)) {
         try {
           const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(source.id_source);
           if (blobUrl) {
@@ -876,13 +914,14 @@ export class AiSetupPage implements OnInit, OnDestroy {
   private async uploadSources(
     files: File[],
     sourceType: 'image' | 'video'
-  ): Promise<{ sources: ParkingAISource[]; failures: string[] }> {
+  ): Promise<{ sources: ParkingAISource[]; failures: string[]; uploadedFiles: File[] }> {
     if (!this.activeParkingId) {
-      return { sources: [], failures: [] };
+      return { sources: [], failures: [], uploadedFiles: [] };
     }
 
     const createdSources: ParkingAISource[] = [];
     const failures: string[] = [];
+    const uploadedFiles: File[] = [];
     for (const [index, file] of files.entries()) {
       try {
         const baseProgress = index / files.length;
@@ -906,13 +945,35 @@ export class AiSetupPage implements OnInit, OnDestroy {
             : undefined
         );
         createdSources.push(source);
+        uploadedFiles.push(file);
       } catch (error) {
         console.error(`Erreur upload ${sourceType}`, file.name, error);
         failures.push(file.name);
       }
     }
 
-    return { sources: createdSources, failures };
+    return { sources: createdSources, failures, uploadedFiles };
+  }
+
+  private attachLocalPreviewUrlsByMatchingFiles(files: File[], sourceType: 'image' | 'video'): void {
+    const remainingSources = this.aiSources.filter(
+      (source) => source.source_type === sourceType && !this.sourceBlobs.has(source.id_source)
+    );
+
+    files.forEach((file) => {
+      const matchIndex = remainingSources.findIndex((source) =>
+        (source.original_name || '').trim() === file.name ||
+        (source.label || '').trim() === file.name
+      );
+
+      if (matchIndex < 0) {
+        return;
+      }
+
+      const [source] = remainingSources.splice(matchIndex, 1);
+      const localUrl = URL.createObjectURL(file);
+      this.replaceBlobUrl(this.sourceBlobs, source.id_source, localUrl);
+    });
   }
 
   private buildVideoUploadHint(files: File[]): string | null {
@@ -1011,9 +1072,51 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     this.calibrationImageUrl = nextUrl;
 
-    if (nextUrl) {
+    if (nextUrl?.startsWith('blob:')) {
       this.objectUrls.add(nextUrl);
     }
+  }
+
+  private extractVideoFrameUrl(videoUrl: string): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      video.src = videoUrl;
+
+      const cleanup = () => {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      };
+
+      video.onerror = () => {
+        cleanup();
+        reject(new Error('Impossible de lire la video pour en extraire une capture.'));
+      };
+
+      video.onloadeddata = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 1280;
+          canvas.height = video.videoHeight || 720;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            cleanup();
+            reject(new Error('Impossible de preparer la capture video.'));
+            return;
+          }
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const frameUrl = canvas.toDataURL('image/png');
+          cleanup();
+          resolve(frameUrl);
+        } catch (error) {
+          cleanup();
+          reject(error instanceof Error ? error : new Error('Capture video impossible.'));
+        }
+      };
+    });
   }
 
   private revokeObjectUrls(): void {

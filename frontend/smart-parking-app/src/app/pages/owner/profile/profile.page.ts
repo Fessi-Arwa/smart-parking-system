@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
@@ -67,7 +67,7 @@ interface ParkingPortfolioHealth {
   styleUrls: ['./profile.page.scss'],
   standalone: false,
 })
-export class ProfilePage implements OnInit {
+export class ProfilePage implements OnInit, OnDestroy {
   owner: OwnerProfile = {
     id_compte: 1,
     nom: 'Ahmed Ben Ali',
@@ -93,6 +93,7 @@ export class ProfilePage implements OnInit {
   isCreatingParking = false;
   workflowState: OwnerWorkflowState | null = null;
   private previewErrorIds = new Set<number>();
+  private sourceBlobs = new Map<number, string>();
 
   editProfileData = {
     nom: '',
@@ -168,6 +169,10 @@ export class ProfilePage implements OnInit {
           }
         : null;
     }
+  }
+
+  ngOnDestroy(): void {
+    this.clearSourceBlobs();
   }
 
   get ownerInitials(): string {
@@ -529,6 +534,7 @@ export class ProfilePage implements OnInit {
     this.selectedParking = parking;
     this.selectedParkingSources = [];
     this.previewErrorIds.clear();
+    this.clearSourceBlobs();
     this.isEditingParking = false;
     await this.router.navigate([], {
       relativeTo: this.route,
@@ -539,6 +545,7 @@ export class ProfilePage implements OnInit {
 
     try {
       this.selectedParkingSources = await this.parkingAiSourceService.getSources(parking.id_park);
+      await this.loadBlobUrlsForSources();
     } catch (error) {
       console.error('Erreur chargement sources IA parking', error);
       this.toastService.show(this.getErrorMessage(error, 'Impossible de charger les videos de ce parking.'), 'error');
@@ -549,6 +556,7 @@ export class ProfilePage implements OnInit {
     this.selectedParking = null;
     this.selectedParkingSources = [];
     this.previewErrorIds.clear();
+    this.clearSourceBlobs();
     this.showAddParking = false;
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -816,11 +824,19 @@ export class ProfilePage implements OnInit {
   }
 
   showPreview(source: ParkingAISource): boolean {
-    return !!source.preview_url && !this.previewErrorIds.has(source.id_source);
+    return !!this.getSourceMediaUrl(source) && !this.previewErrorIds.has(source.id_source);
   }
 
   markPreviewError(source: ParkingAISource): void {
     this.previewErrorIds.add(source.id_source);
+  }
+
+  getSourceVideoUrl(source: ParkingAISource): string {
+    return this.getSourceMediaUrl(source);
+  }
+
+  getSourceMediaUrl(source: ParkingAISource): string {
+    return this.sourceBlobs.get(source.id_source) || source.preview_url || '';
   }
 
   private async loadOwnerParkings(selectedParkingId?: number): Promise<void> {
@@ -929,6 +945,28 @@ export class ProfilePage implements OnInit {
 
     score += this.getParkingOccupancy(parking);
     return score;
+  }
+
+  private async loadBlobUrlsForSources(): Promise<void> {
+    for (const source of this.selectedParkingSources) {
+      if ((source.source_type !== 'video' && source.source_type !== 'image') || !source.preview_url) {
+        continue;
+      }
+
+      try {
+        const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(source.id_source);
+        if (blobUrl) {
+          this.sourceBlobs.set(source.id_source, blobUrl);
+        }
+      } catch (error) {
+        console.warn(`Erreur lors du chargement du blob pour la source ${source.id_source}:`, error);
+      }
+    }
+  }
+
+  private clearSourceBlobs(): void {
+    this.sourceBlobs.forEach((blobUrl) => URL.revokeObjectURL(blobUrl));
+    this.sourceBlobs.clear();
   }
 
   private extractCity(address: string): string {
