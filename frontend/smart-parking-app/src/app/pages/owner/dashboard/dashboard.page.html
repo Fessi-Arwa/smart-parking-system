@@ -5,69 +5,60 @@
 
   <div class="dashboard-content">
     <section class="overview-shell">
-      <div class="owner-ribbon">
-        <span class="owner-ribbon__label">Parcours owner</span>
-        <div class="owner-ribbon__steps">
-          <span>Validation</span>
-          <span>Abonnement</span>
-          <span>Parking</span>
-          <span>IA</span>
-        </div>
-      </div>
-
       <div class="overview-header">
         <div>
           <p class="overview-kicker">Owner analytics</p>
-          <h1>Overview</h1>
-          <p class="overview-subtitle">
-            Suivez vos parkings, vos revenus et votre progression owner depuis une seule vue.
-          </p>
-        </div>
-
-        <div class="period-filter">
-          <button type="button" [class.is-active]="isSelectedPeriod('7d')" (click)="setSelectedPeriod('7d')">7 j</button>
-          <button type="button" [class.is-active]="isSelectedPeriod('30d')" (click)="setSelectedPeriod('30d')">30 j</button>
-          <button type="button" [class.is-active]="isSelectedPeriod('90d')" (click)="setSelectedPeriod('90d')">90 j</button>
+          <h1>Tableau owner</h1>
+          <p class="overview-subtitle">Une vue simple pour continuer le workflow.</p>
+          <p class="overview-owner">Pilotage actif pour {{ ownerName }}</p>
         </div>
       </div>
 
-      <div class="overview-grid">
-        <article
-          class="overview-card"
-          *ngFor="let card of overviewCards"
-          [attr.data-accent]="card.accent">
-          <div class="overview-card__top">
-            <div>
-              <span class="overview-card__label">{{ card.title }}</span>
-              <strong>{{ card.value }}</strong>
-            </div>
-            <span class="delta-badge" [attr.data-tone]="card.deltaTone">{{ card.deltaLabel }}</span>
+      <section class="owner-spotlight">
+        <article class="owner-spotlight__hero">
+          <div class="owner-spotlight__eyebrow">
+            <span>Action prioritaire</span>
+            <span>{{ workflowCompletion }}%</span>
+          </div>
+          <h2>{{ nextAction.title }}</h2>
+          <p>{{ dashboardInsightText }}</p>
+
+          <div class="owner-spotlight__metrics">
+            <article>
+              <span>Parkings</span>
+              <strong>{{ stats.totalParkings }}</strong>
+            </article>
+            <article>
+              <span>Workflow</span>
+              <strong>{{ workflowCompletion }}%</strong>
+            </article>
+            <article>
+              <span>Sources IA</span>
+              <strong>{{ aiSources.length }}</strong>
+            </article>
           </div>
 
-          <p class="overview-card__subtitle">{{ card.subtitle }}</p>
-
-          <svg viewBox="0 0 100 34" preserveAspectRatio="none" class="sparkline">
-            <path [attr.d]="card.fillPath" class="sparkline__fill"></path>
-            <polyline [attr.points]="card.points" class="sparkline__line"></polyline>
-          </svg>
+          <div class="owner-spotlight__actions">
+            <ion-button [routerLink]="nextAction.route">
+              Continuer
+              <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
+            </ion-button>
+          </div>
         </article>
 
-        <article class="overview-card overview-card--insight">
-          <div class="insight-icon">
-            <ion-icon name="sparkles-outline"></ion-icon>
-          </div>
-          <div>
-            <span class="overview-card__label">Action prioritaire</span>
-            <strong>{{ nextAction.title }}</strong>
-          </div>
-          <p class="overview-card__subtitle">{{ dashboardInsightText }}</p>
-          <ion-button [routerLink]="nextAction.route" expand="block">
-            Explorer
-            <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
-          </ion-button>
-        </article>
-      </div>
-
+        <aside class="owner-spotlight__aside">
+          <article class="owner-spotlight__panel">
+            <span>Workflow</span>
+            <strong>{{ workflowCompletion }}%</strong>
+            <p>{{ nextAction.title }}</p>
+          </article>
+          <article class="owner-spotlight__panel owner-spotlight__panel--soft">
+            <span>Parking cible</span>
+            <strong>{{ workflowState?.parkingId || '-' }}</strong>
+            <p>{{ dashboardParkingStatusLabel || 'Aucun parking actif' }}</p>
+          </article>
+        </aside>
+      </section>
       <div class="workflow-banner">
         <div>
           <span>Etape actuelle</span>
@@ -83,92 +74,6 @@
         </div>
         <p>Le dashboard reste accessible, mais ce parking doit encore passer la validation administrative.</p>
       </div>
-    </section>
-
-    <section class="analytics-grid">
-      <ion-card class="section-card section-card--trend">
-        <ion-card-header>
-          <div class="section-heading-group">
-            <p class="section-kicker">Performance</p>
-            <ion-card-title>Reservations et revenus</ion-card-title>
-            <p class="section-copy">Vue consolidee sur {{ selectedPeriodLabel }}</p>
-          </div>
-          <div class="section-heading-metric">
-            <strong>{{ selectedPeriodRevenue | number: '1.0-0' }} TND</strong>
-            <span>{{ filteredReservations.length }} reservation(s)</span>
-          </div>
-        </ion-card-header>
-
-        <ion-card-content>
-          <div class="trend-legend">
-            <span><i class="trend-legend__dot trend-legend__dot--blue"></i> Reservations</span>
-            <span><i class="trend-legend__dot trend-legend__dot--teal"></i> Revenu</span>
-          </div>
-
-          <div class="trend-chart">
-            <div class="trend-chart__grid">
-              <span></span>
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-
-            <svg viewBox="0 0 100 160" preserveAspectRatio="none" class="trend-chart__svg">
-              <defs>
-                <linearGradient id="trendAreaOwner" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="rgba(33, 150, 243, 0.32)"></stop>
-                  <stop offset="100%" stop-color="rgba(33, 150, 243, 0.02)"></stop>
-                </linearGradient>
-              </defs>
-              <path [attr.d]="reservationTrendAreaPath" fill="url(#trendAreaOwner)"></path>
-              <polyline
-                [attr.points]="revenueTrendPoints"
-                class="trend-chart__line trend-chart__line--teal"></polyline>
-              <polyline
-                [attr.points]="reservationTrendPoints"
-                class="trend-chart__line trend-chart__line--blue"></polyline>
-            </svg>
-          </div>
-
-          <div class="trend-labels">
-            <div class="trend-label" *ngFor="let point of trendChartData">
-              <strong>{{ point.label }}</strong>
-              <span>{{ point.reservations }} res.</span>
-            </div>
-          </div>
-        </ion-card-content>
-      </ion-card>
-
-      <ion-card class="section-card section-card--bars">
-        <ion-card-header>
-          <div class="section-heading-group">
-            <p class="section-kicker">Business</p>
-            <ion-card-title>Revenus et abonnements</ion-card-title>
-            <p class="section-copy">6 derniers mois</p>
-          </div>
-          <span class="section-badge">{{ stats.activeSubscriptions }} actifs</span>
-        </ion-card-header>
-
-        <ion-card-content>
-          <div class="bar-chart">
-            <div class="bar-chart__columns">
-              <div class="bar-stack" *ngFor="let bar of monthlyBusinessBars">
-                <div class="bar-stack__bars">
-                  <span class="bar-stack__segment bar-stack__segment--dark" [style.height.%]="bar.reservationHeight"></span>
-                  <span class="bar-stack__segment bar-stack__segment--light" [style.height.%]="bar.subscriptionHeight"></span>
-                </div>
-                <strong>{{ bar.label }}</strong>
-                <small>{{ (bar.reservationRevenue + bar.subscriptionRevenue) | number: '1.0-0' }} TND</small>
-              </div>
-            </div>
-
-            <div class="bar-chart__legend">
-              <span><i class="trend-legend__dot trend-legend__dot--dark"></i> Reservations</span>
-              <span><i class="trend-legend__dot trend-legend__dot--light"></i> Abonnements</span>
-            </div>
-          </div>
-        </ion-card-content>
-      </ion-card>
     </section>
 
     <section class="dashboard-grid">
@@ -213,6 +118,21 @@
         </ion-card-header>
 
         <ion-card-content>
+          <div class="parking-health-grid" *ngIf="parkings.length">
+            <article class="parking-health-card">
+              <span>En attente</span>
+              <strong>{{ parkingHealth.pendingValidation }}</strong>
+            </article>
+            <article class="parking-health-card parking-health-card--warning">
+              <span>Capacite faible</span>
+              <strong>{{ parkingHealth.lowCapacity }}</strong>
+            </article>
+            <article class="parking-health-card parking-health-card--neutral">
+              <span>Maintenance</span>
+              <strong>{{ parkingHealth.maintenance }}</strong>
+            </article>
+          </div>
+
           <div class="parking-list" *ngIf="parkings.length; else emptyParkings">
             <article class="parking-card" *ngFor="let parking of visibleParkings; trackBy: trackByParking">
               <div class="parking-card__top">
@@ -240,6 +160,19 @@
               <div class="parking-card__progress">
                 <span [style.width.%]="getParkingOccupancyRate(parking)"></span>
               </div>
+
+              <div class="parking-card__footprint">
+                <span>{{ parking.totalSpaces }} places totales</span>
+                <span>{{ getParkingOccupancyRate(parking) < 40 ? 'Reserve de capacite confortable' : 'Tension operationnelle a surveiller' }}</span>
+              </div>
+
+              <a
+                class="parking-card__link"
+                [routerLink]="['/owner/profile']"
+                [queryParams]="{ parking: parking.id }">
+                Ouvrir ce parking
+                <ion-icon name="arrow-forward-outline"></ion-icon>
+              </a>
             </article>
 
             <a *ngIf="hiddenParkingsCount > 0" class="parking-list__more" routerLink="/owner/profile">
@@ -295,7 +228,10 @@
             <p class="section-kicker">Configuration IA</p>
             <ion-card-title>Sources par parking</ion-card-title>
           </div>
-          <ion-button fill="clear" routerLink="/owner/ai-setup">
+          <ion-button
+            fill="clear"
+            routerLink="/owner/ai-setup"
+            [queryParams]="activeAiParkingGroup ? { parking: activeAiParkingGroup.parkingId } : null">
             Gerer
             <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
           </ion-button>
@@ -305,6 +241,21 @@
           <div class="ai-summary">
             <strong>{{ aiSources.length }}</strong>
             <span>{{ aiSummary }}</span>
+          </div>
+
+          <div class="ai-dashboard-strip" *ngIf="activeAiParkingGroup as activeGroup">
+            <div>
+              <span>Parking cible</span>
+              <strong>{{ activeGroup.parkingName }}</strong>
+            </div>
+            <div>
+              <span>Adresse</span>
+              <strong>{{ activeGroup.parkingAddress }}</strong>
+            </div>
+            <div>
+              <span>Sources</span>
+              <strong>{{ activeGroup.sources.length }}</strong>
+            </div>
           </div>
 
           <div class="ai-parking-tabs" *ngIf="aiParkingGroups.length > 0">
@@ -332,7 +283,7 @@
                 <article class="ai-source-card" *ngFor="let source of activeGroup.sources; trackBy: trackBySource">
                   <div class="ai-source-card__preview" *ngIf="isImageSource(source) && showPreview(source); else imageFallback">
                     <img
-                      [src]="source.preview_url"
+                      [src]="getSourceMediaUrl(source)"
                       [alt]="source.label || source.original_name || 'Image IA'"
                       (error)="markPreviewError(source)" />
                   </div>
@@ -347,7 +298,7 @@
                   </ng-template>
 
                   <div class="ai-source-card__preview ai-source-card__preview--video" *ngIf="isVideoSource(source) && showPreview(source); else videoFallback">
-                    <video [src]="source.preview_url" controls preload="metadata" (error)="markPreviewError(source)"></video>
+                    <video [src]="getSourceVideoUrl(source)" controls preload="metadata" (error)="markPreviewError(source)"></video>
                   </div>
 
                   <ng-template #videoFallback>
@@ -368,6 +319,11 @@
                     <strong>{{ source.label || source.original_name || 'Source IA' }}</strong>
                     <p *ngIf="source.stream_url">{{ source.stream_url }}</p>
                     <p *ngIf="!source.stream_url">{{ source.original_name || source.mime_type }}</p>
+                    <div class="ai-source-card__tags">
+                      <span *ngIf="isImageSource(source)">Image statique</span>
+                      <span *ngIf="isVideoSource(source)">Sequence video</span>
+                      <span *ngIf="isCameraSource(source)">Flux camera</span>
+                    </div>
                     <div class="ai-source-analysis ai-source-analysis--success" *ngIf="hasProcessedAnalysis(source)">
                       <span class="ai-source-analysis__badge">Analyse terminee</span>
                       <strong *ngIf="getAnalysisSummary(source)">{{ getAnalysisSummary(source) }}</strong>

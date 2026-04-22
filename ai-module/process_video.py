@@ -269,9 +269,12 @@ class ParkingVideoProcessor:
 
     @staticmethod
     def _draw_header(frame: Any, free: int, occupied: int, total: int) -> None:
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (20, 20), (450, 110), (18, 24, 38), -1)
-        cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
+        x1, y1, x2, y2 = 20, 20, 450, 110
+        roi = frame[y1:y2, x1:x2]
+        if roi.size:
+            overlay = roi.copy()
+            cv2.rectangle(overlay, (0, 0), (x2 - x1, y2 - y1), (18, 24, 38), -1)
+            cv2.addWeighted(overlay, 0.75, roi, 0.25, 0, roi)
         cv2.putText(
             frame,
             f"Free: {free}",

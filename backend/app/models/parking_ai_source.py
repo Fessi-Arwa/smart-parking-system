@@ -21,6 +21,7 @@ class ParkingAISource(ModelMixin, db.Model):
         "source_type",
         "label",
         "file_path",
+        "bucket_key",
         "original_name",
         "mime_type",
         "stream_url",
@@ -42,6 +43,7 @@ class ParkingAISource(ModelMixin, db.Model):
     )
     label = db.Column(db.String(150))
     file_path = db.Column(db.Text)
+    bucket_key = db.Column(db.Text)
     original_name = db.Column(db.String(255))
     mime_type = db.Column(db.String(120))
     stream_url = db.Column(db.Text)

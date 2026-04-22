@@ -131,11 +131,33 @@
   font-weight: 700;
 }
 
-.subscription-grid {
+.wizard-focus {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+  gap: 0.35rem;
+  margin-top: 1.35rem;
+  padding: 1rem 1.15rem;
+  border-radius: 1.2rem;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+  border: 1px solid rgba(234, 88, 12, 0.16);
+}
+
+.wizard-focus span {
+  color: #9a3412;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.wizard-focus strong {
+  color: #172554;
+  font-size: 1rem;
+}
+
+.subscription-strip {
+  display: grid;
   gap: 1rem;
-  margin-top: 2rem;
+  margin-top: 1.5rem;
 }
 
 .plan-card {
@@ -152,11 +174,6 @@
   cursor: pointer;
 }
 
-.plan-card.is-selected {
-  border-color: rgba(234, 88, 12, 0.45);
-  box-shadow: 0 20px 44px rgba(234, 88, 12, 0.12);
-}
-
 .plan-card strong,
 .plan-card span {
   display: block;
@@ -164,7 +181,23 @@
   font-weight: 800;
 }
 
-.feature-card,
+.subscription-strip__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.subscription-strip__chips span {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.65rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(23, 37, 84, 0.08);
+  color: #334155;
+  font-weight: 700;
+}
+
 .summary-card,
 .payment-card {
   margin-top: 1.5rem;
@@ -173,20 +206,6 @@
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(23, 37, 84, 0.08);
   box-shadow: 0 16px 40px rgba(23, 37, 84, 0.06);
-}
-
-.feature-card strong {
-  display: block;
-  margin-bottom: 0.8rem;
-  color: #172554;
-}
-
-.feature-card ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: grid;
-  gap: 0.6rem;
-  color: #475569;
 }
 
 .summary-card__row {
@@ -280,13 +299,6 @@
   font-weight: 600;
 }
 
-.payment-form label small {
-  color: #64748b;
-  font-size: 0.86rem;
-  font-weight: 500;
-  line-height: 1.45;
-}
-
 .payment-form input,
 .payment-form select {
   width: 100%;
@@ -355,8 +367,7 @@
 }
 
 @media (max-width: 760px) {
-  .owner-progress,
-  .subscription-grid {
+  .owner-progress {
     grid-template-columns: 1fr;
   }
 

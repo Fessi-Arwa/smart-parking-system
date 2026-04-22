@@ -76,6 +76,14 @@ interface SubscriptionItem {
   tarif: number;
 }
 
+interface ParkingStructureSection {
+  etage: string;
+  zones: Array<{
+    name: string;
+    spots: ParkingSpot[];
+  }>;
+}
+
 @Component({
   selector: 'app-dashboard',
   templateUrl: './dashboard.page.html',
@@ -83,6 +91,9 @@ interface SubscriptionItem {
   standalone: false,
 })
 export class DashboardPage implements OnInit, OnDestroy {
+  private readonly subscriptionAlertWindowDays = 3;
+  private readonly liveParkingRefreshIntervalMs = 5000;
+  private readonly notifiedSubscriptionIds = new Set<number>();
   activeTab: DriverTab = 'home';
   searchTerm = '';
   isDriverLocationFocused = false;
@@ -102,6 +113,7 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   selectedParking: ParkingCard | null = null;
   private locationWatchId: number | null = null;
+  private reservationRefreshIntervalId: number | null = null;
 
   driverProfile: DriverProfile = {
     nom: 'Nadia Benali',
@@ -290,6 +302,7 @@ export class DashboardPage implements OnInit, OnDestroy {
     if (this.locationWatchId !== null && 'geolocation' in navigator) {
       navigator.geolocation.clearWatch(this.locationWatchId);
     }
+    this.stopReservationLiveRefresh();
   }
 
   logout(): void {
@@ -318,6 +331,11 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   get notificationItems(): HeaderNotificationItem[] {
+    const subscriptionAlerts = this.subscriptions
+      .map((subscription) => this.buildSubscriptionExpiryNotification(subscription))
+      .filter((item): item is HeaderNotificationItem => item !== null)
+      .slice(0, 3);
+
     const reservationNotifications = this.reservations
       .filter((reservation) => reservation.statut === 'en_attente' || reservation.statut === 'confirmee')
       .slice(0, 4)
@@ -328,15 +346,17 @@ export class DashboardPage implements OnInit, OnDestroy {
       }));
 
     const subscriptionNotifications = this.subscriptions
-      .filter((subscription) => subscription.statut === 'en_attente' || subscription.statut === 'actif')
+      .filter((subscription) => subscription.statut === 'en_attente')
       .slice(0, 2)
       .map((subscription) => ({
         title: `Abonnement ${this.getStatusLabel(subscription.statut)}`,
         description: `${subscription.parkingNom} • ${subscription.type}`,
         timestamp: this.formatNotificationTimestamp(subscription.date_debut),
+        icon: 'card-outline',
+        tone: 'info' as const,
       }));
 
-    return [...reservationNotifications, ...subscriptionNotifications].slice(0, 5);
+    return [...subscriptionAlerts, ...reservationNotifications, ...subscriptionNotifications].slice(0, 6);
   }
 
   get notificationsCount(): number {
@@ -350,6 +370,33 @@ export class DashboardPage implements OnInit, OnDestroy {
   get selectedReservationParking(): ParkingCard | undefined {
     const parkingId = Number(this.reservationForm.get('parking_id')?.value);
     return this.parkings.find((parking) => parking.id_park === parkingId);
+  }
+
+  get selectedReservationStructure(): ParkingStructureSection[] {
+    const parkingId = Number(this.reservationForm.get('parking_id')?.value);
+    const parkingSpots = this.spots
+      .filter((spot) => spot.parking_id === parkingId)
+      .sort((a, b) => a.num_place - b.num_place);
+
+    const floors = new Map<string, Map<string, ParkingSpot[]>>();
+
+    parkingSpots.forEach((spot) => {
+      const floorKey = (spot.etage || 'RDC').trim() || 'RDC';
+      const zoneKey = (spot.zone || 'A').trim() || 'A';
+      const floorZones = floors.get(floorKey) ?? new Map<string, ParkingSpot[]>();
+      const zoneSpots = floorZones.get(zoneKey) ?? [];
+      zoneSpots.push(spot);
+      floorZones.set(zoneKey, zoneSpots);
+      floors.set(floorKey, floorZones);
+    });
+
+    return Array.from(floors.entries()).map(([etage, zones]) => ({
+      etage,
+      zones: Array.from(zones.entries()).map(([name, spots]) => ({
+        name,
+        spots,
+      })),
+    }));
   }
 
   get reservationDurationHours(): number | null {
@@ -464,6 +511,7 @@ export class DashboardPage implements OnInit, OnDestroy {
     try {
       const subscriptions = await firstValueFrom(this.subscriptionService.getSubscriptions());
       this.subscriptions = subscriptions.map((subscription) => this.mapSubscription(subscription));
+      this.notifyExpiringSubscriptions();
     } catch (error: any) {
       this.toastService.show(
         error?.error?.msg || error?.error?.error || 'Impossible de charger les abonnements',
@@ -590,6 +638,34 @@ export class DashboardPage implements OnInit, OnDestroy {
     return this.spots.filter((spot) => spot.parking_id === parkingId && this.isSpotAvailable(spot.etat));
   }
 
+
+  get selectedSubscriptionStructure(): ParkingStructureSection[] {
+    const parkingId = Number(this.subscriptionForm.get('parking_id')?.value);
+    const parkingSpots = this.spots
+      .filter((spot) => spot.parking_id === parkingId)
+      .sort((a, b) => a.num_place - b.num_place);
+
+    const floors = new Map<string, Map<string, ParkingSpot[]>>();
+
+    parkingSpots.forEach((spot) => {
+      const floorKey = (spot.etage || 'RDC').trim() || 'RDC';
+      const zoneKey = (spot.zone || 'A').trim() || 'A';
+      const floorZones = floors.get(floorKey) ?? new Map<string, ParkingSpot[]>();
+      const zoneSpots = floorZones.get(zoneKey) ?? [];
+      zoneSpots.push(spot);
+      floorZones.set(zoneKey, zoneSpots);
+      floors.set(floorKey, floorZones);
+    });
+
+    return Array.from(floors.entries()).map(([etage, zones]) => ({
+      etage,
+      zones: Array.from(zones.entries()).map(([name, spots]) => ({
+        name,
+        spots,
+      })),
+    }));
+  }
+
   openReservation(parking?: ParkingCard): void {
     this.selectedParking = parking ?? null;
     const preferredParkingId = parking?.id_park ?? this.parkings[0]?.id_park ?? '';
@@ -598,12 +674,12 @@ export class DashboardPage implements OnInit, OnDestroy {
     const defaultVehicleId = this.defaultVehicle?.id ?? '';
 
     const availableSpot = this.spots.find(
-      (spot) => spot.parking_id === preferredParkingId && this.isSpotAvailable(spot.etat)
+      (spot) => spot.parking_id === Number(targetParkingId) && this.isSpotAvailable(spot.etat)
     );
 
 
-    this.reservationForm.reset({
-      parking_id: targetParkingId ?? '',
+      this.reservationForm.reset({
+        parking_id: targetParkingId ?? '',
       vehicule_id: defaultVehicleId,
       place_id: availableSpot?.id_place ?? '',
       date_debut: '',
@@ -614,10 +690,11 @@ export class DashboardPage implements OnInit, OnDestroy {
       card_number: '',
       card_expiry: '',
       card_cvv: '',
-    });
+      });
 
-    this.isReservationModalOpen = true;
-  }
+      this.isReservationModalOpen = true;
+      this.startReservationLiveRefresh();
+    }
 
   handleMapParkingSelected(parking: MapParking): void {
     const selectedParking = this.parkings.find((item) => item.id_park === parking.id);
@@ -627,6 +704,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   closeReservationModal(): void {
+    this.stopReservationLiveRefresh();
     this.isReservationModalOpen = false;
     this.selectedParking = null;
   }
@@ -636,6 +714,24 @@ export class DashboardPage implements OnInit, OnDestroy {
     this.reservationForm.patchValue({
       place_id: firstSpot?.id_place ?? '',
     });
+    this.selectedParking =
+      this.parkings.find((parking) => parking.id_park === Number(this.reservationForm.get('parking_id')?.value)) ??
+      null;
+    this.refreshReservationParkingOccupancy();
+  }
+
+  selectReservationSpot(spot: ParkingSpot): void {
+    if (!this.isSpotAvailable(spot.etat)) {
+      return;
+    }
+
+    this.reservationForm.patchValue({
+      place_id: spot.id_place,
+    });
+  }
+
+  isReservationSpotSelected(spotId: number): boolean {
+    return Number(this.reservationForm.get('place_id')?.value) === spotId;
   }
 
   private hasAvailableSpot(parkingId: number | string | undefined): boolean {
@@ -872,6 +968,20 @@ export class DashboardPage implements OnInit, OnDestroy {
     });
   }
 
+  selectSubscriptionSpot(spot: ParkingSpot): void {
+    if (!this.isSpotAvailable(spot.etat)) {
+      return;
+    }
+
+    this.subscriptionForm.patchValue({
+      place_id: spot.id_place,
+    });
+  }
+
+  isSubscriptionSpotSelected(spotId: number): boolean {
+    return Number(this.subscriptionForm.get('place_id')?.value) === spotId;
+  }
+
   async submitSubscription(): Promise<void> {
     if (this.subscriptionForm.invalid) {
       this.subscriptionForm.markAllAsTouched();
@@ -911,18 +1021,7 @@ export class DashboardPage implements OnInit, OnDestroy {
       };
 
       await firstValueFrom(this.subscriptionService.createPlaceSubscription(payload));
-
-      this.spots = this.spots.map((item) =>
-        item.id_place === spot.id_place
-          ? { ...item, etat: 'reservee' }
-          : item
-      );
-      this.parkings = this.parkings.map((item) =>
-        item.id_park === parking.id_park
-          ? { ...item, availablePlaces: Math.max(item.availablePlaces - 1, 0) }
-          : item
-      );
-
+      await this.loadParkingsAndPlaces();
       await this.loadSubscriptions();
       this.toastService.show('Abonnement cree avec succes', 'success');
       this.closeSubscriptionModal();
@@ -1009,6 +1108,89 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   buildSpotLabel(spot: ParkingSpot): string {
     return `Place ${spot.zone}-${spot.num_place} • Etage ${spot.etage}`;
+  }
+
+  getSpotStatusLabel(status: ParkingSpot['etat']): string {
+    if (status === 'libre') {
+      return 'Libre';
+    }
+    if (status === 'reservee') {
+      return 'Reservee';
+    }
+    return 'Occupee';
+  }
+
+  getSpotVisualState(status: ParkingSpot['etat']): 'libre' | 'reservee' | 'occupee' {
+    return this.normalizePlaceStatus(status);
+  }
+
+  private buildSubscriptionExpiryNotification(subscription: SubscriptionItem): HeaderNotificationItem | null {
+    if (this.isSubscriptionExpired(subscription)) {
+      return {
+        title: 'Abonnement expire',
+        description: `${subscription.parkingNom} • ${subscription.placeLabel}`,
+        timestamp: this.formatNotificationTimestamp(subscription.date_fin),
+        icon: 'alert-circle-outline',
+        tone: 'warning',
+      };
+    }
+
+    const remainingDays = this.getSubscriptionRemainingDays(subscription);
+    if (subscription.statut === 'actif' && remainingDays !== null && remainingDays <= this.subscriptionAlertWindowDays) {
+      return {
+        title: 'Abonnement bientot termine',
+        description: `${subscription.placeLabel} expire dans ${remainingDays} jour${remainingDays > 1 ? 's' : ''}`,
+        timestamp: this.formatNotificationTimestamp(subscription.date_fin),
+        icon: 'notifications-outline',
+        tone: 'alert',
+      };
+    }
+
+    return null;
+  }
+
+  private getSubscriptionRemainingDays(subscription: SubscriptionItem): number | null {
+    if (!subscription.date_fin) {
+      return null;
+    }
+
+    const endDate = new Date(subscription.date_fin);
+    if (Number.isNaN(endDate.getTime())) {
+      return null;
+    }
+
+    endDate.setHours(23, 59, 59, 999);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diffMs = endDate.getTime() - today.getTime();
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  }
+
+  private isSubscriptionExpired(subscription: SubscriptionItem): boolean {
+    const remainingDays = this.getSubscriptionRemainingDays(subscription);
+    return subscription.statut === 'expire' || (remainingDays !== null && remainingDays < 0);
+  }
+
+  private notifyExpiringSubscriptions(): void {
+    this.subscriptions.forEach((subscription) => {
+      const remainingDays = this.getSubscriptionRemainingDays(subscription);
+      const isAlertable =
+        subscription.statut === 'actif' &&
+        remainingDays !== null &&
+        remainingDays >= 0 &&
+        remainingDays <= this.subscriptionAlertWindowDays;
+
+      if (!isAlertable || this.notifiedSubscriptionIds.has(subscription.id_abon)) {
+        return;
+      }
+
+      this.notifiedSubscriptionIds.add(subscription.id_abon);
+      this.toastService.show(
+        `Alerte abonnement: votre place ${subscription.placeLabel} expire dans ${remainingDays} jour${remainingDays > 1 ? 's' : ''}.`,
+        'info'
+      );
+    });
   }
 
   private formatNotificationTimestamp(value: string): string {
@@ -1248,6 +1430,63 @@ private showLocationToast(latitude: number, longitude: number): void {
 
   private isSpotAvailable(status?: string): boolean {
     return this.normalizePlaceStatus(status) === 'libre';
+  }
+
+  private startReservationLiveRefresh(): void {
+    this.stopReservationLiveRefresh();
+    void this.refreshReservationParkingOccupancy();
+    this.reservationRefreshIntervalId = window.setInterval(() => {
+      void this.refreshReservationParkingOccupancy();
+    }, this.liveParkingRefreshIntervalMs);
+  }
+
+  private stopReservationLiveRefresh(): void {
+    if (this.reservationRefreshIntervalId !== null) {
+      window.clearInterval(this.reservationRefreshIntervalId);
+      this.reservationRefreshIntervalId = null;
+    }
+  }
+
+  private async refreshReservationParkingOccupancy(): Promise<void> {
+    if (!this.isReservationModalOpen) {
+      return;
+    }
+
+    const parkingId = Number(this.reservationForm.get('parking_id')?.value);
+    if (!parkingId) {
+      return;
+    }
+
+    try {
+      const places = await firstValueFrom(this.placeService.getPlaces(parkingId));
+      const refreshedSpots = places.map((place) => this.mapPlaceToSpot(place));
+      const remainingSpots = this.spots.filter((spot) => spot.parking_id !== parkingId);
+      this.spots = [...remainingSpots, ...refreshedSpots];
+
+      const availablePlaces = refreshedSpots.filter((spot) => this.isSpotAvailable(spot.etat)).length;
+      this.parkings = this.parkings.map((parking) =>
+        parking.id_park === parkingId ? { ...parking, availablePlaces } : parking
+      );
+
+      this.selectedParking =
+        this.parkings.find((parking) => parking.id_park === parkingId) ?? this.selectedParking;
+
+      const selectedSpotId = Number(this.reservationForm.get('place_id')?.value);
+      const selectedSpot = refreshedSpots.find((spot) => spot.id_place === selectedSpotId);
+
+      if (selectedSpot && !this.isSpotAvailable(selectedSpot.etat)) {
+        const fallbackSpot = refreshedSpots.find((spot) => this.isSpotAvailable(spot.etat));
+        this.reservationForm.patchValue({
+          place_id: fallbackSpot?.id_place ?? '',
+        });
+        this.toastService.show(
+          'La place choisie vient de changer d etat. Selectionnez une place libre.',
+          'info'
+        );
+      }
+    } catch (error) {
+      console.warn('Impossible de rafraichir l occupation du parking pour la reservation.', error);
+    }
   }
 
 }

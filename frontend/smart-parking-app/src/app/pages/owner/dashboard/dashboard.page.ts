@@ -99,6 +99,12 @@ interface RevenueBar {
   subscriptionHeight: number;
 }
 
+interface DashboardParkingHealth {
+  pendingValidation: number;
+  lowCapacity: number;
+  maintenance: number;
+}
+
 @Component({
   selector: 'app-dashboard',
   templateUrl: './dashboard.page.html',
@@ -107,6 +113,7 @@ interface RevenueBar {
 })
 export class DashboardPage implements OnInit {
   private readonly dashboardParkingLimit = 3;
+  private readonly ownerSubscriptionAlertWindowDays = 5;
   parkings: OwnerParking[] = [];
   reservations: ReservationHistoryDto[] = [];
   subscriptions: SubscriptionDto[] = [];
@@ -118,6 +125,7 @@ export class DashboardPage implements OnInit {
   selectedAiParkingId: number | null = null;
   private previewErrorIds = new Set<number>();
   private analysisVideoErrorIds = new Set<number>();
+  private sourceBlobs = new Map<number, string>(); // Stocke les blob URLs
 
   constructor(
     private authService: AuthService,
@@ -157,11 +165,28 @@ export class DashboardPage implements OnInit {
   }
 
   get visibleParkings(): OwnerParking[] {
-    return this.parkings.slice(0, this.dashboardParkingLimit);
+    return [...this.parkings]
+      .sort((left, right) => {
+        const scoreDiff = this.getParkingPriorityScore(right) - this.getParkingPriorityScore(left);
+        if (scoreDiff !== 0) {
+          return scoreDiff;
+        }
+
+        return this.getParkingOccupancyRate(right) - this.getParkingOccupancyRate(left);
+      })
+      .slice(0, this.dashboardParkingLimit);
   }
 
   get hiddenParkingsCount(): number {
     return Math.max(this.parkings.length - this.visibleParkings.length, 0);
+  }
+
+  get parkingHealth(): DashboardParkingHealth {
+    return {
+      pendingValidation: this.parkings.filter((parking) => parking.validationStatus === 'en_attente_validation').length,
+      lowCapacity: this.parkings.filter((parking) => parking.availableSpaces > 0 && parking.availableSpaces <= 5).length,
+      maintenance: this.parkings.filter((parking) => parking.status === 'maintenance').length,
+    };
   }
 
   get stats(): OwnerStats {
@@ -326,6 +351,16 @@ export class DashboardPage implements OnInit {
         icon: 'refresh-outline',
         route: '/owner/dashboard',
         tone: 'neutral',
+      };
+    }
+
+    if (this.workflowState.ownerStatus !== 'accepte' && !this.workflowState.hasParking) {
+      return {
+        title: 'Ajouter votre premier parking',
+        description: 'Preparez deja votre parking pendant que le compte owner attend la validation admin.',
+        icon: 'add-circle-outline',
+        route: '/owner/profile',
+        tone: 'primary',
       };
     }
 
@@ -555,6 +590,33 @@ export class DashboardPage implements OnInit {
   }
 
   get notificationItems(): HeaderNotificationItem[] {
+    const ownerSubscriptionNotifications = this.getOwnerSubscriptionNotifications();
+
+    const ownerApprovalNotifications =
+      this.workflowState?.ownerStatus === 'accepte'
+        ? [
+            {
+              title: 'Compte owner accepte',
+              description: this.workflowState.hasParking
+                ? 'Le compte owner est valide. Le parking peut maintenant etre traite par l admin.'
+                : 'Le compte owner est valide. Ajoutez maintenant votre premier parking.',
+              timestamp: 'Validation admin',
+              icon: 'checkmark-done-outline',
+              tone: 'success' as const,
+            },
+          ]
+        : this.workflowState?.ownerStatus === 'refuse'
+          ? [
+              {
+                title: 'Compte owner refuse',
+                description: 'Le compte owner a ete refuse. Verifiez le dossier ou contactez l admin.',
+                timestamp: 'Decision admin',
+                icon: 'alert-circle-outline',
+                tone: 'alert' as const,
+              },
+            ]
+          : [];
+
     const parkingValidatedNotification =
       this.workflowState?.ownerStatus === 'accepte' &&
       this.workflowState?.parkingStatus === 'valide' &&
@@ -583,6 +645,20 @@ export class DashboardPage implements OnInit {
           ]
         : [];
 
+    const parkingReviewNotifications = this.parkings
+      .filter((parking) => parking.validationStatus === 'en_attente_validation' || parking.validationStatus === 'rejete')
+      .slice(0, 2)
+      .map((parking) => ({
+        title:
+          parking.validationStatus === 'rejete'
+            ? 'Parking a corriger'
+            : 'Parking en attente de validation',
+        description: `${parking.name} attend une action admin.`,
+        timestamp: parking.validationStatus === 'rejete' ? 'Dossier retourne' : 'File admin',
+        icon: parking.validationStatus === 'rejete' ? 'close-circle-outline' : 'time-outline',
+        tone: parking.validationStatus === 'rejete' ? 'alert' as const : 'warning' as const,
+      }));
+
     const maintenanceNotifications = this.parkings
       .filter((parking) => parking.status === 'maintenance')
       .map((parking) => ({
@@ -593,26 +669,21 @@ export class DashboardPage implements OnInit {
         tone: 'warning' as const,
       }));
 
-    const reservationNotifications = this.todayReservations.slice(0, 3).map((reservation) => ({
-      title: 'Reservation du jour',
-      description: `${reservation.userName} - ${reservation.parkingName} - ${reservation.time}`,
-      timestamp: 'Aujourd hui',
+    const reservationNotifications = this.getRecentReservations(3).map((reservation) => ({
+      title: 'Nouvelle reservation',
+      description: `${reservation.conducteur?.nom || 'Conducteur'} - ${reservation.parking?.nom || 'Parking'}`,
+      timestamp: this.formatOwnerNotificationTimestamp(reservation.date_debut),
       icon: 'car-sport-outline',
       tone: 'success' as const,
     }));
 
-    const subscriptionNotifications =
-      this.stats.activeSubscriptions > 0
-        ? [
-            {
-              title: 'Abonnements actifs',
-              description: `${this.stats.activeSubscriptions} abonnements actifs sur vos parkings`,
-              timestamp: 'Aujourd hui',
-              icon: 'card-outline',
-              tone: 'info' as const,
-            },
-          ]
-        : [];
+    const subscriptionNotifications = this.getRecentPlaceSubscriptions(3).map((subscription) => ({
+      title: 'Nouvel abonnement de place',
+      description: `${subscription.parking?.nom || 'Parking'} - Place ${subscription.place?.zone || 'A'}-${subscription.place?.num_place || '--'}`,
+      timestamp: this.formatOwnerNotificationTimestamp(subscription.created_at || subscription.date_debut),
+      icon: 'card-outline',
+      tone: 'info' as const,
+    }));
 
     const aiNotifications =
       this.aiSources.length > 0
@@ -628,7 +699,10 @@ export class DashboardPage implements OnInit {
         : [];
 
     return [
+      ...ownerApprovalNotifications,
+      ...ownerSubscriptionNotifications,
       ...parkingValidatedNotification,
+      ...parkingReviewNotifications,
       ...workflowNotification,
       ...maintenanceNotifications,
       ...reservationNotifications,
@@ -782,7 +856,10 @@ export class DashboardPage implements OnInit {
         : [];
 
       this.workflowState = workflowState;
-      this.parkings = ownerParkings.map((parking, index) => this.mapParking(parking, places, index));
+      const placesByParking = this.groupPlacesByParking(places);
+      this.parkings = ownerParkings.map((parking, index) =>
+        this.mapParking(parking, placesByParking.get(parking.id_park) ?? [], index)
+      );
       this.reservations = reservations;
       this.subscriptions = subscriptions;
 
@@ -806,13 +883,38 @@ export class DashboardPage implements OnInit {
           ? workflowState.parkingId
           : aiSourcesByParking[0]?.parkingId ?? null;
       this.selectedAiParkingId = preferredParkingId;
+
+      // Charger les blob URLs pour les vidéos
+      await this.loadBlobUrlsForSources();
     } finally {
       this.isLoading = false;
     }
   }
 
-  private mapParking(parking: ParkingDto, places: PlaceDto[], index: number): OwnerParking {
-    const parkingPlaces = places.filter((place) => place.parking_id === parking.id_park);
+  private async loadBlobUrlsForSources(): Promise<void> {
+    for (const source of this.aiSources) {
+      if ((this.isVideoSource(source) || this.isImageSource(source)) && source.preview_url) {
+        try {
+          const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(source.id_source);
+          if (blobUrl) {
+            this.sourceBlobs.set(source.id_source, blobUrl);
+          }
+        } catch (error) {
+          console.warn(`Erreur lors du chargement du blob pour la source ${source.id_source}:`, error);
+        }
+      }
+    }
+  }
+
+  getSourceMediaUrl(source: ParkingAISource): string {
+    return this.sourceBlobs.get(source.id_source) || source.preview_url || '';
+  }
+
+  getSourceVideoUrl(source: ParkingAISource): string {
+    return this.getSourceMediaUrl(source);
+  }
+
+  private mapParking(parking: ParkingDto, parkingPlaces: PlaceDto[], index: number): OwnerParking {
     const availableSpaces = parkingPlaces.length
       ? parkingPlaces.filter((place) => place.etat === 'libre').length
       : parking.capacite;
@@ -827,6 +929,43 @@ export class DashboardPage implements OnInit {
       validationStatus: parking.validation_status || 'brouillon',
       image: `assets/parking${(index % 3) + 1}.jpg`,
     };
+  }
+
+  private groupPlacesByParking(places: PlaceDto[]): Map<number, PlaceDto[]> {
+    const grouped = new Map<number, PlaceDto[]>();
+
+    places.forEach((place) => {
+      const collection = grouped.get(place.parking_id) ?? [];
+      collection.push(place);
+      grouped.set(place.parking_id, collection);
+    });
+
+    return grouped;
+  }
+
+  private getParkingPriorityScore(parking: OwnerParking): number {
+    let score = 0;
+
+    if (parking.validationStatus === 'rejete') {
+      score += 400;
+    } else if (parking.validationStatus === 'en_attente_validation') {
+      score += 300;
+    } else if (parking.validationStatus === 'brouillon') {
+      score += 180;
+    }
+
+    if (parking.status === 'maintenance') {
+      score += 220;
+    }
+
+    if (parking.availableSpaces === 0) {
+      score += 170;
+    } else if (parking.availableSpaces <= 5) {
+      score += 130;
+    }
+
+    score += this.getParkingOccupancyRate(parking);
+    return score;
   }
 
   private isToday(value: string): boolean {
@@ -856,6 +995,112 @@ export class DashboardPage implements OnInit {
     return value.toLocaleTimeString('fr-FR', {
       hour: '2-digit',
       minute: '2-digit',
+    });
+  }
+
+  private getOwnerSubscriptionNotifications(): HeaderNotificationItem[] {
+    if (!this.workflowState?.hasParking || !this.workflowState?.parkingName) {
+      return [];
+    }
+
+    if (this.workflowState.subscriptionStatus === 'expire') {
+      return [
+        {
+          title: 'Abonnement parking expire',
+          description: `${this.workflowState.parkingName} n est plus couvert par un abonnement actif.`,
+          timestamp: this.workflowState.subscriptionEndDate
+            ? this.formatOwnerNotificationTimestamp(this.workflowState.subscriptionEndDate)
+            : 'Mise a jour recente',
+          icon: 'alert-circle-outline',
+          tone: 'alert',
+        },
+      ];
+    }
+
+    const remainingDays = this.getOwnerSubscriptionRemainingDays();
+    if (
+      this.workflowState.subscriptionStatus === 'actif' &&
+      remainingDays !== null &&
+      remainingDays >= 0 &&
+      remainingDays <= this.ownerSubscriptionAlertWindowDays
+    ) {
+      return [
+        {
+          title: 'Abonnement parking bientot termine',
+          description: `${this.workflowState.parkingName} expire dans ${remainingDays} jour${remainingDays > 1 ? 's' : ''}.`,
+          timestamp: this.workflowState.subscriptionEndDate
+            ? this.formatOwnerNotificationTimestamp(this.workflowState.subscriptionEndDate)
+            : 'Mise a jour recente',
+          icon: 'notifications-outline',
+          tone: 'warning',
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  private getOwnerSubscriptionRemainingDays(): number | null {
+    const endDateValue = this.workflowState?.subscriptionEndDate;
+    if (!endDateValue) {
+      return null;
+    }
+
+    const endDate = new Date(endDateValue);
+    if (Number.isNaN(endDate.getTime())) {
+      return null;
+    }
+
+    endDate.setHours(23, 59, 59, 999);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diffMs = endDate.getTime() - today.getTime();
+    return Math.ceil(diffMs / 86400000);
+  }
+
+  private getRecentReservations(limit: number): ReservationHistoryDto[] {
+    return [...this.reservations]
+      .sort((a, b) => new Date(b.date_debut).getTime() - new Date(a.date_debut).getTime())
+      .slice(0, limit);
+  }
+
+  private getRecentPlaceSubscriptions(limit: number): SubscriptionDto[] {
+    return [...this.subscriptions]
+      .sort((a, b) => {
+        const first = new Date(b.created_at || b.date_debut).getTime();
+        const second = new Date(a.created_at || a.date_debut).getTime();
+        return first - second;
+      })
+      .slice(0, limit);
+  }
+
+  private formatOwnerNotificationTimestamp(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'Mise a jour recente';
+    }
+
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / 3600000);
+
+    if (diffHours < 1) {
+      return 'Il y a moins d une heure';
+    }
+
+    if (diffHours < 24) {
+      return `Il y a ${diffHours} h`;
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) {
+      return `Il y a ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
+    }
+
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
     });
   }
 

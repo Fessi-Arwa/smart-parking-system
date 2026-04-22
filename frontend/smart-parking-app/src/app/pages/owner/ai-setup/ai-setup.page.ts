@@ -1,17 +1,28 @@
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
-import { OwnerWorkflowState } from '../../../models/owner-workflow.model';
+import { DEFAULT_OWNER_WORKFLOW_STATE, OwnerWorkflowState } from '../../../models/owner-workflow.model';
+import { AuthService } from '../../../services/auth.service';
 import { OwnerWorkflowService } from '../../../services/owner-workflow.service';
 import { PlaceDto, PlaceService } from '../../../services/place.service';
 import {
   ParkingAISource,
   ParkingAiAuthError,
   ParkingAISlot,
+  ParkingAiUploadProgress,
   ParkingAiSourceService,
 } from '../../../services/parking-ai-source.service';
+import { ParkingDto, ParkingService } from '../../../services/parking.service';
 import { ToastService } from '../../../services/toast.service';
+
+interface OwnerAiParkingOption {
+  id: number;
+  name: string;
+  address: string;
+  setupStatus: string;
+  aiSetupStatus: string;
+}
 
 @Component({
   selector: 'app-owner-ai-setup',
@@ -21,11 +32,15 @@ import { ToastService } from '../../../services/toast.service';
 })
 export class AiSetupPage implements OnInit, OnDestroy {
   @ViewChild('calibrationCanvas') calibrationCanvasRef?: ElementRef<HTMLCanvasElement>;
-  workflowState!: OwnerWorkflowState;
+  workflowState: OwnerWorkflowState = { ...DEFAULT_OWNER_WORKFLOW_STATE };
+  ownerParkings: OwnerAiParkingOption[] = [];
   isSubmitting = false;
   isLoadingSources = true;
   isUploadingImage = false;
   isUploadingVideo = false;
+  videoUploadProgress = 0;
+  currentVideoUploadName = '';
+  videoUploadHint: string | null = null;
   isAddingCamera = false;
   isLoadingCalibration = false;
   isSavingCalibration = false;
@@ -36,6 +51,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   calibrationSource: ParkingAISource | null = null;
   calibrationUsesCustomSlots = false;
   calibrationImageUrl: string | null = null;
+  calibrationWarning: string | null = null;
   cameraDraft = {
     label: '',
     streamUrl: '',
@@ -45,17 +61,20 @@ export class AiSetupPage implements OnInit, OnDestroy {
   private draftRect: { x: number; y: number; w: number; h: number } | null = null;
   private pollingTimer: ReturnType<typeof setInterval> | null = null;
   private analysisVideoErrorIds = new Set<number>();
-  aiTasks = [
-    'Ajouter des images statiques du parking',
-    'Deposer des videos pour analyser circulation et occupation',
-    'Connecter une ou plusieurs cameras de surveillance',
-    'Laisser le modele IA exploiter ces sources pour la detection',
-  ];
+  private previewErrorIds = new Set<number>();
+  private objectUrls = new Set<string>();
+  private sourceBlobs = new Map<number, string>();
+  private analysisBlobs = new Map<number, string>();
+  private analysisPreviewBlobs = new Map<number, string>();
+  private routeParkingId: number | null = null;
 
   constructor(
+    private authService: AuthService,
     private ownerWorkflowService: OwnerWorkflowService,
     private parkingAiSourceService: ParkingAiSourceService,
+    private parkingService: ParkingService,
     private placeService: PlaceService,
+    private route: ActivatedRoute,
     private router: Router,
     private toastService: ToastService
   ) {
@@ -63,17 +82,30 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   async ngOnInit(): Promise<void> {
+    this.routeParkingId = this.parseParkingId(this.route.snapshot.queryParamMap.get('parking'));
     this.workflowState = await this.ownerWorkflowService.refresh();
+    await this.loadOwnerParkings();
+    await this.ensureSelectedParking();
+    if (!this.activeParkingId) {
+      await this.router.navigateByUrl(this.ownerWorkflowService.getNextRoute(this.workflowState));
+      return;
+    }
     await this.loadSources();
   }
 
   ngOnDestroy(): void {
     this.stopPolling();
+    this.revokeObjectUrls();
   }
 
   async refreshStatus(): Promise<void> {
     this.workflowState = await this.ownerWorkflowService.refresh();
+    await this.loadOwnerParkings();
+    await this.ensureSelectedParking();
     await this.loadSources();
+    if (this.hasRouteParkingSelection) {
+      return;
+    }
     const route = this.ownerWorkflowService.getNextRoute(this.workflowState);
     if (route !== '/owner/ai-setup') {
       await this.router.navigateByUrl(route);
@@ -82,7 +114,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
   async onImageSelected(event: Event): Promise<void> {
     const files = this.extractFiles(event);
-    if (files.length === 0 || !this.workflowState.parkingId) {
+    if (files.length === 0 || !this.activeParkingId) {
       return;
     }
 
@@ -90,8 +122,8 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     try {
       const result = await this.uploadSources(files, 'image');
-      const createdSources = result.sources;
-      this.aiSources = [...createdSources, ...this.aiSources];
+      await this.loadSources();
+      this.attachLocalPreviewUrlsByMatchingFiles(result.uploadedFiles, 'image');
       this.notifyUploadResult(result, 'image');
     } catch (error) {
       console.error('Erreur upload image IA', error);
@@ -104,28 +136,33 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
   async onVideoSelected(event: Event): Promise<void> {
     const files = this.extractFiles(event);
-    if (files.length === 0 || !this.workflowState.parkingId) {
+    if (files.length === 0 || !this.activeParkingId) {
       return;
     }
 
     this.isUploadingVideo = true;
+    this.videoUploadProgress = 0;
+    this.currentVideoUploadName = files[0]?.name || '';
+    this.videoUploadHint = this.buildVideoUploadHint(files);
 
     try {
       const result = await this.uploadSources(files, 'video');
-      const createdSources = result.sources;
-      this.aiSources = [...createdSources, ...this.aiSources];
+      await this.loadSources();
+      this.attachLocalPreviewUrlsByMatchingFiles(result.uploadedFiles, 'video');
       this.notifyUploadResult(result, 'video');
     } catch (error) {
       console.error('Erreur upload video IA', error);
       this.toastService.show(this.getErrorMessage(error, 'Impossible d envoyer ces videos.'), 'error');
     } finally {
       this.isUploadingVideo = false;
+      this.videoUploadProgress = 0;
+      this.currentVideoUploadName = '';
       this.resetInput(event);
     }
   }
 
   async addCamera(): Promise<void> {
-    if (!this.workflowState.parkingId) {
+    if (!this.activeParkingId) {
       this.toastService.show('Aucun parking owner n a ete trouve.', 'error');
       return;
     }
@@ -139,7 +176,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     try {
       const source = await this.parkingAiSourceService.createCameraSource(
-        this.workflowState.parkingId,
+        this.activeParkingId,
         {
           label: this.cameraDraft.label.trim() || 'Camera surveillance',
           stream_url: this.cameraDraft.streamUrl.trim(),
@@ -160,6 +197,10 @@ export class AiSetupPage implements OnInit, OnDestroy {
   async removeSource(sourceId: number): Promise<void> {
     try {
       await this.parkingAiSourceService.deleteSource(sourceId);
+      if (this.calibrationSource?.id_source === sourceId) {
+        this.closeCalibration();
+      }
+      this.revokeSourceSpecificObjectUrls(sourceId);
       this.aiSources = this.aiSources.filter((source) => source.id_source !== sourceId);
       this.toastService.show('Source IA supprimee.', 'success');
     } catch (error) {
@@ -169,7 +210,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   async activateAiSetup(): Promise<void> {
-    if (!this.workflowState.parkingId) {
+    if (!this.activeParkingId) {
       this.toastService.show('Aucun parking owner n a ete trouve.', 'error');
       return;
     }
@@ -183,7 +224,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     try {
       this.workflowState = await this.ownerWorkflowService.updateAiSetupStatus(
-        this.workflowState.parkingId,
+        this.activeParkingId,
         'active'
       );
       this.toastService.show('Configuration IA activee avec succes.', 'success');
@@ -192,7 +233,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
       await this.router.navigateByUrl(route);
     } catch (error) {
       console.error('Erreur activation configuration IA', error);
-      this.toastService.show('Impossible d activer la configuration IA.', 'error');
+      this.toastService.show(this.getErrorMessage(error, 'Impossible d activer la configuration IA.'), 'error');
     } finally {
       this.isSubmitting = false;
     }
@@ -211,8 +252,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   async openCalibration(source: ParkingAISource): Promise<void> {
-    const calibrationImageUrl = source.calibration_preview_url || source.preview_url || null;
-    if (!this.workflowState.parkingId || !calibrationImageUrl || this.isCameraSource(source)) {
+    if (!this.activeParkingId || this.isCameraSource(source) || !this.canCalibrateSource(source)) {
       this.toastService.show('Choisissez une image ou une video exploitable pour calibrer les places.', 'error');
       return;
     }
@@ -220,18 +260,40 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.isLoadingCalibration = true;
     try {
       const [places, slotsResponse] = await Promise.all([
-        firstValueFrom(this.placeService.getPlaces(this.workflowState.parkingId)),
-        this.parkingAiSourceService.getParkingSlots(this.workflowState.parkingId),
+        firstValueFrom(this.placeService.getPlaces(this.activeParkingId)),
+        this.parkingAiSourceService.getParkingSlots(this.activeParkingId),
       ]);
       this.calibrationPlaces = (places || []).sort((a, b) => a.num_place - b.num_place);
-      this.calibrationSlots = [...slotsResponse.slots].sort((a, b) => a.slot_index - b.slot_index);
+      this.calibrationSlots = this.autoAssignCalibrationSlots(
+        [...slotsResponse.slots].sort((a, b) => a.slot_index - b.slot_index)
+      );
       this.calibrationUsesCustomSlots = slotsResponse.uses_custom_slots;
+      this.calibrationWarning = slotsResponse.warning || null;
       this.calibrationSource = source;
-      this.calibrationImageUrl = calibrationImageUrl;
-      this.calibrationImage.src = calibrationImageUrl;
+      if (slotsResponse.auto_assigned_count) {
+        this.toastService.show(
+          `${slotsResponse.auto_assigned_count} slot(s) ont ete associes automatiquement aux places existantes.`,
+          'info'
+        );
+      }
+
+      if (this.isVideoSource(source) && !source.calibration_preview_url) {
+        const sourceMediaUrl = this.getSourceMediaUrl(source);
+        if (!sourceMediaUrl) {
+          throw new Error('Aucune video exploitable pour la calibration.');
+        }
+        this.replaceCalibrationImageUrl(await this.extractVideoFrameUrl(sourceMediaUrl));
+      } else {
+        const calibrationMediaUrl = source.calibration_preview_url || source.id_source;
+        this.replaceCalibrationImageUrl(
+          await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(calibrationMediaUrl)
+        );
+      }
+
+      this.calibrationImage.src = this.calibrationImageUrl || '';
       if (this.calibrationPlaces.length === 0) {
         this.toastService.show(
-          `Aucune place n est encore creee pour le parking #${this.workflowState.parkingId}. Termine d abord l etape parking.`,
+          `Aucune place n est encore creee pour le parking #${this.activeParkingId}. Termine d abord l etape parking.`,
           'info'
         );
       }
@@ -252,6 +314,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.reanalyzingSourceIds.add(source.id_source);
     try {
       const updatedSource = await this.parkingAiSourceService.reanalyzeSource(source.id_source);
+      await this.loadBlobUrlsForSpecificSources([updatedSource]);
       this.aiSources = this.aiSources.map((item) =>
         item.id_source === updatedSource.id_source ? updatedSource : item
       );
@@ -275,8 +338,9 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
   closeCalibration(): void {
     this.calibrationSource = null;
-    this.calibrationImageUrl = null;
+    this.replaceCalibrationImageUrl(null);
     this.calibrationSlots = [];
+    this.calibrationWarning = null;
     this.draftRect = null;
     this.dragStart = null;
   }
@@ -307,11 +371,13 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.draftRect = null;
 
     if (rect.w >= 12 && rect.h >= 12) {
+      const nextPlace = this.getNextAvailableCalibrationPlaceId();
       this.calibrationSlots = [
         ...this.calibrationSlots,
         {
           slot_index: this.calibrationSlots.length + 1,
-          place_id: 0,
+          place_id: nextPlace,
+          place_number: this.getCalibrationPlaceNumber(nextPlace),
           ...rect,
         },
       ];
@@ -323,7 +389,9 @@ export class AiSetupPage implements OnInit, OnDestroy {
   updateCalibrationPlace(slotIndex: number, value: string): void {
     const placeId = Number(value || 0);
     this.calibrationSlots = this.calibrationSlots.map((slot, index) =>
-      index === slotIndex ? { ...slot, place_id: placeId } : slot
+      index === slotIndex
+        ? { ...slot, place_id: placeId || null, place_number: this.getCalibrationPlaceNumber(placeId || null) }
+        : slot
     );
     this.redrawCalibrationCanvas();
   }
@@ -335,13 +403,23 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.redrawCalibrationCanvas();
   }
 
-  getCalibrationPlaceLabel(placeId: number): string {
+  getCalibrationPlaceLabel(placeId: number | null | undefined): string {
     const place = this.calibrationPlaces.find((item) => item.id_place === placeId);
     return place ? `Place ${place.num_place}` : 'Non assignee';
   }
 
+  getCalibrationPlaceNumber(placeId: number | null | undefined): number | null {
+    if (!placeId) {
+      return null;
+    }
+    const place = this.calibrationPlaces.find((item) => item.id_place === placeId);
+    return place?.num_place ?? null;
+  }
+
   hasCalibrationDuplicates(): boolean {
-    const used = this.calibrationSlots.map((slot) => slot.place_id).filter((value) => value > 0);
+    const used = this.calibrationSlots
+      .map((slot) => slot.place_id)
+      .filter((value): value is number => typeof value === 'number' && value > 0);
     return new Set(used).size !== used.length;
   }
 
@@ -353,12 +431,90 @@ export class AiSetupPage implements OnInit, OnDestroy {
     return this.calibrationPlaces.length > 0;
   }
 
+  async selectParking(parkingId: number): Promise<void> {
+    if (parkingId === this.activeParkingId) {
+      return;
+    }
+
+    this.routeParkingId = parkingId;
+    this.closeCalibration();
+    await this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { parking: parkingId },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+    await this.loadSources();
+  }
+
+  isSelectedParking(parkingId: number): boolean {
+    return this.activeParkingId === parkingId;
+  }
+
+  get activeParkingOption(): OwnerAiParkingOption | null {
+    if (!this.activeParkingId) {
+      return null;
+    }
+
+    return this.ownerParkings.find((parking) => parking.id === this.activeParkingId) ?? null;
+  }
+
+  get activeParkingLabel(): string {
+    const parking = this.activeParkingOption;
+    if (!parking) {
+      return this.activeParkingId ? `Parking #${this.activeParkingId}` : 'Aucun parking';
+    }
+
+    return `${parking.name} (#${parking.id})`;
+  }
+
+  get canSwitchParking(): boolean {
+    return this.ownerParkings.length > 1;
+  }
+
+  get canActivateAi(): boolean {
+    return this.aiSources.length > 0 && !this.isLoadingSources && !this.isSubmitting;
+  }
+
+  get aiPrimaryActionLabel(): string {
+    if (this.isSubmitting) {
+      return 'Activation...';
+    }
+
+    return this.aiSources.length === 0 ? 'Ajoutez une source pour continuer' : 'Activer et continuer';
+  }
+
+  get hasVideoUploadHint(): boolean {
+    return Boolean(this.videoUploadHint);
+  }
+
+  get videoUploadProgressLabel(): string {
+    if (!this.isUploadingVideo) {
+      return '';
+    }
+    return this.currentVideoUploadName
+      ? `${this.currentVideoUploadName} • ${this.videoUploadProgress}%`
+      : `${this.videoUploadProgress}%`;
+  }
+
+  getParkingStateLabel(parking: OwnerAiParkingOption): string {
+    if (parking.aiSetupStatus === 'active') {
+      return 'IA active';
+    }
+    if (parking.setupStatus === 'terminee') {
+      return 'Pret pour IA';
+    }
+    return 'Parking a finaliser';
+  }
+
   async goToParkingSetup(): Promise<void> {
-    await this.router.navigateByUrl('/owner/parking-setup');
+    await this.router.navigate(['/owner/parking-setup'], {
+      queryParams: this.activeParkingId ? { parking: this.activeParkingId } : {},
+    });
   }
 
   async saveCalibration(): Promise<void> {
-    if (!this.workflowState.parkingId || !this.calibrationSource) {
+    if (!this.activeParkingId || !this.calibrationSource) {
       return;
     }
     if (this.calibrationSlots.length === 0) {
@@ -376,14 +532,17 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     this.isSavingCalibration = true;
     try {
-      await this.parkingAiSourceService.saveParkingSlots(this.workflowState.parkingId, this.calibrationSlots);
+      const savedSlots = await this.parkingAiSourceService.saveParkingSlots(this.activeParkingId, this.calibrationSlots);
+      this.calibrationSlots = this.autoAssignCalibrationSlots(savedSlots.slots);
       const updatedSource = await this.parkingAiSourceService.reanalyzeSource(this.calibrationSource.id_source);
+      await this.loadBlobUrlsForSpecificSources([updatedSource]);
       this.aiSources = this.aiSources.map((source) =>
         source.id_source === updatedSource.id_source ? updatedSource : source
       );
       this.syncPollingState();
       this.calibrationSource = updatedSource;
       this.calibrationUsesCustomSlots = true;
+      this.calibrationWarning = savedSlots.warning || null;
       this.toastService.show(
         this.isVideoSource(updatedSource)
           ? 'Calibration enregistree. Le traitement video est relance en arriere-plan.'
@@ -468,8 +627,12 @@ export class AiSetupPage implements OnInit, OnDestroy {
     return source.analysis?.output_url || null;
   }
 
+  getAnalysisMediaUrl(source: ParkingAISource): string | null {
+    return this.analysisBlobs.get(source.id_source) || this.getAnalysisOutputUrl(source);
+  }
+
   getAnalysisPreviewUrl(source: ParkingAISource): string | null {
-    return source.analysis?.output_preview_url || null;
+    return this.analysisPreviewBlobs.get(source.id_source) || source.analysis?.output_preview_url || null;
   }
 
   isImageAnalysis(source: ParkingAISource): boolean {
@@ -492,6 +655,35 @@ export class AiSetupPage implements OnInit, OnDestroy {
     return this.isVideoAnalysis(source) && !this.showAnalysisVideo(source);
   }
 
+  showSourcePreview(source: ParkingAISource): boolean {
+    return !!this.getSourceMediaUrl(source) && !this.previewErrorIds.has(source.id_source);
+  }
+
+  markSourcePreviewError(source: ParkingAISource): void {
+    this.previewErrorIds.add(source.id_source);
+  }
+
+  async retrySourcePreview(source: ParkingAISource): Promise<void> {
+    this.previewErrorIds.delete(source.id_source);
+    await this.loadBlobUrlsForSpecificSources([source]);
+  }
+
+  hasSourceMedia(source: ParkingAISource): boolean {
+    return Boolean(this.sourceBlobs.get(source.id_source) || source.preview_url);
+  }
+
+  canCalibrateSource(source: ParkingAISource): boolean {
+    if (this.isCameraSource(source)) {
+      return false;
+    }
+
+    if (this.isImageSource(source)) {
+      return this.hasSourceMedia(source);
+    }
+
+    return Boolean(source.calibration_preview_url || this.hasSourceMedia(source));
+  }
+
   getAnalysisError(source: ParkingAISource): string | null {
     return source.analysis?.error || null;
   }
@@ -501,7 +693,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
     return rows.map((item) => {
       const parts = [
         `S${item.slot_index}`,
-        item.place_id ? `P${item.place_id}` : null,
+        item.place_number ? `Place ${item.place_number}` : item.place_id ? `P${item.place_id}` : null,
         item.label,
         item.average_confidence !== undefined && item.average_confidence !== null
           ? `${Math.round(item.average_confidence * 100)}%`
@@ -527,7 +719,8 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   private async loadSources(): Promise<void> {
-    if (!this.workflowState?.parkingId) {
+    if (!this.activeParkingId) {
+      this.closeCalibration();
       this.aiSources = [];
       this.isLoadingSources = false;
       return;
@@ -536,7 +729,8 @@ export class AiSetupPage implements OnInit, OnDestroy {
     this.isLoadingSources = true;
 
     try {
-      this.aiSources = await this.parkingAiSourceService.getSources(this.workflowState.parkingId);
+      this.aiSources = await this.parkingAiSourceService.getSources(this.activeParkingId);
+      await this.loadBlobUrlsForSources();
       this.syncPollingState();
     } catch (error) {
       console.error('Erreur chargement sources IA', error);
@@ -546,6 +740,53 @@ export class AiSetupPage implements OnInit, OnDestroy {
     } finally {
       this.isLoadingSources = false;
     }
+  }
+
+  private async loadBlobUrlsForSources(): Promise<void> {
+    await this.loadBlobUrlsForSpecificSources(this.aiSources);
+  }
+
+  private async loadBlobUrlsForSpecificSources(sources: ParkingAISource[]): Promise<void> {
+    for (const source of sources) {
+      if (this.isVideoSource(source) || this.isImageSource(source)) {
+        try {
+          const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(source.id_source);
+          if (blobUrl) {
+            this.replaceBlobUrl(this.sourceBlobs, source.id_source, blobUrl);
+          }
+        } catch (error) {
+          console.warn(`Erreur lors du chargement du blob pour la source ${source.id_source}:`, error);
+        }
+      }
+
+      const analysisOutputUrl = this.getAnalysisOutputUrl(source);
+      if (analysisOutputUrl) {
+        try {
+          const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(analysisOutputUrl);
+          if (blobUrl) {
+            this.replaceBlobUrl(this.analysisBlobs, source.id_source, blobUrl);
+          }
+        } catch (error) {
+          console.warn(`Erreur lors du chargement du resultat analyse pour ${source.id_source}:`, error);
+        }
+      }
+
+      const analysisPreviewUrl = source.analysis?.output_preview_url;
+      if (analysisPreviewUrl) {
+        try {
+          const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(analysisPreviewUrl);
+          if (blobUrl) {
+            this.replaceBlobUrl(this.analysisPreviewBlobs, source.id_source, blobUrl);
+          }
+        } catch (error) {
+          console.warn(`Erreur lors du chargement de la preview analyse pour ${source.id_source}:`, error);
+        }
+      }
+    }
+  }
+
+  getSourceMediaUrl(source: ParkingAISource): string {
+    return this.sourceBlobs.get(source.id_source) || source.preview_url || '';
   }
 
   private extractFiles(event: Event): File[] {
@@ -619,32 +860,141 @@ export class AiSetupPage implements OnInit, OnDestroy {
     };
   }
 
+  private autoAssignCalibrationSlots(slots: ParkingAISlot[]): ParkingAISlot[] {
+    const availablePlaces = [...this.calibrationPlaces];
+    const placesById = new Map(availablePlaces.map((place) => [place.id_place, place]));
+    const usedPlaceIds = new Set<number>();
+
+    const normalized = slots.map((slot, index) => {
+      let placeId = slot.place_id ?? null;
+      let placeNumber = slot.place_number ?? this.getCalibrationPlaceNumber(placeId);
+
+      if (placeId && placesById.has(placeId) && !usedPlaceIds.has(placeId)) {
+        usedPlaceIds.add(placeId);
+        return {
+          ...slot,
+          slot_index: index + 1,
+          place_id: placeId,
+          place_number: placeNumber,
+        };
+      }
+
+      const nextPlace = availablePlaces.find((place) => !usedPlaceIds.has(place.id_place)) || null;
+      if (!nextPlace) {
+        return {
+          ...slot,
+          slot_index: index + 1,
+          place_id: null,
+          place_number: null,
+        };
+      }
+
+      usedPlaceIds.add(nextPlace.id_place);
+      return {
+        ...slot,
+        slot_index: index + 1,
+        place_id: nextPlace.id_place,
+        place_number: nextPlace.num_place,
+      };
+    });
+
+    return normalized;
+  }
+
+  private getNextAvailableCalibrationPlaceId(): number | null {
+    const usedPlaceIds = new Set(
+      this.calibrationSlots
+        .map((slot) => slot.place_id)
+        .filter((value): value is number => Boolean(value))
+    );
+    const nextPlace = this.calibrationPlaces.find((place) => !usedPlaceIds.has(place.id_place));
+    return nextPlace?.id_place ?? null;
+  }
+
   private async uploadSources(
     files: File[],
     sourceType: 'image' | 'video'
-  ): Promise<{ sources: ParkingAISource[]; failures: string[] }> {
-    if (!this.workflowState.parkingId) {
-      return { sources: [], failures: [] };
+  ): Promise<{ sources: ParkingAISource[]; failures: string[]; uploadedFiles: File[] }> {
+    if (!this.activeParkingId) {
+      return { sources: [], failures: [], uploadedFiles: [] };
     }
 
     const createdSources: ParkingAISource[] = [];
     const failures: string[] = [];
-    for (const file of files) {
+    const uploadedFiles: File[] = [];
+    for (const [index, file] of files.entries()) {
       try {
+        const baseProgress = index / files.length;
+        const progressSpan = 1 / files.length;
+        if (sourceType === 'video') {
+          this.currentVideoUploadName = file.name;
+          this.videoUploadProgress = Math.round(baseProgress * 100);
+        }
         const source = await this.parkingAiSourceService.uploadSource(
-          this.workflowState.parkingId,
+          this.activeParkingId,
           file,
           sourceType,
-          file.name
+          file.name,
+          sourceType === 'video'
+            ? (progress: ParkingAiUploadProgress) => {
+                this.videoUploadProgress = Math.min(
+                  100,
+                  Math.round((baseProgress + progressSpan * (progress.percent / 100)) * 100)
+                );
+              }
+            : undefined
         );
         createdSources.push(source);
+        uploadedFiles.push(file);
       } catch (error) {
         console.error(`Erreur upload ${sourceType}`, file.name, error);
         failures.push(file.name);
       }
     }
 
-    return { sources: createdSources, failures };
+    return { sources: createdSources, failures, uploadedFiles };
+  }
+
+  private attachLocalPreviewUrlsByMatchingFiles(files: File[], sourceType: 'image' | 'video'): void {
+    const remainingSources = this.aiSources.filter(
+      (source) => source.source_type === sourceType && !this.sourceBlobs.has(source.id_source)
+    );
+
+    files.forEach((file) => {
+      const matchIndex = remainingSources.findIndex((source) =>
+        (source.original_name || '').trim() === file.name ||
+        (source.label || '').trim() === file.name
+      );
+
+      if (matchIndex < 0) {
+        return;
+      }
+
+      const [source] = remainingSources.splice(matchIndex, 1);
+      const localUrl = URL.createObjectURL(file);
+      this.replaceBlobUrl(this.sourceBlobs, source.id_source, localUrl);
+    });
+  }
+
+  private buildVideoUploadHint(files: File[]): string | null {
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    const largestFile = files.reduce((largest, file) => (file.size > largest.size ? file : largest), files[0]);
+    const formatBytes = (bytes: number): string => {
+      if (bytes < 1024 * 1024) {
+        return `${Math.round(bytes / 1024)} KB`;
+      }
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
+    if (largestFile.size >= 200 * 1024 * 1024) {
+      return `Video lourde detectee (${largestFile.name}, ${formatBytes(largestFile.size)}). Utilise idealement une capture plus courte.`;
+    }
+
+    if (totalBytes >= 250 * 1024 * 1024) {
+      return `Upload total ${formatBytes(totalBytes)}. Le transfert peut prendre du temps selon ton reseau.`;
+    }
+
+    return `Upload estime: ${formatBytes(totalBytes)} a transferer.`;
   }
 
   private notifyUploadResult(
@@ -712,5 +1062,151 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     clearInterval(this.pollingTimer);
     this.pollingTimer = null;
+  }
+
+  private replaceCalibrationImageUrl(nextUrl: string | null): void {
+    if (this.calibrationImageUrl && this.objectUrls.has(this.calibrationImageUrl)) {
+      URL.revokeObjectURL(this.calibrationImageUrl);
+      this.objectUrls.delete(this.calibrationImageUrl);
+    }
+
+    this.calibrationImageUrl = nextUrl;
+
+    if (nextUrl?.startsWith('blob:')) {
+      this.objectUrls.add(nextUrl);
+    }
+  }
+
+  private extractVideoFrameUrl(videoUrl: string): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      video.src = videoUrl;
+
+      const cleanup = () => {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      };
+
+      video.onerror = () => {
+        cleanup();
+        reject(new Error('Impossible de lire la video pour en extraire une capture.'));
+      };
+
+      video.onloadeddata = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 1280;
+          canvas.height = video.videoHeight || 720;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            cleanup();
+            reject(new Error('Impossible de preparer la capture video.'));
+            return;
+          }
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const frameUrl = canvas.toDataURL('image/png');
+          cleanup();
+          resolve(frameUrl);
+        } catch (error) {
+          cleanup();
+          reject(error instanceof Error ? error : new Error('Capture video impossible.'));
+        }
+      };
+    });
+  }
+
+  private revokeObjectUrls(): void {
+    this.objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    this.objectUrls.clear();
+    this.sourceBlobs.clear();
+    this.analysisBlobs.clear();
+    this.analysisPreviewBlobs.clear();
+  }
+
+  private replaceBlobUrl(target: Map<number, string>, sourceId: number, nextUrl: string): void {
+    const previousUrl = target.get(sourceId);
+    if (previousUrl && this.objectUrls.has(previousUrl)) {
+      URL.revokeObjectURL(previousUrl);
+      this.objectUrls.delete(previousUrl);
+    }
+
+    target.set(sourceId, nextUrl);
+    this.objectUrls.add(nextUrl);
+  }
+
+  private revokeSourceSpecificObjectUrls(sourceId: number): void {
+    const collections = [this.sourceBlobs, this.analysisBlobs, this.analysisPreviewBlobs];
+    collections.forEach((collection) => {
+      const currentUrl = collection.get(sourceId);
+      if (currentUrl && this.objectUrls.has(currentUrl)) {
+        URL.revokeObjectURL(currentUrl);
+        this.objectUrls.delete(currentUrl);
+      }
+      collection.delete(sourceId);
+    });
+    this.analysisVideoErrorIds.delete(sourceId);
+  }
+
+  get activeParkingId(): number | null {
+    if (this.routeParkingId) {
+      return this.routeParkingId;
+    }
+    return this.workflowState?.parkingId ?? null;
+  }
+
+  get hasRouteParkingSelection(): boolean {
+    return Boolean(this.routeParkingId);
+  }
+
+  private async loadOwnerParkings(): Promise<void> {
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser?.id) {
+      this.ownerParkings = [];
+      return;
+    }
+
+    const parkings = await firstValueFrom(this.parkingService.getParkings());
+    this.ownerParkings = parkings
+      .filter((parking) => parking.owner_id === currentUser.id)
+      .map((parking) => this.mapOwnerParking(parking));
+  }
+
+  private async ensureSelectedParking(): Promise<void> {
+    const activeParkingId = this.activeParkingId;
+    if (activeParkingId && this.ownerParkings.some((parking) => parking.id === activeParkingId)) {
+      return;
+    }
+
+    const fallbackParkingId = this.ownerParkings[0]?.id ?? null;
+    if (!fallbackParkingId) {
+      return;
+    }
+
+    this.routeParkingId = fallbackParkingId;
+    await this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { parking: fallbackParkingId },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  private mapOwnerParking(parking: ParkingDto): OwnerAiParkingOption {
+    return {
+      id: parking.id_park,
+      name: parking.nom,
+      address: parking.adresse,
+      setupStatus: parking.setup_status || 'non_commencee',
+      aiSetupStatus: parking.ai_setup_status || 'non_configuree',
+    };
+  }
+
+  private parseParkingId(value: string | null): number | null {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
 }

@@ -1,8 +1,9 @@
 .dashboard-container {
   --background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.1), transparent 24%),
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 26%),
-    linear-gradient(180deg, #f7fafc 0%, #eef4f8 100%);
+    radial-gradient(circle at 0% 0%, rgba(244, 114, 182, 0.12), transparent 22%),
+    radial-gradient(circle at 100% 10%, rgba(56, 189, 248, 0.12), transparent 24%),
+    radial-gradient(circle at 50% 100%, rgba(16, 185, 129, 0.12), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #edf3f8 52%, #f4efe7 100%);
 }
 
 .dashboard-content {
@@ -21,6 +22,14 @@
 
 .overview-shell {
   margin-bottom: 18px;
+}
+
+.overview-owner {
+  margin: 10px 0 0;
+  color: #7b4f2a;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .owner-ribbon {
@@ -128,6 +137,165 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+}
+
+.owner-spotlight {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.7fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.owner-spotlight__hero,
+.owner-spotlight__panel {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.07);
+  backdrop-filter: blur(12px);
+}
+
+.owner-spotlight__hero {
+  position: relative;
+  overflow: hidden;
+  padding: 22px;
+  border-radius: 28px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 248, 240, 0.92)),
+    radial-gradient(circle at top right, rgba(16, 185, 129, 0.12), transparent 30%);
+}
+
+.owner-spotlight__hero::after {
+  content: '';
+  position: absolute;
+  inset: auto -40px -50px auto;
+  width: 180px;
+  height: 180px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.14), transparent 68%);
+  pointer-events: none;
+}
+
+.owner-spotlight__eyebrow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.owner-spotlight__eyebrow span {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.owner-spotlight__hero h2 {
+  margin: 0;
+  max-width: 14ch;
+  color: #0f172a;
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-weight: 650;
+}
+
+.owner-spotlight__hero p {
+  max-width: 42rem;
+  margin: 12px 0 0;
+  color: #617284;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.owner-spotlight__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.owner-spotlight__metrics article {
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.owner-spotlight__metrics span,
+.owner-spotlight__panel span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.owner-spotlight__metrics strong,
+.owner-spotlight__panel strong {
+  display: block;
+  margin-top: 8px;
+  color: #0f172a;
+  font-size: clamp(22px, 2.4vw, 32px);
+  letter-spacing: -0.045em;
+  font-weight: 650;
+}
+
+.owner-spotlight__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.owner-spotlight__actions ion-button {
+  --background: #0f172a;
+  --background-hover: #1e293b;
+  --border-radius: 16px;
+  --box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+  min-height: 42px;
+  font-weight: 700;
+}
+
+.owner-spotlight__ghost-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.owner-spotlight__aside {
+  display: grid;
+  gap: 14px;
+}
+
+.owner-spotlight__panel {
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.owner-spotlight__panel p {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.owner-spotlight__panel--soft {
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.94), rgba(236, 253, 245, 0.94));
 }
 
 .workflow-banner {
@@ -590,6 +758,46 @@
   gap: 12px;
 }
 
+.parking-health-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.parking-health-card {
+  padding: 14px;
+  border-radius: 18px;
+  background: #eff6ff;
+  border: 1px solid rgba(59, 130, 246, 0.14);
+}
+
+.parking-health-card span {
+  display: block;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.parking-health-card strong {
+  display: block;
+  margin-top: 8px;
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 620;
+  letter-spacing: -0.03em;
+}
+
+.parking-health-card--warning {
+  background: #fff7ed;
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.parking-health-card--neutral {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
 .parking-list__more {
   display: inline-flex;
   align-items: center;
@@ -609,6 +817,19 @@
   border-radius: 18px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
+}
+
+.parking-card {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.parking-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(37, 99, 235, 0.2);
+  box-shadow: 0 14px 24px rgba(15, 23, 42, 0.05);
 }
 
 .workflow-step {
@@ -715,6 +936,28 @@
   background: linear-gradient(90deg, #1d4ed8, #38bdf8);
 }
 
+.parking-card__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  margin-top: 14px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.parking-card__footprint {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -748,6 +991,38 @@
   align-items: baseline;
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.ai-dashboard-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ai-dashboard-strip div {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f3f7fb 100%);
+  border: 1px solid #e2e8f0;
+}
+
+.ai-dashboard-strip span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ai-dashboard-strip strong {
+  display: block;
+  margin-top: 7px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.4;
 }
 
 .ai-summary strong {
@@ -908,6 +1183,24 @@
   padding: 14px;
 }
 
+.ai-source-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ai-source-card__tags span {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .ai-source-analysis {
   display: grid;
   gap: 8px;
@@ -1025,6 +1318,11 @@
 }
 
 @media (max-width: 1180px) {
+  .parking-health-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .owner-spotlight,
   .overview-grid,
   .analytics-grid,
   .dashboard-grid {
@@ -1046,6 +1344,7 @@
   .overview-header,
   .owner-ribbon,
   .workflow-banner,
+  .owner-spotlight,
   .overview-grid,
   .analytics-grid,
   .dashboard-grid {
@@ -1086,6 +1385,11 @@
     font-size: 30px;
   }
 
+  .owner-spotlight__metrics,
+  .ai-dashboard-strip {
+    grid-template-columns: 1fr;
+  }
+
   .trend-labels {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -1110,6 +1414,10 @@
   .parking-card__top,
   .reservation-card__meta,
   .ai-swipe-card__header {
+    flex-direction: column;
+  }
+
+  .parking-card__footprint {
     flex-direction: column;
   }
 

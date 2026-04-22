@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { environment } from 'src/environments/environment';
@@ -30,11 +30,26 @@ export class OwnerWorkflowService {
   }
 
   async refresh(): Promise<OwnerWorkflowState> {
-    const state = await firstValueFrom(
-      this.http.get<OwnerWorkflowState>(`${this.apiUrl}/workflow-status`, {
-        headers: this.buildAuthHeaders(),
-      })
-    );
+    const headers = this.buildAuthHeaders();
+    if (!headers) {
+      this.stateSubject.next(DEFAULT_OWNER_WORKFLOW_STATE);
+      return DEFAULT_OWNER_WORKFLOW_STATE;
+    }
+
+    let state: OwnerWorkflowState;
+    try {
+      state = await firstValueFrom(
+        this.http.get<OwnerWorkflowState>(`${this.apiUrl}/workflow-status`, {
+          headers,
+        })
+      );
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 401) {
+        this.stateSubject.next(DEFAULT_OWNER_WORKFLOW_STATE);
+        return DEFAULT_OWNER_WORKFLOW_STATE;
+      }
+      throw error;
+    }
 
     const normalizedState = {
       ...DEFAULT_OWNER_WORKFLOW_STATE,
@@ -124,6 +139,11 @@ export class OwnerWorkflowService {
 
   private buildAuthHeaders(): HttpHeaders | undefined {
     const token = this.authService.getToken();
-    return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    if (!token) {
+      this.authService.handleUnauthorized();
+      return undefined;
+    }
+
+    return new HttpHeaders({ Authorization: `Bearer ${token}` });
   }
 }

@@ -3,11 +3,12 @@ from flask_jwt_extended import get_jwt_identity, jwt_required, verify_jwt_in_req
 from sqlalchemy import func, or_
 
 from .. import db
-from ..models.compte import Compte, RoleCompte, StatutValidationOwner
+from ..models.compte import Compte, RoleCompte
 from ..models.parking import (
     Parking,
     StatutConfigurationIA,
     StatutConfigurationParking,
+    StatutParking,
     StatutValidationParking,
 )
 
@@ -44,6 +45,18 @@ def _find_owner_duplicate_parking(owner_id, nom, adresse, exclude_id=None):
     if exclude_id is not None:
         query = query.filter(Parking.id_park != exclude_id)
     return query.first()
+
+
+def _parse_parking_status(raw_value):
+    normalized_value = _normalize_text(raw_value).lower()
+    if not normalized_value:
+        return None
+    if normalized_value == "maintenance":
+        normalized_value = StatutParking.inactif.value
+    try:
+        return StatutParking(normalized_value)
+    except ValueError:
+        return None
 
 
 @parking_bp.route("/", methods=["GET"])
@@ -84,9 +97,6 @@ def create_parking():
     if user.role != RoleCompte.owner:
         return jsonify({"msg": "Seuls les owners peuvent ajouter un parking"}), 403
 
-    if user.owner_status != StatutValidationOwner.accepte:
-        return jsonify({"msg": "Le compte owner doit etre accepte avant de creer un parking"}), 403
-
     nom = _normalize_text(data.get("nom"))
     adresse = _normalize_text(data.get("adresse"))
     required_fields = {
@@ -105,6 +115,12 @@ def create_parking():
     except (TypeError, ValueError):
         return jsonify({"msg": "capacite et prix_heure doivent etre numeriques"}), 400
 
+    raw_statut = _normalize_text(data.get("statut")) or StatutParking.actif.value
+    try:
+        statut = StatutParking(raw_statut)
+    except ValueError:
+        return jsonify({"msg": "statut invalide"}), 400
+
     if capacite <= 0 or prix_heure < 0:
         return jsonify({"msg": "capacite doit etre superieure a 0 et prix_heure doit etre positif"}), 400
 
@@ -118,6 +134,7 @@ def create_parking():
         adresse=adresse,
         capacite=capacite,
         prix_heure=prix_heure,
+        statut=statut,
         validation_status=StatutValidationParking.en_attente_validation,
         setup_status=StatutConfigurationParking.non_commencee,
         ai_setup_status=StatutConfigurationIA.non_configuree,
@@ -165,13 +182,14 @@ def update_parking(parking_id):
         return jsonify({"msg": "Seuls les owners peuvent modifier leur parking"}), 403
 
     data = request.get_json() or {}
-    tracked_fields = ("nom", "adresse", "capacite", "prix_heure")
+    tracked_fields = ("nom", "adresse", "capacite", "prix_heure", "statut")
     changed_structural_fields = False
     next_values = {
         "nom": parking.nom,
         "adresse": parking.adresse,
         "capacite": parking.capacite,
         "prix_heure": float(parking.prix_heure),
+        "statut": parking.statut,
     }
 
     for field in tracked_fields:
@@ -197,11 +215,16 @@ def update_parking(parking_id):
                 return jsonify({"msg": "prix_heure doit etre numerique"}), 400
             if value < 0:
                 return jsonify({"msg": "prix_heure doit etre positif"}), 400
+        elif field == "statut":
+            try:
+                value = StatutParking(_normalize_text(value))
+            except ValueError:
+                return jsonify({"msg": "statut invalide"}), 400
 
         if getattr(parking, field) != value:
             changed_structural_fields = True
             setattr(parking, field, value)
-        next_values[field] = value
+        next_values[field] = value.value if hasattr(value, "value") else value
 
     duplicate = _find_owner_duplicate_parking(
         user.id_compte,
@@ -213,9 +236,18 @@ def update_parking(parking_id):
         return jsonify({"msg": "Un autre parking avec le meme nom et la meme adresse existe deja"}), 400
 
     if changed_structural_fields:
-        parking.validation_status = StatutValidationParking.en_attente_validation
-        parking.setup_status = StatutConfigurationParking.non_commencee
-        parking.ai_setup_status = StatutConfigurationIA.non_configuree
+        # Keep the workflow stable while the owner is still inside the dedicated
+        # parking-setup step. Otherwise every edit would send the parking back to
+        # admin review before step 3 can be completed.
+        is_setup_in_progress = (
+            parking.validation_status == StatutValidationParking.valide
+            and parking.setup_status != StatutConfigurationParking.terminee
+        )
+
+        if not is_setup_in_progress:
+            parking.validation_status = StatutValidationParking.en_attente_validation
+            parking.setup_status = StatutConfigurationParking.non_commencee
+            parking.ai_setup_status = StatutConfigurationIA.non_configuree
 
     db.session.commit()
     return jsonify({"msg": "Parking mis a jour avec succes", "parking": parking.to_dict()}), 200

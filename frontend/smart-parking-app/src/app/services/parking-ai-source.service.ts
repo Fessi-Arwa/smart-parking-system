@@ -38,6 +38,7 @@ export interface ParkingAISourceAnalysis {
   slot_debug?: Array<{
     slot_index: number;
     place_id?: number | null;
+    place_number?: number | null;
     label: string;
     average_confidence?: number | null;
     free_votes?: number | null;
@@ -59,7 +60,8 @@ export interface ParkingAISourceAnalysis {
 
 export interface ParkingAISlot {
   slot_index: number;
-  place_id: number;
+  place_id: number | null;
+  place_number?: number | null;
   x: number;
   y: number;
   w: number;
@@ -70,6 +72,19 @@ export interface ParkingAISlotsResponse {
   slots: ParkingAISlot[];
   slots_path: string;
   uses_custom_slots: boolean;
+  warning?: string | null;
+  auto_assigned_count?: number | null;
+}
+
+interface DirectUploadInitResponse {
+  upload_url: string;
+  object_key: string;
+  headers?: Record<string, string>;
+  expires_in?: number;
+  filename: string;
+  label: string;
+  mime_type: string;
+  source_type: ParkingAISourceType;
 }
 
 export interface ParkingVideoBatchResult {
@@ -119,6 +134,12 @@ export class ParkingAiAuthError extends Error {
   }
 }
 
+export interface ParkingAiUploadProgress {
+  loaded: number;
+  total: number;
+  percent: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -146,7 +167,26 @@ export class ParkingAiSourceService {
     parkingId: number,
     file: File,
     sourceType: 'image' | 'video',
-    label?: string
+    label?: string,
+    onProgress?: (progress: ParkingAiUploadProgress) => void
+  ): Promise<ParkingAISource> {
+    if (sourceType === 'video' || sourceType === 'image') {
+      try {
+        return await this.uploadSourceDirectToStorage(parkingId, file, sourceType, label, onProgress);
+      } catch (error) {
+        console.warn(`Upload direct ${sourceType} indisponible, fallback vers upload backend classique.`, error);
+      }
+    }
+
+    return this.uploadSourceViaBackend(parkingId, file, sourceType, label, onProgress);
+  }
+
+  private async uploadSourceViaBackend(
+    parkingId: number,
+    file: File,
+    sourceType: 'image' | 'video',
+    label?: string,
+    onProgress?: (progress: ParkingAiUploadProgress) => void
   ): Promise<ParkingAISource> {
     const formData = new FormData();
     formData.append('file', file);
@@ -155,12 +195,11 @@ export class ParkingAiSourceService {
       formData.append('label', label.trim());
     }
 
-    const source = await firstValueFrom(
-      this.http.post<ParkingAISource>(
-        `${this.apiUrl}/parkings/${parkingId}/ai-sources/upload`,
-        formData,
-        { headers: this.buildAuthHeaders() }
-      )
+    const source = await this.uploadMultipartWithProgress<ParkingAISource>(
+      `${this.apiUrl}/parkings/${parkingId}/ai-sources/upload`,
+      formData,
+      this.buildAuthHeaders(),
+      onProgress
     );
 
     return this.normalizeSource(source);
@@ -170,13 +209,59 @@ export class ParkingAiSourceService {
     parkingId: number,
     payload: { label?: string; stream_url: string }
   ): Promise<ParkingAISource> {
-    return firstValueFrom(
+    const source = await firstValueFrom(
       this.http.post<ParkingAISource>(
         `${this.apiUrl}/parkings/${parkingId}/ai-sources/camera`,
         payload,
         { headers: this.buildAuthHeaders() }
       )
     );
+
+    return this.normalizeSource(source);
+  }
+
+  private async uploadSourceDirectToStorage(
+    parkingId: number,
+    file: File,
+    sourceType: 'image' | 'video',
+    label?: string,
+    onProgress?: (progress: ParkingAiUploadProgress) => void
+  ): Promise<ParkingAISource> {
+    const init = await firstValueFrom(
+      this.http.post<DirectUploadInitResponse>(
+        `${this.apiUrl}/parkings/${parkingId}/ai-sources/upload-init`,
+        {
+          filename: file.name,
+          mime_type: file.type || 'application/octet-stream',
+          source_type: sourceType,
+          label: label?.trim() || file.name,
+        },
+        { headers: this.buildAuthHeaders() }
+      )
+    );
+
+    await this.uploadBinaryWithProgress(
+      init.upload_url,
+      file,
+      init.headers || { 'Content-Type': file.type || 'application/octet-stream' },
+      onProgress
+    );
+
+    const source = await firstValueFrom(
+      this.http.post<ParkingAISource>(
+        `${this.apiUrl}/parkings/${parkingId}/ai-sources/upload-complete`,
+        {
+          object_key: init.object_key,
+          filename: init.filename,
+          mime_type: init.mime_type,
+          source_type: init.source_type,
+          label: init.label,
+        },
+        { headers: this.buildAuthHeaders() }
+      )
+    );
+
+    return this.normalizeSource(source);
   }
 
   async deleteSource(sourceId: number): Promise<void> {
@@ -255,6 +340,21 @@ export class ParkingAiSourceService {
     );
   }
 
+  async fetchProtectedMediaObjectUrl(mediaUrlOrSourceId: string | number): Promise<string> {
+    const mediaUrl =
+      typeof mediaUrlOrSourceId === 'number'
+        ? `${this.apiUrl}/ai-sources/${mediaUrlOrSourceId}/file`
+        : mediaUrlOrSourceId;
+    const blob = await firstValueFrom(
+      this.http.get(mediaUrl, {
+        headers: this.buildAuthHeaders(),
+        responseType: 'blob',
+      })
+    );
+
+    return URL.createObjectURL(blob);
+  }
+
   private buildAuthHeaders(): HttpHeaders {
     const token = this.authService.getToken();
     if (!token) {
@@ -263,6 +363,85 @@ export class ParkingAiSourceService {
     }
 
     return new HttpHeaders({ Authorization: `Bearer ${token}` });
+  }
+
+  private uploadMultipartWithProgress<T>(
+    url: string,
+    formData: FormData,
+    headers: HttpHeaders,
+    onProgress?: (progress: ParkingAiUploadProgress) => void
+  ): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      headers.keys().forEach((key) => {
+        const value = headers.get(key);
+        if (value) {
+          xhr.setRequestHeader(key, value);
+        }
+      });
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable || !onProgress) {
+          return;
+        }
+        onProgress({
+          loaded: event.loaded,
+          total: event.total,
+          percent: Math.round((event.loaded / event.total) * 100),
+        });
+      };
+
+      xhr.onerror = () => reject(new Error('Erreur reseau pendant l upload.'));
+      xhr.onabort = () => reject(new Error('Upload annule.'));
+      xhr.onload = () => {
+        const raw = xhr.responseText || '{}';
+        const payload = raw ? JSON.parse(raw) : {};
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(payload as T);
+          return;
+        }
+        reject({ status: xhr.status, error: payload });
+      };
+
+      xhr.send(formData);
+    });
+  }
+
+  private uploadBinaryWithProgress(
+    url: string,
+    file: File,
+    headers: Record<string, string>,
+    onProgress?: (progress: ParkingAiUploadProgress) => void
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', url, true);
+      Object.entries(headers).forEach(([key, value]) => xhr.setRequestHeader(key, value));
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable || !onProgress) {
+          return;
+        }
+        onProgress({
+          loaded: event.loaded,
+          total: event.total,
+          percent: Math.round((event.loaded / event.total) * 100),
+        });
+      };
+
+      xhr.onerror = () => reject(new Error('Erreur reseau pendant l upload direct.'));
+      xhr.onabort = () => reject(new Error('Upload direct annule.'));
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+          return;
+        }
+        reject(new Error(`Echec upload stockage direct (${xhr.status})`));
+      };
+
+      xhr.send(file);
+    });
   }
 
   private normalizeSource(source: ParkingAISource): ParkingAISource {

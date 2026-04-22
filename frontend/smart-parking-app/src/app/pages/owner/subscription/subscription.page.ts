@@ -109,7 +109,7 @@ export class SubscriptionPage implements OnInit {
       return 'Saisissez le nom du porteur.';
     }
 
-    const normalizedCardNumber = this.paymentData.cardNumber.replace(/\s+/g, '');
+    const normalizedCardNumber = this.paymentData.cardNumber.replace(/\D+/g, '');
     if (!normalizedCardNumber) {
       return 'Saisissez le numero de carte.';
     }

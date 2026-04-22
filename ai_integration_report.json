@@ -1,0 +1,153 @@
+{
+  "model_files": [
+    {
+      "name": "Modèle YOLOv8n-cls",
+      "path": "C:\\Users\\marie\\Desktop\\smart-parking-system\\ai-module\\model\\yolov8n-cls.pt",
+      "exists": true,
+      "size_mb": 5.305362701416016
+    },
+    {
+      "name": "Slots JSON",
+      "path": "C:\\Users\\marie\\Desktop\\smart-parking-system\\ai-module\\slots.json",
+      "exists": true,
+      "size_mb": 2.86102294921875e-06
+    }
+  ],
+  "dependencies": [
+    {
+      "package": "ultralytics",
+      "description": "YOLOv8 - Détection & Classification",
+      "location": "AI Module",
+      "found": true
+    },
+    {
+      "package": "opencv-python",
+      "description": "OpenCV - Traitement d'images/vidéos",
+      "location": "AI Module",
+      "found": true
+    },
+    {
+      "package": "Flask",
+      "description": "Framework Web - Module AI",
+      "location": "AI Module",
+      "found": true
+    },
+    {
+      "package": "Flask-SQLAlchemy",
+      "description": "ORM - Backend",
+      "location": "AI Module",
+      "found": false
+    },
+    {
+      "package": "ultralytics",
+      "description": "YOLOv8 - Détection & Classification",
+      "location": "Backend",
+      "found": true
+    },
+    {
+      "package": "opencv-python",
+      "description": "OpenCV - Traitement d'images/vidéos",
+      "location": "Backend",
+      "found": true
+    },
+    {
+      "package": "Flask",
+      "description": "Framework Web - Module AI",
+      "location": "Backend",
+      "found": true
+    },
+    {
+      "package": "Flask-SQLAlchemy",
+      "description": "ORM - Backend",
+      "location": "Backend",
+      "found": true
+    }
+  ],
+  "config_files": [
+    {
+      "name": "Data History",
+      "path": "C:\\Users\\marie\\Desktop\\smart-parking-system\\ai-module\\data\\history.json",
+      "type": "file",
+      "exists": true,
+      "valid_json": true
+    },
+    {
+      "name": "Calibration State",
+      "path": "C:\\Users\\marie\\Desktop\\smart-parking-system\\ai-module\\data\\calibration_state.json",
+      "type": "file",
+      "exists": true,
+      "valid_json": true
+    }
+  ],
+  "service_files": [
+    {
+      "category": "🎥 Modules AI",
+      "name": "app.py",
+      "path": "C:\\Users\\marie\\Desktop\\smart-parking-system\\ai-module\\app.py",
+      "exists": true,
+      "size": 14787
+    },
+    {
+      "category": "🎥 Modules AI",
+      "name": "process_video.py",
+      "path": "C:\\Users\\marie\\Desktop\\smart-parking-system\\ai-module\\process_video.py",
+      "exists": true,
+      "size": 9822
+    },
+    {
+      "category": "🔧 Services",
+      "name": "ai_service.py",
+      "path": "C:\\Users\\marie\\Desktop\\smart-parking-system\\backend\\app\\services\\ai_service.py",
+      "exists": true,
+      "size": 25991
+    },
+    {
+      "category": "🔧 Services",
+      "name": "video_ai_service.py",
+      "path": "C:\\Users\\marie\\Desktop\\smart-parking-system\\backend\\app\\services\\video_ai_service.py",
+      "exists": true,
+      "size": 23996
+    },
+    {
+      "category": "📍 Routes",
+      "name": "ai.py",
+      "path": "C:\\Users\\marie\\Desktop\\smart-parking-system\\backend\\app\\routes\\ai.py",
+      "exists": true,
+      "size": 8047
+    },
+    {
+      "category": "📊 Modèles",
+      "name": "detection.py",
+      "path": "C:\\Users\\marie\\Desktop\\smart-parking-system\\backend\\app\\models\\detection.py",
+      "exists": true,
+      "size": 2144
+    },
+    {
+      "category": "📊 Modèles",
+      "name": "parking_ai_source.py",
+      "path": "C:\\Users\\marie\\Desktop\\smart-parking-system\\backend\\app\\models\\parking_ai_source.py",
+      "exists": true,
+      "size": 1288
+    }
+  ],
+  "route_files": [],
+  "data_files": [
+    {
+      "file": "slots.json",
+      "valid": false,
+      "entries": 0
+    },
+    {
+      "file": "ai_batch",
+      "exists": true,
+      "jobs": 3
+    }
+  ],
+  "errors": [],
+  "warnings": [
+    "Fichier vide: C:\\Users\\marie\\Desktop\\smart-parking-system\\ai-module\\parking_detector.py",
+    "Fichier vide: C:\\Users\\marie\\Desktop\\smart-parking-system\\ai-module\\detect.py",
+    "Fichier vide: C:\\Users\\marie\\Desktop\\smart-parking-system\\ai-module\\utils.py",
+    "slots.json vide ou invalide"
+  ]
+}

@@ -36,6 +36,16 @@ def _parking_to_admin_dict(parking):
     return data
 
 
+def _sync_abonnements_statuses(abonnements):
+    has_changes = False
+    for abonnement in abonnements:
+        if abonnement and abonnement.sync_status_with_dates():
+            has_changes = True
+
+    if has_changes:
+        db.session.commit()
+
+
 @admin_bp.route("/stats", methods=["GET"])
 @jwt_required()
 def get_stats():
@@ -241,6 +251,7 @@ def get_app_subscriptions():
         abonnement.id_abon: abonnement
         for abonnement in Abonnement.query.filter(Abonnement.id_abon.in_(abonnement_ids)).all()
     } if abonnement_ids else {}
+    _sync_abonnements_statuses(abonnements.values())
     parkings = {
         parking.id_park: parking
         for parking in Parking.query.filter(Parking.id_park.in_(parking_ids)).all()

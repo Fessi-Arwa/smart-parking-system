@@ -7,23 +7,11 @@
     class="profile-content"
     [class.blur-background]="isEditingProfile || showAddParking || isEditingParking || showDeleteConfirm">
     <section class="overview-shell">
-      <div class="owner-ribbon">
-        <span class="owner-ribbon__label">Workflow owner</span>
-        <div class="owner-ribbon__steps">
-          <span>1. Validation</span>
-          <span>2. Abonnement</span>
-          <span>3. Parking</span>
-          <span>4. IA</span>
-        </div>
-      </div>
-
       <div class="overview-header">
         <div>
           <p class="overview-kicker">Owner profile</p>
           <h1>Profil proprietaire</h1>
-          <p class="overview-subtitle">
-            Gere tes informations, ton portefeuille de parkings et leur niveau d'exploitation.
-          </p>
+          <p class="overview-subtitle">Un seul endroit pour avancer dans le workflow owner.</p>
         </div>
 
         <button class="logout-btn" type="button" (click)="logout()">
@@ -65,6 +53,19 @@
           <span>Prochaine priorite</span>
           <strong>{{ portfolioNextActionTitle }}</strong>
         </div>
+      </div>
+
+      <section class="wizard-focus">
+        <span>Action actuelle</span>
+        <strong>{{ portfolioNextActionTitle }}</strong>
+        <button class="btn-primary wizard-focus__action" type="button" (click)="handleProfilePrimaryAction()">
+          {{ profilePrimaryActionLabel }}
+        </button>
+      </section>
+
+      <div class="workflow-banner workflow-banner--info" *ngIf="workflowState?.ownerStatus !== 'accepte' && parkings.length === 0">
+        <ion-icon name="information-circle-outline"></ion-icon>
+        <p>Vous pouvez deja ajouter votre premier parking. Il sera visible par l admin et attendra la validation du compte owner.</p>
       </div>
     </section>
 
@@ -144,12 +145,12 @@
             <div class="parking-filters">
               <button type="button" [class.is-active]="parkingStatusFilter === 'all'" (click)="setParkingStatusFilter('all')">Tous</button>
               <button type="button" [class.is-active]="parkingStatusFilter === 'actif'" (click)="setParkingStatusFilter('actif')">Actifs</button>
-              <button type="button" [class.is-active]="parkingStatusFilter === 'maintenance'" (click)="setParkingStatusFilter('maintenance')">Maintenance</button>
+              <button type="button" [class.is-active]="parkingStatusFilter === 'inactif'" (click)="setParkingStatusFilter('inactif')">Maintenance</button>
             </div>
           </div>
 
           <div *ngIf="!selectedParking && !showAddParking" class="parking-list">
-            <article *ngFor="let parking of filteredParkings" class="parking-item" (click)="selectParking(parking)">
+            <article *ngFor="let parking of filteredParkings; trackBy: trackByParking" class="parking-item" (click)="selectParking(parking)">
               <div class="parking-item__top">
                 <div class="parking-item__identity">
                   <div class="parking-icon">
@@ -195,6 +196,15 @@
               <div class="parking-progress">
                 <span [style.width.%]="getParkingOccupancy(parking)"></span>
               </div>
+
+              <div class="parking-item__actions">
+                <button
+                  class="btn-outline btn-outline--compact"
+                  type="button"
+                  (click)="selectParking(parking); $event.stopPropagation()">
+                  Ouvrir
+                </button>
+              </div>
             </article>
 
             <div *ngIf="filteredParkings.length === 0" class="empty-state">
@@ -216,7 +226,10 @@
                 <button class="icon-btn" type="button" (click)="startEditParking()">
                   <ion-icon name="create-outline"></ion-icon>
                 </button>
-                <button class="icon-btn danger" type="button" (click)="confirmDelete(selectedParking)">
+                <button class="icon-btn" type="button" (click)="openParkingSetup()" [disabled]="!canOpenParkingSetup">
+                  <ion-icon name="construct-outline"></ion-icon>
+                </button>
+                <button class="icon-btn danger" type="button" (click)="confirmDelete(selectedParking); $event.stopPropagation()">
                   <ion-icon name="trash-outline"></ion-icon>
                 </button>
               </div>
@@ -275,15 +288,28 @@
               </div>
             </div>
 
+            <div class="parking-setup-card">
+              <div>
+                <p class="section-kicker">Configuration parking</p>
+                <strong>Etape suivante pour ce parking</strong>
+                <p>{{ parkingSetupHint }}</p>
+              </div>
+              <button
+                class="btn-primary parking-setup-card__action"
+                type="button"
+                (click)="openParkingSetup()"
+                [disabled]="!canOpenParkingSetup">
+                Ouvrir la configuration parking
+              </button>
+            </div>
+
             <div class="ai-shortcut-card">
               <div>
                 <p class="section-kicker">Module IA</p>
-                <strong>Ajouter des images, videos ou cameras pour ce parking</strong>
-                <p>
-                  L ajout de sources et leur traitement IA se font dans l ecran dedie a la configuration IA.
-                </p>
+                <strong>Derniere etape du workflow</strong>
+                <p>{{ aiSetupHint }}</p>
               </div>
-              <button class="btn-primary ai-shortcut-card__action" type="button" (click)="openAiSetup()">
+              <button class="btn-primary ai-shortcut-card__action" type="button" (click)="openAiSetup()" [disabled]="!canOpenAiSetup">
                 Ouvrir la configuration IA
               </button>
             </div>
@@ -305,6 +331,40 @@
 
             <div class="detail-media">
               <div class="detail-media__header">
+                <p class="section-kicker">Sources image du parking</p>
+                <strong>{{ selectedParkingImages.length }}</strong>
+              </div>
+
+              <div class="video-grid" *ngIf="selectedParkingImages.length > 0; else emptyParkingImages">
+                <article class="video-card" *ngFor="let source of selectedParkingImages">
+                  <div class="video-card__preview" *ngIf="showPreview(source); else imageFallback">
+                    <img [src]="getSourceMediaUrl(source)" [alt]="source.label || source.original_name || 'Image du parking'" (error)="markPreviewError(source)" />
+                  </div>
+
+                  <ng-template #imageFallback>
+                    <div class="video-card__preview video-card__preview--fallback">
+                      <ion-icon name="image-outline"></ion-icon>
+                      <span>Apercu image indisponible</span>
+                    </div>
+                  </ng-template>
+
+                  <div class="video-card__body">
+                    <strong>{{ source.label || source.original_name || 'Image du parking' }}</strong>
+                    <p>{{ source.original_name || source.mime_type || 'Source image' }}</p>
+                  </div>
+                </article>
+              </div>
+
+              <ng-template #emptyParkingImages>
+                <div class="empty-state empty-state--compact">
+                  <ion-icon name="image-outline"></ion-icon>
+                  <p>Aucune image n a encore ete ajoutee pour ce parking.</p>
+                </div>
+              </ng-template>
+            </div>
+
+            <div class="detail-media">
+              <div class="detail-media__header">
                 <p class="section-kicker">Sources video du parking</p>
                 <strong>{{ selectedParkingVideos.length }}</strong>
               </div>
@@ -312,7 +372,7 @@
               <div class="video-grid" *ngIf="selectedParkingVideos.length > 0; else emptyParkingVideos">
                 <article class="video-card" *ngFor="let source of selectedParkingVideos">
                   <div class="video-card__preview" *ngIf="showPreview(source); else videoFallback">
-                    <video [src]="source.preview_url" controls preload="metadata" (error)="markPreviewError(source)"></video>
+                    <video [src]="getSourceVideoUrl(source)" controls preload="metadata" (error)="markPreviewError(source)"></video>
                   </div>
 
                   <ng-template #videoFallback>
@@ -417,7 +477,7 @@
             <ion-icon name="checkmark-circle-outline"></ion-icon>
             Actif
           </button>
-          <button class="status-option" type="button" [class.active]="newParkingData.statut === 'maintenance'" (click)="newParkingData.statut = 'maintenance'">
+          <button class="status-option" type="button" [class.active]="newParkingData.statut === 'inactif'" (click)="newParkingData.statut = 'inactif'">
             <ion-icon name="construct-outline"></ion-icon>
             Maintenance
           </button>
@@ -500,7 +560,7 @@
             <ion-icon name="checkmark-circle-outline"></ion-icon>
             Actif
           </button>
-          <button class="status-option" type="button" [class.active]="editParkingData.statut === 'maintenance'" (click)="editParkingData.statut = 'maintenance'">
+          <button class="status-option" type="button" [class.active]="editParkingData.statut === 'inactif'" (click)="editParkingData.statut = 'inactif'">
             <ion-icon name="construct-outline"></ion-icon>
             Maintenance
           </button>

@@ -17,6 +17,8 @@ from werkzeug.utils import secure_filename
 
 FREE_LABEL = "free"
 BUSY_LABEL = "busy"
+FREE_LABEL_ALIASES = {"free", "empty", "vacant", "available", "libre"}
+BUSY_LABEL_ALIASES = {"busy", "occupied", "full", "taken", "occupee", "occupé"}
 
 
 @dataclass
@@ -86,10 +88,19 @@ def load_slots(slots_path: Path) -> list[dict[str, int | None]]:
             if place_id <= 0:
                 raise ValueError(f"Slot #{index} must have a positive place_id.")
 
+        place_number_value = slot.get("place_number")
+        place_number = None
+        if place_number_value not in (None, ""):
+            try:
+                place_number = int(place_number_value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Slot #{index} has an invalid place_number.") from exc
+
         normalized.append(
             {
                 "slot_index": index,
                 "place_id": place_id,
+                "place_number": place_number,
                 "x": x,
                 "y": y,
                 "w": w,
@@ -116,8 +127,22 @@ def is_parking_classifier(model_path: Path) -> bool:
     except Exception:
         return False
 
-    normalized = {str(value).lower() for value in getattr(names, "values", lambda: [])()}
+    normalized = {
+        normalized_label
+        for value in getattr(names, "values", lambda: [])()
+        for normalized_label in [_normalize_parking_label(str(value))]
+        if normalized_label
+    }
     return FREE_LABEL in normalized and BUSY_LABEL in normalized
+
+
+def _normalize_parking_label(label: str) -> str | None:
+    normalized = str(label or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if normalized in FREE_LABEL_ALIASES:
+        return FREE_LABEL
+    if normalized in BUSY_LABEL_ALIASES:
+        return BUSY_LABEL
+    return None
 
 
 class ParkingVideoAIService:
@@ -162,9 +187,12 @@ class ParkingVideoAIService:
             "slots",
         )
         self.model = load_model(str(self.model_path))
-        self.frame_stride = max(1, int(os.getenv("SMART_PARKING_VIDEO_FRAME_STRIDE", "5")))
-        self.classify_imgsz = max(96, int(os.getenv("SMART_PARKING_CLASSIFY_IMGSZ", "192")))
-        self.slot_padding_ratio = max(0.0, float(os.getenv("SMART_PARKING_SLOT_PADDING_RATIO", "0.12")))
+        # Match the standalone ai-module defaults so backend and local runs
+        # produce the same crops and classification behavior unless explicitly overridden.
+        self.frame_stride = max(1, int(os.getenv("SMART_PARKING_VIDEO_FRAME_STRIDE", "1")))
+        self.classify_imgsz = max(96, int(os.getenv("SMART_PARKING_CLASSIFY_IMGSZ", "160")))
+        self.slot_padding_ratio = max(0.0, float(os.getenv("SMART_PARKING_SLOT_PADDING_RATIO", "0.0")))
+        self.debug_enabled = os.getenv("SMART_PARKING_AI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
         self._ensure_storage()
 
     def get_slots_config_path(self, parking_id: int) -> Path:
@@ -178,7 +206,13 @@ class ParkingVideoAIService:
 
     def get_slots(self, parking_id: int) -> tuple[list[dict[str, int | None]], Path]:
         slots_path = self.get_slots_path(parking_id)
-        return load_slots(slots_path), slots_path
+        try:
+            return load_slots(slots_path), slots_path
+        except (ValueError, json.JSONDecodeError):
+            parking_slots_path = self.get_slots_config_path(parking_id)
+            if slots_path == parking_slots_path:
+                return load_slots(self.default_slots_path), self.default_slots_path
+            raise
 
     def save_parking_slots(self, parking_id: int, slots: list[dict[str, Any]]) -> Path:
         slots_path = self.get_slots_config_path(parking_id)
@@ -189,10 +223,25 @@ class ParkingVideoAIService:
         slots_path = self.get_slots_config_path(parking_id)
         if not slots_path.exists():
             return []
-        return json.loads(slots_path.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(slots_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return []
+        return data if isinstance(data, list) else []
 
     def process_video(self, parking_id: int, input_path: Path, source_filename: str) -> ParkingVideoResult:
         slots, slots_path = self.get_slots(parking_id)
+        self._log_debug(
+            "video-process-start parking_id=%s source=%s model=%s slots=%s imgsz=%s padding=%s frame_stride=%s total_slots=%s",
+            parking_id,
+            source_filename,
+            self.model_path,
+            slots_path,
+            self.classify_imgsz,
+            self.slot_padding_ratio,
+            self.frame_stride,
+            len(slots),
+        )
         cap = cv2.VideoCapture(str(input_path))
         if not cap.isOpened():
             raise RuntimeError(f"Unable to open video: {source_filename}")
@@ -208,6 +257,8 @@ class ParkingVideoAIService:
         slot_votes = [{FREE_LABEL: 0, BUSY_LABEL: 0} for _ in slots]
         slot_confidence_sum = [0.0 for _ in slots]
         slot_inference_count = [0 for _ in slots]
+        latest_states = [BUSY_LABEL for _ in slots]
+        latest_confidences = [0.0 for _ in slots]
         processed_frames = 0
         frame_index = 0
 
@@ -222,9 +273,13 @@ class ParkingVideoAIService:
                     for slot_index, slot in enumerate(slots, start=1):
                         prediction = self._predict_slot(frame, slot)
                         class_mapping.update(prediction["class_mapping"])
-                        is_free = prediction["label"] == FREE_LABEL
+                        label = prediction["label"]
+                        confidence = float(prediction["confidence"])
+                        latest_states[slot_index - 1] = label
+                        latest_confidences[slot_index - 1] = confidence
+                        is_free = label == FREE_LABEL
                         slot_votes[slot_index - 1][FREE_LABEL if is_free else BUSY_LABEL] += 1
-                        slot_confidence_sum[slot_index - 1] += float(prediction["confidence"])
+                        slot_confidence_sum[slot_index - 1] += confidence
                         slot_inference_count[slot_index - 1] += 1
                     processed_frames += 1
                 frame_index += 1
@@ -234,10 +289,7 @@ class ParkingVideoAIService:
         if processed_frames == 0:
             raise RuntimeError("The uploaded video does not contain readable frames.")
 
-        final_states = [
-            FREE_LABEL if votes[FREE_LABEL] >= votes[BUSY_LABEL] else BUSY_LABEL
-            for votes in slot_votes
-        ]
+        final_states = list(latest_states)
         average_confidences = [
             round(slot_confidence_sum[index] / slot_inference_count[index], 4)
             if slot_inference_count[index] > 0
@@ -286,14 +338,28 @@ class ParkingVideoAIService:
             raise RuntimeError(f"Unable to reopen video for rendering: {source_filename}")
 
         try:
+            render_frame_index = 0
+            render_states = [BUSY_LABEL for _ in slots]
+            render_confidences = [0.0 for _ in slots]
             while True:
                 ok, frame = render_cap.read()
                 if not ok:
                     break
 
+                should_infer = render_frame_index % self.frame_stride == 0
+                if should_infer:
+                    for slot_index, slot in enumerate(slots, start=1):
+                        prediction = self._predict_slot(frame, slot)
+                        label = prediction["label"]
+                        confidence = float(prediction["confidence"])
+                        render_states[slot_index - 1] = label
+                        render_confidences[slot_index - 1] = confidence
+
+                current_free = sum(label == FREE_LABEL for label in render_states)
+                current_occupied = len(render_states) - current_free
                 for slot_index, slot in enumerate(slots, start=1):
-                    label = final_states[slot_index - 1]
-                    confidence = average_confidences[slot_index - 1]
+                    label = render_states[slot_index - 1]
+                    confidence = render_confidences[slot_index - 1]
                     is_free = label == FREE_LABEL
                     self._draw_slot(
                         frame=frame,
@@ -304,8 +370,9 @@ class ParkingVideoAIService:
                         is_free=is_free,
                     )
 
-                self._draw_header(frame, free, occupied, total)
+                self._draw_header(frame, current_free, current_occupied, total, "Smart Parking Real-time Analysis")
                 writer.write(frame)
+                render_frame_index += 1
         finally:
             render_cap.release()
             writer.release()
@@ -549,6 +616,7 @@ class ParkingVideoAIService:
         x2 = min(frame_width, x + w + pad_x)
         y2 = min(frame_height, y + h + pad_y)
         crop = frame[y1:y2, x1:x2]
+        self._log_slot_debug(slot, x1, y1, x2, y2, frame_width, frame_height)
         if crop.size == 0:
             return {"label": BUSY_LABEL, "confidence": 0.0, "class_mapping": {}}
 
@@ -556,18 +624,55 @@ class ParkingVideoAIService:
         probs = getattr(result, "probs", None)
         names = self._normalize_names(result.names)
         if probs is None:
-            return {"label": BUSY_LABEL, "confidence": 0.0, "class_mapping": names}
+            raise RuntimeError("Le modele IA configure ne retourne pas de probabilites de classification exploitables.")
 
         cls_id = int(probs.top1)
-        label = names.get(str(cls_id), BUSY_LABEL).lower()
-        if label not in {FREE_LABEL, BUSY_LABEL}:
-            label = BUSY_LABEL
+        raw_label = names.get(str(cls_id), "")
+        label = _normalize_parking_label(raw_label)
+        if label is None:
+            raise RuntimeError(
+                "Le modele IA configure n est pas compatible avec la detection free/busy des places."
+            )
 
         return {
             "label": label,
             "confidence": float(probs.top1conf),
             "class_mapping": names,
         }
+
+    def _log_debug(self, message: str, *args: Any) -> None:
+        if not self.debug_enabled:
+            return
+        if self.flask_app:
+            self.flask_app.logger.info(message, *args)
+
+    def _log_slot_debug(
+        self,
+        slot: dict[str, int],
+        x1: int,
+        y1: int,
+        x2: int,
+        y2: int,
+        frame_width: int,
+        frame_height: int,
+    ) -> None:
+        if not self.debug_enabled:
+            return
+        self._log_debug(
+            "slot-crop slot_index=%s place_id=%s rect=(%s,%s,%s,%s) crop=(%s,%s)-(%s,%s) frame=%sx%s",
+            slot.get("slot_index"),
+            slot.get("place_id"),
+            slot["x"],
+            slot["y"],
+            slot["w"],
+            slot["h"],
+            x1,
+            y1,
+            x2,
+            y2,
+            frame_width,
+            frame_height,
+        )
 
     @staticmethod
     def _normalize_names(names: Any) -> dict[str, str]:
@@ -586,12 +691,17 @@ class ParkingVideoAIService:
     ) -> None:
         x, y, w, h = slot["x"], slot["y"], slot["w"], slot["h"]
         color = (46, 204, 113) if is_free else (52, 73, 94)
+        slot_label = (
+            f"Place {slot.get('place_number')}"
+            if slot.get("place_number")
+            else (f"P{slot.get('place_id')}" if slot.get("place_id") else f"S{slot_index}")
+        )
 
         cv2.rectangle(frame, (x, y), (x + w, y + h), color, 3)
         cv2.rectangle(frame, (x, max(0, y - 28)), (x + 190, y), color, -1)
         cv2.putText(
             frame,
-            f"P{slot_index} {label} {confidence:.2f}",
+            f"{slot_label} {label} {confidence:.2f}",
             (x + 8, max(18, y - 8)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.55,
@@ -602,9 +712,12 @@ class ParkingVideoAIService:
 
     @staticmethod
     def _draw_header(frame: Any, free: int, occupied: int, total: int) -> None:
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (20, 20), (450, 110), (18, 24, 38), -1)
-        cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
+        x1, y1, x2, y2 = 20, 20, 450, 110
+        roi = frame[y1:y2, x1:x2]
+        if roi.size:
+            overlay = roi.copy()
+            cv2.rectangle(overlay, (0, 0), (x2 - x1, y2 - y1), (18, 24, 38), -1)
+            cv2.addWeighted(overlay, 0.75, roi, 0.25, 0, roi)
         cv2.putText(frame, f"Free: {free}", (36, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (46, 204, 113), 2, cv2.LINE_AA)
         cv2.putText(frame, f"Occupied: {occupied}", (160, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 193, 7), 2, cv2.LINE_AA)
         cv2.putText(frame, f"Total: {total}", (336, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2, cv2.LINE_AA)

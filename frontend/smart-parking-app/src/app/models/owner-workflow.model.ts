@@ -8,6 +8,9 @@ export interface OwnerWorkflowState {
   ownerStatus: OwnerValidationStatus;
   parkingStatus: ParkingValidationStatus;
   subscriptionStatus: SubscriptionStatus;
+  subscriptionStartDate?: string | null;
+  subscriptionEndDate?: string | null;
+  subscriptionType?: 'mensuel' | 'trimestriel' | 'annuel' | null;
   parkingSetupStatus: SetupStatus;
   aiSetupStatus: AiSetupStatus;
   parkingId?: number | null;
