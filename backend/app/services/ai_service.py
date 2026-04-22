@@ -14,11 +14,13 @@ from flask import current_app
 from .. import db
 from ..models.place import Place, StatutPlace
 from ..models.parking_ai_source import ParkingAISource, TypeSourceIA
+from .object_storage import ObjectStorageService
 from .slot_mapping_service import assign_slots_to_places
 from .video_ai_service import (
     BUSY_LABEL,
     FREE_LABEL,
     ParkingVideoAIService,
+    _normalize_parking_label,
     is_parking_classifier,
     load_slots,
     load_model,
@@ -69,7 +71,9 @@ class ParkingSourceAIService:
         self.analysis_root = self.upload_root / "ai_source_analysis"
         self.output_root = self.analysis_root / "output"
         self.calibration_root = self.analysis_root / "calibration_frames"
+        self.source_cache_root = self.analysis_root / "source_cache"
         self.history_path = self.analysis_root / "history.json"
+        self.object_storage = ObjectStorageService()
 
         external_ai_dir = Path(
             os.getenv("SMART_PARKING_SOURCE_DIR", r"C:\Users\marie\smart parking")
@@ -110,7 +114,7 @@ class ParkingSourceAIService:
         source_type = source.source_type.value if isinstance(source.source_type, TypeSourceIA) else str(source.source_type)
         source_id = source.id_source
         parking_id = source.parking_id
-        file_path = Path(source.file_path or "")
+        file_path = self.resolve_source_path(source)
         if source_type == TypeSourceIA.camera.value:
             return self.record_error(
                 source_id=source_id,
@@ -119,7 +123,7 @@ class ParkingSourceAIService:
                 error="Le traitement automatique n'est pas disponible pour les cameras.",
             )
 
-        if not file_path.exists():
+        if not file_path or not file_path.exists():
             return self.record_error(
                 source_id=source_id,
                 parking_id=parking_id,
@@ -231,7 +235,10 @@ class ParkingSourceAIService:
                 # Release the worker's DB connection before long-running video inference.
                 db.session.expunge(source)
                 db.session.remove()
-                result = self._analyze_video(source, Path(source.file_path or ""))
+                resolved_path = self.resolve_source_path(source)
+                if not resolved_path:
+                    raise RuntimeError("Le fichier source est introuvable.")
+                result = self._analyze_video(source, resolved_path)
                 self._upsert_history_entry(result.to_dict())
             except Exception as exc:
                 self.record_error(
@@ -246,16 +253,16 @@ class ParkingSourceAIService:
     def extract_calibration_frame(self, source: ParkingAISource) -> tuple[Path | None, str | None]:
         source_type = source.source_type.value if isinstance(source.source_type, TypeSourceIA) else str(source.source_type)
         if source_type == TypeSourceIA.image.value:
-            path = Path(source.file_path or "")
-            if not path.exists():
+            path = self.resolve_source_path(source)
+            if not path or not path.exists():
                 return None, None
             return path, source.mime_type or "image/jpeg"
 
         if source_type != TypeSourceIA.video.value:
             return None, None
 
-        file_path = Path(source.file_path or "")
-        if not file_path.exists():
+        file_path = self.resolve_source_path(source)
+        if not file_path or not file_path.exists():
             return None, None
 
         output_dir = self.calibration_root / str(source.parking_id)
@@ -345,6 +352,8 @@ class ParkingSourceAIService:
         slots = slot_mapping["slots"]
         if slot_mapping["changed"]:
             slots_path = self.video_service.get_slots_config_path(source.parking_id)
+        if not slots:
+            raise RuntimeError("Aucun slot n est configure pour ce parking. Ouvrez d abord la calibration et dessinez les places.")
         self._log_debug(
             "image-process-start parking_id=%s source_id=%s file=%s model=%s slots=%s imgsz=%s padding=%s total_slots=%s",
             source.parking_id,
@@ -437,6 +446,8 @@ class ParkingSourceAIService:
     def _analyze_video(self, source: ParkingAISource, file_path: Path) -> ParkingSourceAnalysisResult:
         slots, _ = self.video_service.get_slots(source.parking_id)
         slot_mapping = self._ensure_slot_mapping(source.parking_id, slots)
+        if not slot_mapping["slots"]:
+            raise RuntimeError("Aucun slot n est configure pour ce parking. Ouvrez d abord la calibration et dessinez les places.")
         video_result = self.video_service.process_video(
             parking_id=source.parking_id,
             input_path=file_path,
@@ -578,10 +589,27 @@ class ParkingSourceAIService:
         return " ".join(dict.fromkeys(parts))
 
     def _ensure_storage(self) -> None:
-        for directory in (self.analysis_root, self.output_root, self.calibration_root):
+        for directory in (self.analysis_root, self.output_root, self.calibration_root, self.source_cache_root):
             directory.mkdir(parents=True, exist_ok=True)
         if not self.history_path.exists():
             self.history_path.write_text("[]", encoding="utf-8")
+
+    def resolve_source_path(self, source: ParkingAISource) -> Path | None:
+        raw_file_path = (source.file_path or "").strip()
+        local_path = Path(raw_file_path) if raw_file_path else None
+        if local_path and local_path.exists():
+            return local_path
+
+        bucket_key = getattr(source, "bucket_key", None)
+        if not bucket_key or not self.object_storage.enabled:
+            return None
+
+        safe_name = Path(source.original_name or f"source_{source.id_source}").name
+        destination = self.source_cache_root / str(source.parking_id) / f"{source.id_source}_{safe_name}"
+        try:
+            return self.object_storage.download_file(bucket_key, destination)
+        except Exception:
+            return None
 
     def _read_history(self) -> list[dict[str, Any]]:
         try:
@@ -648,12 +676,15 @@ class ParkingSourceAIService:
         probs = getattr(result, "probs", None)
         names = self._normalize_names(result.names)
         if probs is None:
-            return {"label": BUSY_LABEL, "confidence": 0.0, "class_mapping": names}
+            raise RuntimeError("Le modele IA configure ne retourne pas de probabilites de classification exploitables.")
 
         cls_id = int(probs.top1)
-        label = names.get(str(cls_id), BUSY_LABEL).lower()
-        if label not in {FREE_LABEL, BUSY_LABEL}:
-            label = BUSY_LABEL
+        raw_label = names.get(str(cls_id), "")
+        label = _normalize_parking_label(raw_label)
+        if label is None:
+            raise RuntimeError(
+                "Le modele IA configure n est pas compatible avec la detection free/busy des places."
+            )
 
         return {
             "label": label,

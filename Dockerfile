@@ -4,7 +4,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=8000 \
-    UPLOAD_FOLDER=/data/uploads
+    UPLOAD_FOLDER=/data/uploads \
+    GUNICORN_TIMEOUT=900
 
 WORKDIR /app
 
@@ -32,4 +33,4 @@ WORKDIR /app/backend
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 1 --timeout 300 wsgi:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 1 --timeout ${GUNICORN_TIMEOUT:-900} wsgi:app"]

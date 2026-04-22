@@ -80,6 +80,11 @@ def _ensure_runtime_schema_compatibility(app):
             "created_at",
             "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
         )
+        add_column_if_missing(
+            "parking_ai_source",
+            "bucket_key",
+            "bucket_key TEXT",
+        )
 
         add_column_if_missing(
             "abonnement",
@@ -144,10 +149,10 @@ def _ensure_runtime_schema_compatibility(app):
                 """
                 UPDATE comptes
                 SET owner_status = CASE
-                    WHEN role = 'owner' THEN 'en_attente'
-                    ELSE 'accepte'
+                    WHEN role = 'owner' THEN CAST('en_attente' AS statut_validation_owner)
+                    ELSE CAST('accepte' AS statut_validation_owner)
                 END
-                WHERE owner_status IS NULL OR owner_status = ''
+                WHERE owner_status IS NULL OR CAST(owner_status AS TEXT) = ''
                 """
             )
         )
@@ -155,10 +160,26 @@ def _ensure_runtime_schema_compatibility(app):
             text(
                 """
                 UPDATE parking
-                SET validation_status = COALESCE(NULLIF(validation_status, ''), 'en_attente_validation'),
-                    setup_status = COALESCE(NULLIF(setup_status, ''), 'non_commencee'),
-                    ai_setup_status = COALESCE(NULLIF(ai_setup_status, ''), 'non_configuree'),
-                    statut = COALESCE(NULLIF(statut, ''), 'actif'),
+                SET validation_status = CASE
+                        WHEN validation_status IS NULL OR CAST(validation_status AS TEXT) = ''
+                            THEN CAST('en_attente_validation' AS statut_validation_parking)
+                        ELSE validation_status
+                    END,
+                    setup_status = CASE
+                        WHEN setup_status IS NULL OR CAST(setup_status AS TEXT) = ''
+                            THEN CAST('non_commencee' AS statut_configuration_parking)
+                        ELSE setup_status
+                    END,
+                    ai_setup_status = CASE
+                        WHEN ai_setup_status IS NULL OR CAST(ai_setup_status AS TEXT) = ''
+                            THEN CAST('non_configuree' AS statut_configuration_ia)
+                        ELSE ai_setup_status
+                    END,
+                    statut = CASE
+                        WHEN statut IS NULL OR CAST(statut AS TEXT) = ''
+                            THEN CAST('actif' AS statut_parking)
+                        ELSE statut
+                    END,
                     capacite = COALESCE(capacite, 0)
                 """
             )
@@ -167,7 +188,11 @@ def _ensure_runtime_schema_compatibility(app):
             text(
                 """
                 UPDATE abonnement
-                SET statut = COALESCE(NULLIF(statut, ''), 'en_attente'),
+                SET statut = CASE
+                        WHEN statut IS NULL OR CAST(statut AS TEXT) = ''
+                            THEN CAST('en_attente' AS statut_abonnement)
+                        ELSE statut
+                    END,
                     tarif = COALESCE(tarif, 0)
                 """
             )

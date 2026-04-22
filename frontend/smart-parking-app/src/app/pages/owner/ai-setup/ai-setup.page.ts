@@ -2,7 +2,7 @@ import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/co
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
-import { OwnerWorkflowState } from '../../../models/owner-workflow.model';
+import { DEFAULT_OWNER_WORKFLOW_STATE, OwnerWorkflowState } from '../../../models/owner-workflow.model';
 import { AuthService } from '../../../services/auth.service';
 import { OwnerWorkflowService } from '../../../services/owner-workflow.service';
 import { PlaceDto, PlaceService } from '../../../services/place.service';
@@ -10,6 +10,7 @@ import {
   ParkingAISource,
   ParkingAiAuthError,
   ParkingAISlot,
+  ParkingAiUploadProgress,
   ParkingAiSourceService,
 } from '../../../services/parking-ai-source.service';
 import { ParkingDto, ParkingService } from '../../../services/parking.service';
@@ -31,12 +32,15 @@ interface OwnerAiParkingOption {
 })
 export class AiSetupPage implements OnInit, OnDestroy {
   @ViewChild('calibrationCanvas') calibrationCanvasRef?: ElementRef<HTMLCanvasElement>;
-  workflowState!: OwnerWorkflowState;
+  workflowState: OwnerWorkflowState = { ...DEFAULT_OWNER_WORKFLOW_STATE };
   ownerParkings: OwnerAiParkingOption[] = [];
   isSubmitting = false;
   isLoadingSources = true;
   isUploadingImage = false;
   isUploadingVideo = false;
+  videoUploadProgress = 0;
+  currentVideoUploadName = '';
+  videoUploadHint: string | null = null;
   isAddingCamera = false;
   isLoadingCalibration = false;
   isSavingCalibration = false;
@@ -137,6 +141,9 @@ export class AiSetupPage implements OnInit, OnDestroy {
     }
 
     this.isUploadingVideo = true;
+    this.videoUploadProgress = 0;
+    this.currentVideoUploadName = files[0]?.name || '';
+    this.videoUploadHint = this.buildVideoUploadHint(files);
 
     try {
       const result = await this.uploadSources(files, 'video');
@@ -149,6 +156,8 @@ export class AiSetupPage implements OnInit, OnDestroy {
       this.toastService.show(this.getErrorMessage(error, 'Impossible d envoyer ces videos.'), 'error');
     } finally {
       this.isUploadingVideo = false;
+      this.videoUploadProgress = 0;
+      this.currentVideoUploadName = '';
       this.resetInput(event);
     }
   }
@@ -464,6 +473,19 @@ export class AiSetupPage implements OnInit, OnDestroy {
     }
 
     return this.aiSources.length === 0 ? 'Ajoutez une source pour continuer' : 'Activer et continuer';
+  }
+
+  get hasVideoUploadHint(): boolean {
+    return Boolean(this.videoUploadHint);
+  }
+
+  get videoUploadProgressLabel(): string {
+    if (!this.isUploadingVideo) {
+      return '';
+    }
+    return this.currentVideoUploadName
+      ? `${this.currentVideoUploadName} • ${this.videoUploadProgress}%`
+      : `${this.videoUploadProgress}%`;
   }
 
   getParkingStateLabel(parking: OwnerAiParkingOption): string {
@@ -861,13 +883,27 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
     const createdSources: ParkingAISource[] = [];
     const failures: string[] = [];
-    for (const file of files) {
+    for (const [index, file] of files.entries()) {
       try {
+        const baseProgress = index / files.length;
+        const progressSpan = 1 / files.length;
+        if (sourceType === 'video') {
+          this.currentVideoUploadName = file.name;
+          this.videoUploadProgress = Math.round(baseProgress * 100);
+        }
         const source = await this.parkingAiSourceService.uploadSource(
           this.activeParkingId,
           file,
           sourceType,
-          file.name
+          file.name,
+          sourceType === 'video'
+            ? (progress: ParkingAiUploadProgress) => {
+                this.videoUploadProgress = Math.min(
+                  100,
+                  Math.round((baseProgress + progressSpan * (progress.percent / 100)) * 100)
+                );
+              }
+            : undefined
         );
         createdSources.push(source);
       } catch (error) {
@@ -877,6 +913,27 @@ export class AiSetupPage implements OnInit, OnDestroy {
     }
 
     return { sources: createdSources, failures };
+  }
+
+  private buildVideoUploadHint(files: File[]): string | null {
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    const largestFile = files.reduce((largest, file) => (file.size > largest.size ? file : largest), files[0]);
+    const formatBytes = (bytes: number): string => {
+      if (bytes < 1024 * 1024) {
+        return `${Math.round(bytes / 1024)} KB`;
+      }
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
+    if (largestFile.size >= 200 * 1024 * 1024) {
+      return `Video lourde detectee (${largestFile.name}, ${formatBytes(largestFile.size)}). Utilise idealement une capture plus courte.`;
+    }
+
+    if (totalBytes >= 250 * 1024 * 1024) {
+      return `Upload total ${formatBytes(totalBytes)}. Le transfert peut prendre du temps selon ton reseau.`;
+    }
+
+    return `Upload estime: ${formatBytes(totalBytes)} a transferer.`;
   }
 
   private notifyUploadResult(

@@ -17,6 +17,8 @@ from werkzeug.utils import secure_filename
 
 FREE_LABEL = "free"
 BUSY_LABEL = "busy"
+FREE_LABEL_ALIASES = {"free", "empty", "vacant", "available", "libre"}
+BUSY_LABEL_ALIASES = {"busy", "occupied", "full", "taken", "occupee", "occupé"}
 
 
 @dataclass
@@ -125,8 +127,22 @@ def is_parking_classifier(model_path: Path) -> bool:
     except Exception:
         return False
 
-    normalized = {str(value).lower() for value in getattr(names, "values", lambda: [])()}
+    normalized = {
+        normalized_label
+        for value in getattr(names, "values", lambda: [])()
+        for normalized_label in [_normalize_parking_label(str(value))]
+        if normalized_label
+    }
     return FREE_LABEL in normalized and BUSY_LABEL in normalized
+
+
+def _normalize_parking_label(label: str) -> str | None:
+    normalized = str(label or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if normalized in FREE_LABEL_ALIASES:
+        return FREE_LABEL
+    if normalized in BUSY_LABEL_ALIASES:
+        return BUSY_LABEL
+    return None
 
 
 class ParkingVideoAIService:
@@ -190,7 +206,13 @@ class ParkingVideoAIService:
 
     def get_slots(self, parking_id: int) -> tuple[list[dict[str, int | None]], Path]:
         slots_path = self.get_slots_path(parking_id)
-        return load_slots(slots_path), slots_path
+        try:
+            return load_slots(slots_path), slots_path
+        except (ValueError, json.JSONDecodeError):
+            parking_slots_path = self.get_slots_config_path(parking_id)
+            if slots_path == parking_slots_path:
+                return load_slots(self.default_slots_path), self.default_slots_path
+            raise
 
     def save_parking_slots(self, parking_id: int, slots: list[dict[str, Any]]) -> Path:
         slots_path = self.get_slots_config_path(parking_id)
@@ -201,7 +223,11 @@ class ParkingVideoAIService:
         slots_path = self.get_slots_config_path(parking_id)
         if not slots_path.exists():
             return []
-        return json.loads(slots_path.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(slots_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return []
+        return data if isinstance(data, list) else []
 
     def process_video(self, parking_id: int, input_path: Path, source_filename: str) -> ParkingVideoResult:
         slots, slots_path = self.get_slots(parking_id)
@@ -598,12 +624,15 @@ class ParkingVideoAIService:
         probs = getattr(result, "probs", None)
         names = self._normalize_names(result.names)
         if probs is None:
-            return {"label": BUSY_LABEL, "confidence": 0.0, "class_mapping": names}
+            raise RuntimeError("Le modele IA configure ne retourne pas de probabilites de classification exploitables.")
 
         cls_id = int(probs.top1)
-        label = names.get(str(cls_id), BUSY_LABEL).lower()
-        if label not in {FREE_LABEL, BUSY_LABEL}:
-            label = BUSY_LABEL
+        raw_label = names.get(str(cls_id), "")
+        label = _normalize_parking_label(raw_label)
+        if label is None:
+            raise RuntimeError(
+                "Le modele IA configure n est pas compatible avec la detection free/busy des places."
+            )
 
         return {
             "label": label,

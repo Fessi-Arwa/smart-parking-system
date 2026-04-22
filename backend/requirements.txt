@@ -10,3 +10,4 @@ python-dotenv
 opencv-python
 ultralytics
 gunicorn
+boto3

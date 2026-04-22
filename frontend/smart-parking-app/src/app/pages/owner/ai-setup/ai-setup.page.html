@@ -114,6 +114,13 @@
           <input type="file" accept="video/*" multiple (change)="onVideoSelected($event)" hidden />
           <strong>{{ isUploadingVideo ? 'Upload videos...' : 'Ajouter des videos' }}</strong>
           <span>Sequences pour analyse et calibration</span>
+          <div class="ai-upload-card__progress" *ngIf="isUploadingVideo">
+            <div class="ai-upload-card__progress-bar">
+              <span [style.width.%]="videoUploadProgress"></span>
+            </div>
+            <small>{{ videoUploadProgressLabel }}</small>
+          </div>
+          <small class="ai-upload-card__hint" *ngIf="hasVideoUploadHint">{{ videoUploadHint }}</small>
         </label>
       </div>
 

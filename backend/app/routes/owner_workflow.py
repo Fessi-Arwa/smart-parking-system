@@ -19,6 +19,7 @@ from ..models.parking import (
     StatutValidationParking,
 )
 from ..services.ai_service import ParkingSourceAIService
+from ..services.object_storage import ObjectStorageService
 from ..services.slot_mapping_service import assign_slots_to_places
 from ..services.video_ai_service import ParkingVideoAIService
 from ..utils.storage_manager import StorageManager
@@ -137,6 +138,10 @@ def _get_video_service():
     return ParkingVideoAIService(current_app.config["UPLOAD_FOLDER"], current_app._get_current_object())
 
 
+def _get_object_storage():
+    return ObjectStorageService()
+
+
 def _get_latest_app_subscription_for_parking(parking):
     if not parking:
         return None, None
@@ -202,7 +207,11 @@ def _select_workflow_parking(user):
 
 def _source_to_dict(source, ai_service=None):
     data = source.to_dict()
-    data["preview_url"] = f"/api/owner/ai-sources/{source.id_source}/file" if source.file_path else None
+    data["preview_url"] = (
+        f"/api/owner/ai-sources/{source.id_source}/file"
+        if source.file_path or getattr(source, "bucket_key", None)
+        else None
+    )
     data["calibration_preview_url"] = None
     try:
         service = ai_service or _get_ai_source_service()
@@ -587,6 +596,133 @@ def upload_ai_source(parking_id):
         }), 500
 
 
+@owner_workflow_bp.route("/parkings/<int:parking_id>/ai-sources/upload-init", methods=["POST"])
+@jwt_required()
+def init_direct_ai_source_upload(parking_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+    approval_error = _ensure_owner_approved(user)
+    if approval_error:
+        return approval_error
+
+    parking = _get_owner_parking(user, parking_id)
+    if not parking:
+        return jsonify({"msg": "Parking introuvable"}), 404
+    ai_error = _ensure_parking_ready_for_ai(parking)
+    if ai_error:
+        return ai_error
+
+    storage = _get_object_storage()
+    if not storage.enabled:
+        return jsonify({"msg": "Le stockage direct n est pas configure sur ce backend."}), 503
+
+    data = request.get_json() or {}
+    source_type_value = (data.get("source_type") or "").strip()
+    filename = (data.get("filename") or "").strip()
+    mime_type = (data.get("mime_type") or "").strip() or "application/octet-stream"
+    label = (data.get("label") or "").strip()
+
+    if not filename:
+        return jsonify({"msg": "filename est obligatoire"}), 400
+
+    try:
+        source_type = TypeSourceIA(source_type_value)
+    except ValueError:
+        return jsonify({"msg": "source_type invalide"}), 400
+
+    if source_type == TypeSourceIA.camera:
+        return jsonify({"msg": "Utilisez la route camera pour les flux de surveillance"}), 400
+
+    object_key = storage.build_object_key(parking.id_park, source_type.value, filename)
+    payload = storage.create_presigned_upload(object_key, mime_type)
+    payload.update(
+        {
+            "filename": filename,
+            "label": label or filename,
+            "mime_type": mime_type,
+            "source_type": source_type.value,
+        }
+    )
+    return jsonify(payload), 200
+
+
+@owner_workflow_bp.route("/parkings/<int:parking_id>/ai-sources/upload-complete", methods=["POST"])
+@jwt_required()
+def complete_direct_ai_source_upload(parking_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+    approval_error = _ensure_owner_approved(user)
+    if approval_error:
+        return approval_error
+
+    parking = _get_owner_parking(user, parking_id)
+    if not parking:
+        return jsonify({"msg": "Parking introuvable"}), 404
+    ai_error = _ensure_parking_ready_for_ai(parking)
+    if ai_error:
+        return ai_error
+
+    storage = _get_object_storage()
+    if not storage.enabled:
+        return jsonify({"msg": "Le stockage direct n est pas configure sur ce backend."}), 503
+
+    data = request.get_json() or {}
+    object_key = (data.get("object_key") or "").strip()
+    source_type_value = (data.get("source_type") or "").strip()
+    original_name = (data.get("filename") or "").strip()
+    mime_type = (data.get("mime_type") or "").strip() or "application/octet-stream"
+    label = (data.get("label") or "").strip()
+
+    if not object_key or not original_name:
+        return jsonify({"msg": "object_key et filename sont obligatoires"}), 400
+
+    try:
+        source_type = TypeSourceIA(source_type_value)
+    except ValueError:
+        return jsonify({"msg": "source_type invalide"}), 400
+
+    if source_type == TypeSourceIA.camera:
+        return jsonify({"msg": "Utilisez la route camera pour les flux de surveillance"}), 400
+
+    try:
+        storage.ensure_object_exists(object_key)
+    except Exception as exc:
+        return jsonify({"msg": f"Fichier bucket introuvable: {exc}"}), 400
+
+    source = ParkingAISource(
+        parking_id=parking.id_park,
+        source_type=source_type,
+        label=label or original_name,
+        bucket_key=object_key,
+        original_name=original_name,
+        mime_type=mime_type,
+    )
+    db.session.add(source)
+    db.session.commit()
+
+    analysis = None
+    if source_type == TypeSourceIA.image:
+        try:
+            analysis = _get_ai_source_service().analyze_source(source)
+        except Exception as exc:
+            analysis = {
+                "source_id": source.id_source,
+                "parking_id": source.parking_id,
+                "source_type": source.source_type.value,
+                "status": "error",
+                "error": str(exc),
+            }
+    elif source_type == TypeSourceIA.video:
+        analysis = _get_ai_source_service().enqueue_video_analysis(source)
+
+    payload = _source_to_dict(source)
+    if analysis is not None:
+        payload["analysis"] = analysis
+    return jsonify(payload), 201
+
+
 @owner_workflow_bp.route("/parkings/<int:parking_id>/ai-slots", methods=["GET"])
 @jwt_required()
 def get_ai_slots(parking_id):
@@ -609,7 +745,10 @@ def get_ai_slots(parking_id):
     uses_custom_slots = bool(saved_slots)
     slots = saved_slots
     if not slots:
-        slots, _ = service.get_slots(parking.id_park)
+        try:
+            slots, _ = service.get_slots(parking.id_park)
+        except ValueError:
+            slots = []
 
     slot_mapping = assign_slots_to_places(parking.id_park, slots)
     if slot_mapping["changed"]:
@@ -689,6 +828,11 @@ def delete_ai_source(source_id):
         path = Path(source.file_path)
         if path.exists():
             path.unlink()
+    if getattr(source, "bucket_key", None):
+        try:
+            _get_object_storage().delete_file(source.bucket_key)
+        except Exception:
+            pass
 
     try:
         _get_ai_source_service().delete_analysis(source.id_source)
@@ -749,15 +893,15 @@ def get_ai_source_file(source_id):
         return approval_error
 
     source = ParkingAISource.query.get(source_id)
-    if not source or not source.file_path:
+    if not source:
         return jsonify({"msg": "Fichier introuvable"}), 404
 
     parking = _get_owner_parking(user, source.parking_id)
     if not parking:
         return jsonify({"msg": "Acces non autorise"}), 403
 
-    path = Path(source.file_path)
-    if not path.exists():
+    path = _get_ai_source_service().resolve_source_path(source)
+    if not path or not path.exists():
         return jsonify({"msg": "Fichier introuvable"}), 404
 
     return send_file(path, mimetype=source.mime_type or "application/octet-stream")
