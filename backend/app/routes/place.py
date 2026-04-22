@@ -3,6 +3,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from .. import db
 from ..models.compte import Compte, RoleCompte
+from ..models.etage import Etage
 from ..models.parking import Parking, StatutValidationParking
 from ..models.place import Place
 
@@ -77,8 +78,15 @@ def create_place():
     if not _can_manage_parking(user, parking):
         return jsonify({"error": "Unauthorized to manage places for this parking"}), 403
 
+    etage_id = data.get("etage_id")
+    if etage_id is not None:
+        etage = Etage.query.get(etage_id)
+        if not etage or etage.parking_id != parking.id_park:
+            return jsonify({"error": "etage_id invalide pour ce parking"}), 400
+
     place = Place(
         parking_id=data["parking_id"],
+        etage_id=etage_id,
         num_place=data["num_place"],
         etat=data.get("etat", "libre"),
         zone=data.get("zone"),
@@ -112,7 +120,12 @@ def update_place(place_id):
 
     data = request.get_json() or {}
 
-    place.update_from_dict(data, ("parking_id", "num_place", "etat", "zone", "etage"))
+    if "etage_id" in data and data.get("etage_id") is not None:
+        etage = Etage.query.get(data["etage_id"])
+        if not etage or etage.parking_id != parking.id_park:
+            return jsonify({"error": "etage_id invalide pour ce parking"}), 400
+
+    place.update_from_dict(data, ("parking_id", "etage_id", "num_place", "etat", "zone", "etage"))
 
     db.session.commit()
     return jsonify(place.to_dict())

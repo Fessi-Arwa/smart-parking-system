@@ -18,6 +18,7 @@ class Place(ModelMixin, db.Model):
     __public_fields__ = (
         "id_place",
         "parking_id",
+        "etage_id",
         "num_place",
         "etat",
         "zone",
@@ -34,6 +35,11 @@ class Place(ModelMixin, db.Model):
         db.BigInteger,
         db.ForeignKey("parking.id_park", ondelete="CASCADE"),
         nullable=False,
+    )
+    etage_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("etage.id_etage", ondelete="SET NULL"),
+        nullable=True,
     )
     num_place = db.Column(db.Integer, nullable=False)
     etat = db.Column(

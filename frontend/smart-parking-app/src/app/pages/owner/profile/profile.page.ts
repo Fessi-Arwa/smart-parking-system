@@ -26,6 +26,7 @@ export interface OwnerProfile {
   email: string;
   telephone: string;
   role: string;
+  owner_status?: 'en_attente' | 'accepte' | 'refuse' | 'suspendu' | null;
   companyName?: string;
   avatar?: string;
 }
@@ -133,20 +134,40 @@ export class ProfilePage implements OnInit {
   ) {}
 
   async ngOnInit(): Promise<void> {
-    const currentUser = this.authService.getCurrentUser();
+    const currentUser = this.authService.getCurrentUser() as (OwnerProfile & { id?: number | string; id_compte?: number | string }) | null;
     if (currentUser) {
+      const normalizedOwnerId = Number(currentUser.id ?? currentUser.id_compte ?? this.owner.id_compte);
       this.owner = {
         ...this.owner,
-        id_compte: currentUser.id,
+        id_compte: normalizedOwnerId,
         nom: currentUser.nom || this.owner.nom,
         email: currentUser.email || this.owner.email,
         telephone: currentUser.telephone || this.owner.telephone,
+        owner_status: currentUser.owner_status ?? this.owner.owner_status ?? null,
       };
     }
 
     await this.loadOwnerParkings();
     await this.applyParkingSelectionFromRoute();
     this.workflowState = await this.ownerWorkflowService.refresh();
+    try {
+      this.workflowState = await this.ownerWorkflowService.refresh();
+      this.owner.owner_status = this.workflowState.ownerStatus;
+    } catch (error) {
+      console.warn('Workflow owner indisponible, fallback sur les donnees locales du profil.', error);
+      this.workflowState = this.owner.owner_status
+        ? {
+            ownerStatus: this.owner.owner_status,
+            parkingStatus: 'en_attente_validation',
+            subscriptionStatus: 'non_souscrit',
+            parkingSetupStatus: 'non_commencee',
+            aiSetupStatus: 'non_configuree',
+            hasParking: this.parkings.length > 0,
+            parkingId: this.parkings[0]?.id_park ?? null,
+            parkingName: this.parkings[0]?.nom ?? null,
+          }
+        : null;
+    }
   }
 
   get ownerInitials(): string {
@@ -335,7 +356,13 @@ export class ProfilePage implements OnInit {
   }
 
   get canCreateParking(): boolean {
-    return true;
+    if (this.workflowState?.ownerStatus === 'accepte') {
+      return true;
+    }
+    if (this.owner.owner_status === 'accepte') {
+      return true;
+    }
+    return this.workflowState == null;
   }
 
   get pendingReviewParking(): ParkingInfo | null {
@@ -584,7 +611,7 @@ export class ProfilePage implements OnInit {
       adresse: this.buildAddress(this.editParkingData.adresse, this.editParkingData.ville),
       capacite: this.editParkingData.totalSpaces,
       prix_heure: this.editParkingData.prix_heure,
-      statut: this.editParkingData.statut,
+      statut: this.toBackendParkingStatus(this.editParkingData.statut),
     };
 
     try {
@@ -619,11 +646,19 @@ export class ProfilePage implements OnInit {
 
   async deleteParking(): Promise<void> {
     if (this.parkingToDelete) {
-      await firstValueFrom(this.parkingService.deleteParking(this.parkingToDelete.id_park));
-      this.showDeleteConfirm = false;
-      this.parkingToDelete = null;
-      this.selectedParking = null;
-      await this.loadOwnerParkings();
+      try {
+        await firstValueFrom(this.parkingService.deleteParking(this.parkingToDelete.id_park));
+        this.showDeleteConfirm = false;
+        this.parkingToDelete = null;
+        this.selectedParking = null;
+        await this.loadOwnerParkings();
+        this.toastService.show('Parking supprime avec succes.', 'success');
+      } catch (error: any) {
+        this.toastService.show(
+          error?.error?.msg || error?.error?.error || 'Impossible de supprimer ce parking.',
+          'error'
+        );
+      }
       return;
     }
 
@@ -659,9 +694,9 @@ export class ProfilePage implements OnInit {
     const payload: CreateParkingPayload = {
       nom: this.newParkingData.nom!.trim(),
       adresse: this.buildAddress(this.newParkingData.adresse, this.newParkingData.ville),
-      capacite: this.newParkingData.totalSpaces ?? 20,
-      prix_heure: this.newParkingData.prix_heure ?? 2.5,
-      statut: this.newParkingData.statut,
+      capacite: this.newParkingData.totalSpaces || 20,
+      prix_heure: this.newParkingData.prix_heure || 2.5,
+      statut: this.toBackendParkingStatus(this.newParkingData.statut || 'actif'),
     };
 
     try {
@@ -685,11 +720,11 @@ export class ProfilePage implements OnInit {
   }
 
   getStatusColor(status: string): string {
-    return status === 'actif' ? 'success' : 'warning';
+    return this.toBackendParkingStatus(status) === 'actif' ? 'success' : 'warning';
   }
 
   getStatusLabel(status: string): string {
-    return status === 'actif' ? 'Actif' : 'Maintenance';
+    return this.toBackendParkingStatus(status) === 'actif' ? 'Actif' : 'Maintenance';
   }
 
   getValidationStatusLabel(status?: string): string {
@@ -789,15 +824,34 @@ export class ProfilePage implements OnInit {
   }
 
   private async loadOwnerParkings(selectedParkingId?: number): Promise<void> {
-    const ownerId = this.owner.id_compte;
-    const [parkings, places] = await Promise.all([
-      firstValueFrom(this.parkingService.getParkings()),
-      firstValueFrom(this.placeService.getPlaces()),
-    ]);
+    const ownerId = Number(this.owner.id_compte);
+    let parkings: ParkingDto[] = [];
+    let places: PlaceDto[] = [];
 
-    const ownerParkings = parkings.filter((parking) => parking.owner_id === ownerId);
+    try {
+      parkings = await firstValueFrom(this.parkingService.getParkings());
+    } catch (error: any) {
+      this.parkings = [];
+      this.selectedParking = null;
+      this.toastService.show(
+        error?.error?.msg || error?.error?.error || 'Impossible de charger les parkings owner.',
+        'error'
+      );
+      return;
+    }
+
+    try {
+      places = await firstValueFrom(this.placeService.getPlaces());
+    } catch (error) {
+      console.warn('Chargement des places indisponible, utilisation de la capacite parking.', error);
+      places = [];
+    }
+
+    const ownerParkings = parkings.filter((parking) => Number(parking.owner_id) === ownerId);
     const placesByParking = this.groupPlacesByParking(places);
-    this.parkings = ownerParkings.map((parking) => this.mapParking(parking, placesByParking.get(parking.id_park) ?? []));
+    this.parkings = ownerParkings.map((parking) =>
+      this.mapParking(parking, placesByParking.get(parking.id_park) ?? [])
+    );
 
     const targetId = selectedParkingId ?? this.selectedParking?.id_park;
     this.selectedParking = targetId
@@ -816,7 +870,7 @@ export class ProfilePage implements OnInit {
       adresse: parking.adresse,
       ville: this.extractCity(parking.adresse),
       prix_heure: Number(parking.prix_heure),
-      statut: parking.statut,
+      statut: this.toFrontendParkingStatus(parking.statut),
       validation_status: parking.validation_status || 'brouillon',
       setup_status: parking.setup_status || 'non_commencee',
       ai_setup_status: parking.ai_setup_status || 'non_configuree',
@@ -889,6 +943,14 @@ export class ProfilePage implements OnInit {
     const trimmedAddress = (address || '').trim();
     const trimmedCity = (city || '').trim();
     return trimmedCity ? `${trimmedAddress}, ${trimmedCity}` : trimmedAddress;
+  }
+
+  private toBackendParkingStatus(status?: string | null): 'actif' | 'inactif' {
+    return String(status || '').trim().toLowerCase() === 'inactif' ? 'inactif' : 'actif';
+  }
+
+  private toFrontendParkingStatus(status?: string | null): 'actif' | 'inactif' {
+    return this.toBackendParkingStatus(status);
   }
 
   private getNewParkingValidationMessage(): string | null {

@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { OwnerWorkflowState } from '../../../models/owner-workflow.model';
+import { EtageDto, EtageService } from '../../../services/etage.service';
 import { OwnerWorkflowService } from '../../../services/owner-workflow.service';
 import { ParkingDto, ParkingService } from '../../../services/parking.service';
 import { PlaceDto, PlaceService } from '../../../services/place.service';
@@ -40,6 +41,7 @@ export class ParkingSetupPage implements OnInit {
   isLoadingPlaces = true;
   isGeneratingStructure = false;
   parking: ParkingDto | null = null;
+  etages: EtageDto[] = [];
   places: PlaceDto[] = [];
   parkingDraft = {
     nom: '',
@@ -50,6 +52,7 @@ export class ParkingSetupPage implements OnInit {
   structureDraft: ParkingStructureFloorDraft[] = [];
 
   constructor(
+    private etageService: EtageService,
     private ownerWorkflowService: OwnerWorkflowService,
     private parkingService: ParkingService,
     private placeService: PlaceService,
@@ -61,6 +64,7 @@ export class ParkingSetupPage implements OnInit {
   async ngOnInit(): Promise<void> {
     this.workflowState = await this.ownerWorkflowService.refresh();
     await this.loadParking();
+    await this.loadEtages();
     await this.loadPlaces();
     this.initializeStructureDraft();
   }
@@ -68,6 +72,7 @@ export class ParkingSetupPage implements OnInit {
   async refreshStatus(): Promise<void> {
     this.workflowState = await this.ownerWorkflowService.refresh();
     await this.loadParking();
+    await this.loadEtages();
     await this.loadPlaces();
     this.initializeStructureDraft();
     if (this.hasRouteParkingSelection) {
@@ -380,6 +385,12 @@ export class ParkingSetupPage implements OnInit {
     return preview;
   }
 
+  get floorSummaries(): Array<{ name: string; ordre: number }> {
+    return this.etages
+      .map((etage) => ({ name: etage.nom, ordre: etage.ordre }))
+      .sort((a, b) => a.ordre - b.ordre);
+  }
+
   private async loadPlaces(): Promise<void> {
     if (!this.activeParkingId) {
       this.isLoadingPlaces = false;
@@ -398,6 +409,22 @@ export class ParkingSetupPage implements OnInit {
       this.places = [];
     } finally {
       this.isLoadingPlaces = false;
+    }
+  }
+
+  private async loadEtages(): Promise<void> {
+    if (!this.workflowState?.parkingId) {
+      this.etages = [];
+      return;
+    }
+
+    try {
+      const etages = await firstValueFrom(this.etageService.getEtages(this.workflowState.parkingId));
+      this.etages = [...etages].sort((a, b) => a.ordre - b.ordre);
+    } catch (error) {
+      console.error('Erreur chargement etages owner', error);
+      this.toastService.show('Impossible de charger les etages du parking.', 'error');
+      this.etages = [];
     }
   }
 
@@ -431,7 +458,7 @@ export class ParkingSetupPage implements OnInit {
   }
 
   private initializeStructureDraft(): void {
-    if (this.places.length > 0) {
+    if (this.etages.length > 0 || this.places.length > 0) {
       this.structureDraft = this.buildDraftFromPlaces(this.places);
     } else if (this.structureDraft.length === 0) {
       this.structureDraft = [this.createFloorDraft('RDC')];
@@ -439,6 +466,35 @@ export class ParkingSetupPage implements OnInit {
   }
 
   private buildDraftFromPlaces(places: PlaceDto[]): ParkingStructureFloorDraft[] {
+    if (this.etages.length > 0) {
+      const floorDrafts = this.etages.map((etage) => {
+        const floorPlaces = places.filter((place) => place.etage_id === etage.id_etage || place.etage === etage.nom);
+        const zonesMap = new Map<string, number>();
+
+        floorPlaces.forEach((place) => {
+          const zoneName = (place.zone || 'A').trim() || 'A';
+          zonesMap.set(zoneName, (zonesMap.get(zoneName) || 0) + 1);
+        });
+
+        return {
+          id: String(etage.id_etage),
+          label: etage.nom,
+          zones:
+            zonesMap.size > 0
+              ? Array.from(zonesMap.entries()).map(([zoneName, placeCount]) => ({
+                  id: this.generateLocalId(),
+                  name: zoneName,
+                  placeCount,
+                }))
+              : [this.createZoneDraft('Zone A')],
+        };
+      });
+
+      if (floorDrafts.length > 0) {
+        return floorDrafts;
+      }
+    }
+
     const floorsMap = new Map<string, Map<string, number>>();
 
     places.forEach((place) => {
@@ -518,16 +574,32 @@ export class ParkingSetupPage implements OnInit {
       await firstValueFrom(this.placeService.deletePlace(place.id_place));
     }
 
+    const existingEtages = [...this.etages];
+    for (const etage of existingEtages) {
+      await firstValueFrom(this.etageService.deleteEtage(etage.id_etage));
+    }
+
     const generatedPlaces: PlaceDto[] = [];
+    const createdEtages: EtageDto[] = [];
     let currentNumber = 1;
 
-    for (const floor of this.structureDraft) {
+    for (const [floorIndex, floor] of this.structureDraft.entries()) {
+      const createdEtage = await firstValueFrom(
+        this.etageService.createEtage({
+          parking_id: this.activeParkingId,
+          nom: floor.label.trim(),
+          ordre: floorIndex,
+        })
+      );
+      createdEtages.push(createdEtage);
+
       for (const zone of floor.zones) {
         const zoneCount = Number(zone.placeCount);
         for (let index = 0; index < zoneCount; index += 1) {
           const createdPlace = await firstValueFrom(
             this.placeService.createPlace({
               parking_id: this.activeParkingId,
+              etage_id: createdEtage.id_etage,
               num_place: currentNumber,
               etat: 'libre',
               zone: zone.name.trim(),
@@ -540,6 +612,7 @@ export class ParkingSetupPage implements OnInit {
       }
     }
 
+    this.etages = createdEtages.sort((a, b) => a.ordre - b.ordre);
     this.places = generatedPlaces.sort((a, b) => a.num_place - b.num_place);
     this.parkingDraft.capacite = generatedPlaces.length;
     await this.persistParkingDraft();

@@ -2152,6 +2152,42 @@
   font-weight: 700;
 }
 
+.parking-structure-selector__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.95rem;
+}
+
+.parking-legend {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.parking-legend--free {
+  background: #ecfdf3;
+  color: #15803d;
+  border-color: rgba(34, 197, 94, 0.24);
+}
+
+.parking-legend--occupied {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.24);
+}
+
+.parking-legend--reserved {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: rgba(249, 115, 22, 0.24);
+}
+
 .parking-structure-selector__floors {
   display: grid;
   gap: 0.9rem;
@@ -2225,6 +2261,20 @@
   color: #15803d;
 }
 
+.structure-spot-btn.is-occupied {
+  background: #fef2f2;
+  border-color: rgba(239, 68, 68, 0.24);
+  color: #dc2626;
+  opacity: 1;
+}
+
+.structure-spot-btn.is-reserved {
+  background: #fff7ed;
+  border-color: rgba(249, 115, 22, 0.24);
+  color: #c2410c;
+  opacity: 1;
+}
+
 .structure-spot-btn.is-selected {
   background: linear-gradient(135deg, #2563eb, #38bdf8);
   border-color: transparent;
@@ -2233,9 +2283,7 @@
 }
 
 .structure-spot-btn.is-unavailable {
-  background: #f8fafc;
-  color: #94a3b8;
-  opacity: 0.75;
+  cursor: not-allowed;
 }
 
 @media (max-width: 680px) {

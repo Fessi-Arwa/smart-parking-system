@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 export interface PlaceDto {
   id_place: number;
   parking_id: number;
+  etage_id?: number | null;
   num_place: number;
   etat: 'libre' | 'reservee' | 'occupee';
   zone?: string;
@@ -16,6 +17,7 @@ export interface PlaceDto {
 
 export interface CreatePlacePayload {
   parking_id: number;
+  etage_id?: number | null;
   num_place: number;
   etat?: 'libre' | 'reservee' | 'occupee';
   zone?: string;
@@ -23,6 +25,7 @@ export interface CreatePlacePayload {
 }
 
 export interface UpdatePlacePayload {
+  etage_id?: number | null;
   num_place?: number;
   etat?: 'libre' | 'reservee' | 'occupee';
   zone?: string;

@@ -92,6 +92,7 @@ interface ParkingStructureSection {
 })
 export class DashboardPage implements OnInit, OnDestroy {
   private readonly subscriptionAlertWindowDays = 3;
+  private readonly liveParkingRefreshIntervalMs = 5000;
   private readonly notifiedSubscriptionIds = new Set<number>();
   activeTab: DriverTab = 'home';
   searchTerm = '';
@@ -112,6 +113,7 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   selectedParking: ParkingCard | null = null;
   private locationWatchId: number | null = null;
+  private reservationRefreshIntervalId: number | null = null;
 
   driverProfile: DriverProfile = {
     nom: 'Nadia Benali',
@@ -300,6 +302,7 @@ export class DashboardPage implements OnInit, OnDestroy {
     if (this.locationWatchId !== null && 'geolocation' in navigator) {
       navigator.geolocation.clearWatch(this.locationWatchId);
     }
+    this.stopReservationLiveRefresh();
   }
 
   logout(): void {
@@ -675,8 +678,8 @@ export class DashboardPage implements OnInit, OnDestroy {
     );
 
 
-    this.reservationForm.reset({
-      parking_id: targetParkingId ?? '',
+      this.reservationForm.reset({
+        parking_id: targetParkingId ?? '',
       vehicule_id: defaultVehicleId,
       place_id: availableSpot?.id_place ?? '',
       date_debut: '',
@@ -687,10 +690,11 @@ export class DashboardPage implements OnInit, OnDestroy {
       card_number: '',
       card_expiry: '',
       card_cvv: '',
-    });
+      });
 
-    this.isReservationModalOpen = true;
-  }
+      this.isReservationModalOpen = true;
+      this.startReservationLiveRefresh();
+    }
 
   handleMapParkingSelected(parking: MapParking): void {
     const selectedParking = this.parkings.find((item) => item.id_park === parking.id);
@@ -700,6 +704,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   closeReservationModal(): void {
+    this.stopReservationLiveRefresh();
     this.isReservationModalOpen = false;
     this.selectedParking = null;
   }
@@ -712,6 +717,7 @@ export class DashboardPage implements OnInit, OnDestroy {
     this.selectedParking =
       this.parkings.find((parking) => parking.id_park === Number(this.reservationForm.get('parking_id')?.value)) ??
       null;
+    this.refreshReservationParkingOccupancy();
   }
 
   selectReservationSpot(spot: ParkingSpot): void {
@@ -1114,6 +1120,10 @@ export class DashboardPage implements OnInit, OnDestroy {
     return 'Occupee';
   }
 
+  getSpotVisualState(status: ParkingSpot['etat']): 'libre' | 'reservee' | 'occupee' {
+    return this.normalizePlaceStatus(status);
+  }
+
   private buildSubscriptionExpiryNotification(subscription: SubscriptionItem): HeaderNotificationItem | null {
     if (this.isSubscriptionExpired(subscription)) {
       return {
@@ -1420,6 +1430,63 @@ private showLocationToast(latitude: number, longitude: number): void {
 
   private isSpotAvailable(status?: string): boolean {
     return this.normalizePlaceStatus(status) === 'libre';
+  }
+
+  private startReservationLiveRefresh(): void {
+    this.stopReservationLiveRefresh();
+    void this.refreshReservationParkingOccupancy();
+    this.reservationRefreshIntervalId = window.setInterval(() => {
+      void this.refreshReservationParkingOccupancy();
+    }, this.liveParkingRefreshIntervalMs);
+  }
+
+  private stopReservationLiveRefresh(): void {
+    if (this.reservationRefreshIntervalId !== null) {
+      window.clearInterval(this.reservationRefreshIntervalId);
+      this.reservationRefreshIntervalId = null;
+    }
+  }
+
+  private async refreshReservationParkingOccupancy(): Promise<void> {
+    if (!this.isReservationModalOpen) {
+      return;
+    }
+
+    const parkingId = Number(this.reservationForm.get('parking_id')?.value);
+    if (!parkingId) {
+      return;
+    }
+
+    try {
+      const places = await firstValueFrom(this.placeService.getPlaces(parkingId));
+      const refreshedSpots = places.map((place) => this.mapPlaceToSpot(place));
+      const remainingSpots = this.spots.filter((spot) => spot.parking_id !== parkingId);
+      this.spots = [...remainingSpots, ...refreshedSpots];
+
+      const availablePlaces = refreshedSpots.filter((spot) => this.isSpotAvailable(spot.etat)).length;
+      this.parkings = this.parkings.map((parking) =>
+        parking.id_park === parkingId ? { ...parking, availablePlaces } : parking
+      );
+
+      this.selectedParking =
+        this.parkings.find((parking) => parking.id_park === parkingId) ?? this.selectedParking;
+
+      const selectedSpotId = Number(this.reservationForm.get('place_id')?.value);
+      const selectedSpot = refreshedSpots.find((spot) => spot.id_place === selectedSpotId);
+
+      if (selectedSpot && !this.isSpotAvailable(selectedSpot.etat)) {
+        const fallbackSpot = refreshedSpots.find((spot) => this.isSpotAvailable(spot.etat));
+        this.reservationForm.patchValue({
+          place_id: fallbackSpot?.id_place ?? '',
+        });
+        this.toastService.show(
+          'La place choisie vient de changer d etat. Selectionnez une place libre.',
+          'info'
+        );
+      }
+    } catch (error) {
+      console.warn('Impossible de rafraichir l occupation du parking pour la reservation.', error);
+    }
   }
 
 }

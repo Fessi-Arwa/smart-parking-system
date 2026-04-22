@@ -3,7 +3,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required, verify_jwt_in_req
 from sqlalchemy import func, or_
 
 from .. import db
-from ..models.compte import Compte, RoleCompte, StatutValidationOwner
+from ..models.compte import Compte, RoleCompte
 from ..models.parking import (
     Parking,
     StatutConfigurationIA,
@@ -45,6 +45,18 @@ def _find_owner_duplicate_parking(owner_id, nom, adresse, exclude_id=None):
     if exclude_id is not None:
         query = query.filter(Parking.id_park != exclude_id)
     return query.first()
+
+
+def _parse_parking_status(raw_value):
+    normalized_value = _normalize_text(raw_value).lower()
+    if not normalized_value:
+        return None
+    if normalized_value == "maintenance":
+        normalized_value = StatutParking.inactif.value
+    try:
+        return StatutParking(normalized_value)
+    except ValueError:
+        return None
 
 
 @parking_bp.route("/", methods=["GET"])
@@ -212,7 +224,7 @@ def update_parking(parking_id):
         if getattr(parking, field) != value:
             changed_structural_fields = True
             setattr(parking, field, value)
-        next_values[field] = value
+        next_values[field] = value.value if hasattr(value, "value") else value
 
     duplicate = _find_owner_duplicate_parking(
         user.id_compte,
