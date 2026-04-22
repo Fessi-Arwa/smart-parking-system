@@ -12,6 +12,7 @@ export interface User {
   telephone?: string;
   role?: 'conducteur' | 'owner' | 'admin';
   owner_status?: 'en_attente' | 'accepte' | 'refuse' | 'suspendu' | null;
+  owner_status_reason?: string | null;
 }
 
 export interface UpdateProfilePayload {

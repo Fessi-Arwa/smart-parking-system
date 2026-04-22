@@ -6,8 +6,11 @@ export type AiSetupStatus = 'non_configuree' | 'en_cours' | 'testee' | 'active';
 
 export interface OwnerWorkflowState {
   ownerStatus: OwnerValidationStatus;
+  ownerStatusReason?: string | null;
   parkingStatus: ParkingValidationStatus;
+  parkingStatusReason?: string | null;
   subscriptionStatus: SubscriptionStatus;
+  subscriptionStatusReason?: string | null;
   subscriptionStartDate?: string | null;
   subscriptionEndDate?: string | null;
   subscriptionType?: 'mensuel' | 'trimestriel' | 'annuel' | null;

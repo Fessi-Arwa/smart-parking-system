@@ -29,6 +29,7 @@ class Abonnement(ModelMixin, db.Model):
         "date_debut",
         "date_fin",
         "statut",
+        "admin_status_reason",
         "tarif",
         "created_at",
     )
@@ -46,6 +47,7 @@ class Abonnement(ModelMixin, db.Model):
         nullable=False,
         server_default=StatutAbonnement.en_attente.value,
     )
+    admin_status_reason = db.Column(db.Text)
     tarif = db.Column(db.Numeric(10, 2), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
 

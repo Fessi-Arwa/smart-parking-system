@@ -1,16 +1,20 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
-import { OwnerWorkflowGuard } from '../../guards/owner-workflow.guard';
 import { AiSetupPage } from './ai-setup/ai-setup.page';
 import { ParkingSetupPage } from './parking-setup/parking-setup.page';
 import { PendingPage } from './pending/pending.page';
 import { SubscriptionPage } from './subscription/subscription.page';
+import { WorkflowPage } from './workflow/workflow.page';
 
 const routes: Routes = [
   {
     path: 'dashboard',
     loadChildren: () => import('./dashboard/dashboard.module').then(m => m.DashboardPageModule)
+  },
+  {
+    path: 'workflow',
+    component: WorkflowPage,
   },
   {
     path: 'overview',
@@ -54,7 +58,7 @@ const routes: Routes = [
   //   path: 'feedbacks',
   //   loadChildren: () => import('./feedbacks/feedbacks.module').then(m => m.FeedbacksPageModule)
   // },
-  { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
+  { path: '', redirectTo: 'workflow', pathMatch: 'full' }
 ];
 
 @NgModule({

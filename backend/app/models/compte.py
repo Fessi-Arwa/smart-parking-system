@@ -28,6 +28,7 @@ class Compte(ModelMixin, db.Model):
         "telephone",
         "role",
         "owner_status",
+        "owner_status_reason",
         "created_at",
         "updated_at",
     )
@@ -43,6 +44,7 @@ class Compte(ModelMixin, db.Model):
         nullable=False,
         server_default=StatutValidationOwner.en_attente.value,
     )
+    owner_status_reason = db.Column(db.Text)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = db.Column(
         db.DateTime(timezone=True),

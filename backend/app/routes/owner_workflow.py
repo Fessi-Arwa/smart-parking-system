@@ -216,8 +216,10 @@ def _source_to_dict(source, ai_service=None):
     try:
         service = ai_service or _get_ai_source_service()
         data["analysis"] = service.get_analysis(source.id_source)
-        calibration_path, _ = service.extract_calibration_frame(source)
-        if calibration_path:
+        source_type = source.source_type.value if hasattr(source.source_type, "value") else str(source.source_type)
+        if source_type == TypeSourceIA.image.value and data["preview_url"]:
+            data["calibration_preview_url"] = data["preview_url"]
+        elif source_type == TypeSourceIA.video.value:
             data["calibration_preview_url"] = f"/api/owner/ai-sources/{source.id_source}/calibration-frame"
     except Exception as exc:
         data["analysis"] = {
@@ -243,12 +245,15 @@ def get_owner_workflow_status():
     return jsonify(
         {
             "ownerStatus": (user.owner_status or StatutValidationOwner.en_attente).value,
+            "ownerStatusReason": getattr(user, "owner_status_reason", None),
             "parkingStatus": (
                 parking.validation_status.value
                 if parking and parking.validation_status
                 else StatutValidationParking.brouillon.value
             ),
+            "parkingStatusReason": getattr(parking, "validation_reason", None) if parking else None,
             "subscriptionStatus": subscription_status,
+            "subscriptionStatusReason": getattr(abonnement, "admin_status_reason", None) if abonnement else None,
             "parkingSetupStatus": (
                 parking.setup_status.value
                 if parking and parking.setup_status

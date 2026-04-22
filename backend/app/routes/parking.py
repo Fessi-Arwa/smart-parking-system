@@ -3,7 +3,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required, verify_jwt_in_req
 from sqlalchemy import func, or_
 
 from .. import db
-from ..models.compte import Compte, RoleCompte
+from ..models.compte import Compte, RoleCompte, StatutValidationOwner
 from ..models.parking import (
     Parking,
     StatutConfigurationIA,
@@ -97,6 +97,11 @@ def create_parking():
     if user.role != RoleCompte.owner:
         return jsonify({"msg": "Seuls les owners peuvent ajouter un parking"}), 403
 
+    if user.owner_status != StatutValidationOwner.accepte:
+        return jsonify(
+            {"msg": "Le compte owner doit etre accepte par l admin avant d ajouter un parking"}
+        ), 403
+
     nom = _normalize_text(data.get("nom"))
     adresse = _normalize_text(data.get("adresse"))
     required_fields = {
@@ -136,6 +141,7 @@ def create_parking():
         prix_heure=prix_heure,
         statut=statut,
         validation_status=StatutValidationParking.en_attente_validation,
+        validation_reason=None,
         setup_status=StatutConfigurationParking.non_commencee,
         ai_setup_status=StatutConfigurationIA.non_configuree,
     )
@@ -246,6 +252,7 @@ def update_parking(parking_id):
 
         if not is_setup_in_progress:
             parking.validation_status = StatutValidationParking.en_attente_validation
+            parking.validation_reason = None
             parking.setup_status = StatutConfigurationParking.non_commencee
             parking.ai_setup_status = StatutConfigurationIA.non_configuree
 

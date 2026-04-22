@@ -36,6 +36,7 @@ def _serialize_user(user):
         "telephone": user.telephone,
         "role": user.role.value,
         "owner_status": user.owner_status.value if getattr(user, "owner_status", None) else None,
+        "owner_status_reason": getattr(user, "owner_status_reason", None),
     }
 
 

@@ -13,6 +13,7 @@ export interface ParkingDto {
   prix_heure: number;
   statut: 'actif' | 'inactif';
   validation_status?: string;
+  validation_reason?: string | null;
   setup_status?: string;
   ai_setup_status?: string;
   created_at?: string;

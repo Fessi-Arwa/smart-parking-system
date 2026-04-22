@@ -3,6 +3,7 @@ import { AbstractControl, FormBuilder, FormGroup, ValidationErrors, Validators }
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../services/auth.service';
+import { OwnerWorkflowService } from '../../../services/owner-workflow.service';
 import { ToastService } from '../../../services/toast.service';
 
 @Component({
@@ -20,6 +21,7 @@ export class SignupComponent implements OnInit, AfterViewInit {
   constructor(
     private fb: FormBuilder,
     private authService: AuthService,
+    private ownerWorkflowService: OwnerWorkflowService,
     private router: Router,
     private toastService: ToastService
   ) {
@@ -42,7 +44,7 @@ export class SignupComponent implements OnInit, AfterViewInit {
 
   ngOnInit() {
     if (this.authService.isAuthenticated()) {
-      this.router.navigate(['/owner/dashboard']);
+      void this.redirectAuthenticatedUser();
     }
   }
 
@@ -83,6 +85,23 @@ export class SignupComponent implements OnInit, AfterViewInit {
 
   goToSignin(): void {
     this.router.navigate(['/pages/auth/signin/form']);
+  }
+
+  private async redirectAuthenticatedUser(): Promise<void> {
+    const user = this.authService.getCurrentUser();
+
+    if (user?.role === 'owner') {
+      const route = await this.ownerWorkflowService.resolveEntryRoute();
+      await this.router.navigateByUrl(route);
+      return;
+    }
+
+    if (user?.role === 'admin') {
+      await this.router.navigate(['/admin']);
+      return;
+    }
+
+    await this.router.navigate(['/dashboard']);
   }
 
   private getAuthErrorMessage(error: any, fallback: string): string {

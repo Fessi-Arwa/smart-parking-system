@@ -27,6 +27,7 @@ export interface OwnerProfile {
   telephone: string;
   role: string;
   owner_status?: 'en_attente' | 'accepte' | 'refuse' | 'suspendu' | null;
+  owner_status_reason?: string | null;
   companyName?: string;
   avatar?: string;
 }
@@ -39,6 +40,7 @@ export interface ParkingInfo {
   prix_heure: number;
   statut: 'actif' | 'inactif';
   validation_status?: string;
+  validation_reason?: string | null;
   setup_status?: string;
   ai_setup_status?: string;
   totalSpaces: number;
@@ -145,6 +147,7 @@ export class ProfilePage implements OnInit, OnDestroy {
         email: currentUser.email || this.owner.email,
         telephone: currentUser.telephone || this.owner.telephone,
         owner_status: currentUser.owner_status ?? this.owner.owner_status ?? null,
+        owner_status_reason: currentUser.owner_status_reason ?? this.owner.owner_status_reason ?? null,
       };
     }
 
@@ -154,6 +157,7 @@ export class ProfilePage implements OnInit, OnDestroy {
     try {
       this.workflowState = await this.ownerWorkflowService.refresh();
       this.owner.owner_status = this.workflowState.ownerStatus;
+      this.owner.owner_status_reason = this.workflowState.ownerStatusReason ?? null;
     } catch (error) {
       console.warn('Workflow owner indisponible, fallback sur les donnees locales du profil.', error);
       this.workflowState = this.owner.owner_status
@@ -361,13 +365,7 @@ export class ProfilePage implements OnInit, OnDestroy {
   }
 
   get canCreateParking(): boolean {
-    if (this.workflowState?.ownerStatus === 'accepte') {
-      return true;
-    }
-    if (this.owner.owner_status === 'accepte') {
-      return true;
-    }
-    return this.workflowState == null;
+    return this.workflowState?.ownerStatus === 'accepte' || this.owner.owner_status === 'accepte';
   }
 
   get pendingReviewParking(): ParkingInfo | null {
@@ -392,7 +390,7 @@ export class ProfilePage implements OnInit, OnDestroy {
 
   get newParkingWorkflowHint(): string {
     if (this.workflowState?.ownerStatus !== 'accepte') {
-      return 'Vous pouvez deja enregistrer le parking. Il sera simplement bloque jusqu a la validation du compte owner.';
+      return 'La creation du parking sera disponible des que le compte owner sera accepte par l admin.';
     }
 
     if (this.pendingReviewParking) {
@@ -404,7 +402,7 @@ export class ProfilePage implements OnInit, OnDestroy {
 
   get portfolioNextActionTitle(): string {
     if (this.workflowState?.ownerStatus !== 'accepte' && this.parkings.length === 0) {
-      return 'Ajouter le premier parking pendant la verification';
+      return 'Attendre la validation du compte owner';
     }
     if (this.workflowState?.ownerStatus !== 'accepte') {
       return 'Attendre la validation du compte owner';
@@ -425,9 +423,6 @@ export class ProfilePage implements OnInit, OnDestroy {
   }
 
   get profilePrimaryActionLabel(): string {
-    if (this.workflowState?.ownerStatus !== 'accepte' && this.parkings.length === 0) {
-      return 'Ajouter un parking';
-    }
     if (this.workflowState?.ownerStatus !== 'accepte') {
       return 'Suivre la validation';
     }
@@ -447,11 +442,6 @@ export class ProfilePage implements OnInit, OnDestroy {
   }
 
   async handleProfilePrimaryAction(): Promise<void> {
-    if (this.workflowState?.ownerStatus !== 'accepte' && this.parkings.length === 0) {
-      this.openAddParking();
-      return;
-    }
-
     if (this.workflowState?.ownerStatus !== 'accepte') {
       await this.router.navigate(['/owner/pending']);
       return;
@@ -679,6 +669,13 @@ export class ProfilePage implements OnInit, OnDestroy {
   }
 
   openAddParking(): void {
+    if (!this.canCreateParking) {
+      this.toastService.show(
+        'Le compte owner doit etre valide par l admin avant d ajouter un parking.',
+        'error'
+      );
+      return;
+    }
     this.showAddParking = true;
     this.selectedParking = null;
     this.newParkingData = {
@@ -763,7 +760,9 @@ export class ProfilePage implements OnInit, OnDestroy {
         }
         return 'Parking valide. La configuration peut continuer.';
       case 'rejete':
-        return 'Le dossier a ete rejete. Mettez a jour les informations avant une nouvelle soumission.';
+        return parking.validation_reason
+          ? `Le dossier a ete rejete. Motif admin: ${parking.validation_reason}`
+          : 'Le dossier a ete rejete. Mettez a jour les informations avant une nouvelle soumission.';
       default:
         return 'Completez les informations pour lancer le workflow.';
     }
@@ -888,6 +887,7 @@ export class ProfilePage implements OnInit, OnDestroy {
       prix_heure: Number(parking.prix_heure),
       statut: this.toFrontendParkingStatus(parking.statut),
       validation_status: parking.validation_status || 'brouillon',
+      validation_reason: parking.validation_reason || null,
       setup_status: parking.setup_status || 'non_commencee',
       ai_setup_status: parking.ai_setup_status || 'non_configuree',
       totalSpaces: parking.capacite,
@@ -992,6 +992,10 @@ export class ProfilePage implements OnInit, OnDestroy {
   }
 
   private getNewParkingValidationMessage(): string | null {
+    if (!this.canCreateParking) {
+      return 'Le compte owner doit etre valide par l admin avant de creer un parking.';
+    }
+
     const nom = this.newParkingData.nom?.trim() || '';
     const adresse = this.newParkingData.adresse?.trim() || '';
 

@@ -47,10 +47,6 @@ export class PendingPage implements OnInit {
   }
 
   get pendingTitle(): string {
-    if (this.waitingOnOwnerApproval && !this.workflowState?.hasParking) {
-      return 'Compte en verification, parking a preparer';
-    }
-
     if (this.waitingOnOwnerApproval) {
       return 'Validation du compte owner en attente';
     }
@@ -67,12 +63,16 @@ export class PendingPage implements OnInit {
   }
 
   get pendingDescription(): string {
-    if (this.waitingOnOwnerApproval && !this.workflowState?.hasParking) {
-      return "Votre compte owner est en attente, mais vous pouvez deja enregistrer votre premier parking pour gagner du temps.";
-    }
-
     if (this.waitingOnOwnerApproval) {
-      return "Votre compte owner est en attente de validation. Votre parking restera bloque jusqu a la decision de l admin.";
+      if (this.workflowState?.ownerStatus === 'refuse' && this.workflowState?.ownerStatusReason) {
+        return `Votre compte owner a ete refuse. Motif admin: ${this.workflowState.ownerStatusReason}`;
+      }
+
+      if (this.workflowState?.ownerStatus === 'suspendu' && this.workflowState?.ownerStatusReason) {
+        return `Votre compte owner est suspendu. Motif admin: ${this.workflowState.ownerStatusReason}`;
+      }
+
+      return "Votre compte owner est en attente de validation. La creation d un parking sera debloquee apres la decision de l admin.";
     }
 
     if (this.waitingOnParkingCreation) {
@@ -80,6 +80,10 @@ export class PendingPage implements OnInit {
     }
 
     if (this.waitingOnParkingApproval) {
+      if (this.workflowState?.parkingStatus === 'rejete' && this.workflowState?.parkingStatusReason) {
+        return `Le parking a ete rejete par l admin. Motif: ${this.workflowState.parkingStatusReason}`;
+      }
+
       const parkingSuffix = this.workflowState?.parkingId
         ? ` Le parking concerne est le #${this.workflowState.parkingId}.`
         : '';
@@ -98,10 +102,6 @@ export class PendingPage implements OnInit {
   }
 
   get primaryActionLabel(): string {
-    if (this.waitingOnOwnerApproval && !this.workflowState?.hasParking) {
-      return 'Ajouter mon parking';
-    }
-
     if (this.waitingOnParkingCreation) {
       return 'Creer mon parking';
     }
@@ -110,11 +110,6 @@ export class PendingPage implements OnInit {
   }
 
   async handlePrimaryAction(): Promise<void> {
-    if (this.waitingOnOwnerApproval && !this.workflowState?.hasParking) {
-      await this.router.navigate(['/owner/profile']);
-      return;
-    }
-
     if (this.waitingOnParkingCreation) {
       await this.router.navigate(['/owner/profile']);
       return;

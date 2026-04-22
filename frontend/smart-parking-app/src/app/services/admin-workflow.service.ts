@@ -12,6 +12,7 @@ export interface AdminUserRecord {
   telephone?: string;
   role: 'conducteur' | 'owner' | 'admin';
   owner_status?: 'en_attente' | 'accepte' | 'refuse' | 'suspendu';
+  owner_status_reason?: string | null;
   created_at: string;
 }
 
@@ -26,6 +27,7 @@ export interface AdminParkingRecord {
   prix_heure: number;
   statut: 'actif' | 'inactif';
   validation_status: 'brouillon' | 'en_attente_validation' | 'valide' | 'rejete';
+  validation_reason?: string | null;
   setup_status?: 'non_commencee' | 'en_cours' | 'terminee';
   ai_setup_status?: 'non_configuree' | 'en_cours' | 'testee' | 'active';
   created_at: string;
@@ -37,6 +39,7 @@ export interface AdminAppSubscriptionRecord {
   date_debut: string;
   date_fin: string;
   statut: 'actif' | 'expire' | 'suspendu' | 'en_attente';
+  admin_status_reason?: string | null;
   tarif: number;
   parking_id: number;
   parking?: {
@@ -54,6 +57,7 @@ export interface AdminAppSubscriptionRecord {
     email: string;
     telephone?: string;
     role: 'conducteur' | 'owner' | 'admin';
+    owner_status?: 'en_attente' | 'accepte' | 'refuse' | 'suspendu' | null;
   } | null;
 }
 
@@ -94,12 +98,13 @@ export class AdminWorkflowService {
 
   updateOwnerStatus(
     userId: number,
-    ownerStatus: 'en_attente' | 'accepte' | 'refuse' | 'suspendu'
+    ownerStatus: 'en_attente' | 'accepte' | 'refuse' | 'suspendu',
+    reason?: string | null
   ): Promise<AdminUserRecord> {
     return firstValueFrom(
       this.http.put<AdminUserRecord>(
         `${this.apiUrl}/owners/${userId}/status`,
-        { owner_status: ownerStatus },
+        { owner_status: ownerStatus, reason: reason || null },
         { headers: this.buildAuthHeaders() }
       )
     );
@@ -107,12 +112,13 @@ export class AdminWorkflowService {
 
   updateParkingValidationStatus(
     parkingId: number,
-    validationStatus: 'brouillon' | 'en_attente_validation' | 'valide' | 'rejete'
+    validationStatus: 'brouillon' | 'en_attente_validation' | 'valide' | 'rejete',
+    reason?: string | null
   ): Promise<AdminParkingRecord> {
     return firstValueFrom(
       this.http.put<AdminParkingRecord>(
         `${this.apiUrl}/parkings/${parkingId}/validation-status`,
-        { validation_status: validationStatus },
+        { validation_status: validationStatus, reason: reason || null },
         { headers: this.buildAuthHeaders() }
       )
     );
@@ -120,12 +126,13 @@ export class AdminWorkflowService {
 
   updateAppSubscriptionStatus(
     abonnementId: number,
-    statut: 'actif' | 'expire' | 'suspendu' | 'en_attente'
+    statut: 'actif' | 'expire' | 'suspendu' | 'en_attente',
+    reason?: string | null
   ): Promise<AdminAppSubscriptionRecord> {
     return firstValueFrom(
       this.http.put<AdminAppSubscriptionRecord>(
         `${this.apiUrl}/app-subscriptions/${abonnementId}/status`,
-        { statut },
+        { statut, reason: reason || null },
         { headers: this.buildAuthHeaders() }
       )
     );

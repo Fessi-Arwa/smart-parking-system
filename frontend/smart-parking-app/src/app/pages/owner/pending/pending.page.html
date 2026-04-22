@@ -45,7 +45,7 @@
 
     <article class="owner-step__next-action" *ngIf="waitingOnOwnerApproval || waitingOnParkingCreation || waitingOnParkingApproval">
       <strong>Prochaine action</strong>
-      <span *ngIf="waitingOnOwnerApproval">Attendre la validation du compte.</span>
+      <span *ngIf="waitingOnOwnerApproval">Attendre la validation du compte owner avant de creer ou debloquer un parking.</span>
       <span *ngIf="waitingOnParkingCreation">Creer le premier parking.</span>
       <span *ngIf="waitingOnParkingApproval">Attendre la validation du parking.</span>
     </article>

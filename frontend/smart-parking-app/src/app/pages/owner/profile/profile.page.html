@@ -65,7 +65,17 @@
 
       <div class="workflow-banner workflow-banner--info" *ngIf="workflowState?.ownerStatus !== 'accepte' && parkings.length === 0">
         <ion-icon name="information-circle-outline"></ion-icon>
-        <p>Vous pouvez deja ajouter votre premier parking. Il sera visible par l admin et attendra la validation du compte owner.</p>
+        <p>Le compte owner doit d abord etre accepte par l admin avant la creation du premier parking.</p>
+      </div>
+
+      <div class="workflow-banner workflow-banner--danger" *ngIf="workflowState?.ownerStatus === 'refuse' && workflowState?.ownerStatusReason">
+        <ion-icon name="alert-circle-outline"></ion-icon>
+        <p>Motif admin : {{ workflowState?.ownerStatusReason }}</p>
+      </div>
+
+      <div class="workflow-banner workflow-banner--danger" *ngIf="workflowState?.ownerStatus === 'suspendu' && workflowState?.ownerStatusReason">
+        <ion-icon name="pause-circle-outline"></ion-icon>
+        <p>Compte suspendu : {{ workflowState?.ownerStatusReason }}</p>
       </div>
     </section>
 
@@ -253,6 +263,11 @@
             <p class="parking-next-step parking-next-step--detail">
               {{ getParkingNextStep(selectedParking) }}
             </p>
+
+            <div class="workflow-banner workflow-banner--danger" *ngIf="selectedParking.validation_status === 'rejete' && selectedParking.validation_reason">
+              <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+              <p>Motif admin : {{ selectedParking.validation_reason }}</p>
+            </div>
 
             <div class="detail-stats">
               <article>

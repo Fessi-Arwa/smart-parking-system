@@ -36,7 +36,7 @@ export class SubscriptionPage implements OnInit {
   ) {}
 
   async ngOnInit(): Promise<void> {
-    this.workflowState = await this.ownerWorkflowService.refresh();
+    await this.refreshStatus();
   }
 
   async refreshStatus(): Promise<void> {

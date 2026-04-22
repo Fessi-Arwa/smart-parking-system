@@ -43,6 +43,7 @@ class Parking(ModelMixin, db.Model):
         "prix_heure",
         "statut",
         "validation_status",
+        "validation_reason",
         "setup_status",
         "ai_setup_status",
         "created_at",
@@ -73,6 +74,7 @@ class Parking(ModelMixin, db.Model):
         nullable=False,
         server_default=StatutValidationParking.brouillon.value,
     )
+    validation_reason = db.Column(db.Text)
     setup_status = db.Column(
         db.Enum(StatutConfigurationParking, name="statut_configuration_parking"),
         nullable=False,

@@ -54,6 +54,11 @@ def _ensure_runtime_schema_compatibility(app):
             "updated_at",
             "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
         )
+        add_column_if_missing(
+            "comptes",
+            "owner_status_reason",
+            "owner_status_reason TEXT",
+        )
 
         add_column_if_missing(
             "parking",
@@ -81,6 +86,11 @@ def _ensure_runtime_schema_compatibility(app):
             "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
         )
         add_column_if_missing(
+            "parking",
+            "validation_reason",
+            "validation_reason TEXT",
+        )
+        add_column_if_missing(
             "parking_ai_source",
             "bucket_key",
             "bucket_key TEXT",
@@ -100,6 +110,11 @@ def _ensure_runtime_schema_compatibility(app):
             "abonnement",
             "tarif",
             "tarif NUMERIC(10,2) NOT NULL DEFAULT 0",
+        )
+        add_column_if_missing(
+            "abonnement",
+            "admin_status_reason",
+            "admin_status_reason TEXT",
         )
 
         add_column_if_missing(

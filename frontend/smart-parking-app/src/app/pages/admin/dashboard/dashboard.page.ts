@@ -42,6 +42,13 @@ export class AdminDashboardPage implements OnInit {
   parkingStatusFilter: 'all' | 'en_attente_validation' | 'valide' | 'rejete' = 'all';
   subscriptionSearchTerm = '';
   subscriptionStatusFilter: 'all' | 'en_attente' | 'actif' | 'suspendu' | 'expire' = 'all';
+  decisionModalOpen = false;
+  decisionReason = '';
+  decisionModalTitle = '';
+  decisionModalDescription = '';
+  decisionRequiresReason = true;
+  decisionConfirmLabel = 'Confirmer';
+  private pendingDecisionAction: (() => Promise<void>) | null = null;
 
   constructor(
     private authService: AuthService,
@@ -150,37 +157,35 @@ export class AdminDashboardPage implements OnInit {
       this.toastService.show('Compte owner approuve avec succes.', 'success');
     } catch (error) {
       console.error('Erreur approbation owner', error);
-      this.toastService.show('Impossible d approuver ce compte owner.', 'error');
+      this.toastService.show(this.getErrorMessage(error, 'Impossible d approuver ce compte owner.'), 'error');
     }
   }
 
   async rejectOwner(userId: number): Promise<void> {
-    try {
-      const updatedUser = await this.adminWorkflowService.updateOwnerStatus(userId, 'refuse');
-      this.users = this.users.map((user) => (user.id_compte === userId ? updatedUser : user));
-      this.updateStats();
-      this.toastService.show('Compte owner rejete.', 'info');
-    } catch (error) {
-      console.error('Erreur rejet owner', error);
-      this.toastService.show('Impossible de rejeter ce compte owner.', 'error');
-    }
+    this.openDecisionModal(
+      'Motif du rejet du compte owner',
+      'Expliquez clairement pourquoi ce compte owner est rejete.',
+      async (reason) => {
+        const updatedUser = await this.adminWorkflowService.updateOwnerStatus(userId, 'refuse', reason);
+        this.users = this.users.map((user) => (user.id_compte === userId ? updatedUser : user));
+        this.updateStats();
+        this.toastService.show('Compte owner rejete.', 'info');
+      }
+    );
   }
 
   async deleteUser(userId: number): Promise<void> {
-    if (!confirm('Etes-vous sur de vouloir supprimer cet utilisateur ?')) {
-      return;
-    }
-
-    try {
-      await this.adminWorkflowService.deleteUser(userId);
-      this.users = this.users.filter((user) => user.id_compte !== userId);
-      this.parkings = this.parkings.filter((parking) => parking.owner_id !== userId);
-      this.updateStats();
-      this.toastService.show('Utilisateur supprime avec succes.', 'success');
-    } catch (error) {
-      console.error('Erreur suppression utilisateur', error);
-      this.toastService.show('Impossible de supprimer cet utilisateur.', 'error');
-    }
+    this.openConfirmationModal(
+      'Supprimer cet utilisateur',
+      'Cette suppression est irreversible et retirera aussi les donnees reliees a cet utilisateur.',
+      async () => {
+        await this.adminWorkflowService.deleteUser(userId);
+        this.users = this.users.filter((user) => user.id_compte !== userId);
+        this.parkings = this.parkings.filter((parking) => parking.owner_id !== userId);
+        this.updateStats();
+        this.toastService.show('Utilisateur supprime avec succes.', 'success');
+      }
+    );
   }
 
   async approveParking(parkingId: number): Promise<void> {
@@ -196,41 +201,40 @@ export class AdminDashboardPage implements OnInit {
       this.toastService.show('Parking approuve avec succes.', 'success');
     } catch (error) {
       console.error('Erreur approbation parking', error);
-      this.toastService.show('Impossible d approuver ce parking.', 'error');
+      this.toastService.show(this.getErrorMessage(error, 'Impossible d approuver ce parking.'), 'error');
     }
   }
 
   async rejectParking(parkingId: number): Promise<void> {
-    try {
-      const updatedParking = await this.adminWorkflowService.updateParkingValidationStatus(
-        parkingId,
-        'rejete'
-      );
-      this.parkings = this.parkings.map((parking) =>
-        parking.id_park === parkingId ? updatedParking : parking
-      );
-      this.updateStats();
-      this.toastService.show('Parking rejete.', 'info');
-    } catch (error) {
-      console.error('Erreur rejet parking', error);
-      this.toastService.show('Impossible de rejeter ce parking.', 'error');
-    }
+    this.openDecisionModal(
+      'Motif du rejet du parking',
+      'Precisez ce que le proprietaire doit corriger avant une nouvelle soumission.',
+      async (reason) => {
+        const updatedParking = await this.adminWorkflowService.updateParkingValidationStatus(
+          parkingId,
+          'rejete',
+          reason
+        );
+        this.parkings = this.parkings.map((parking) =>
+          parking.id_park === parkingId ? updatedParking : parking
+        );
+        this.updateStats();
+        this.toastService.show('Parking rejete.', 'info');
+      }
+    );
   }
 
   async deleteParking(parkingId: number): Promise<void> {
-    if (!confirm('Etes-vous sur de vouloir supprimer ce parking ?')) {
-      return;
-    }
-
-    try {
-      await this.adminWorkflowService.deleteParking(parkingId);
-      this.parkings = this.parkings.filter((parking) => parking.id_park !== parkingId);
-      this.updateStats();
-      this.toastService.show('Parking supprime avec succes.', 'success');
-    } catch (error) {
-      console.error('Erreur suppression parking', error);
-      this.toastService.show('Impossible de supprimer ce parking.', 'error');
-    }
+    this.openConfirmationModal(
+      'Supprimer ce parking',
+      'Cette suppression est irreversible. Verifiez qu aucun dossier ou traitement ne doit etre conserve.',
+      async () => {
+        await this.adminWorkflowService.deleteParking(parkingId);
+        this.parkings = this.parkings.filter((parking) => parking.id_park !== parkingId);
+        this.updateStats();
+        this.toastService.show('Parking supprime avec succes.', 'success');
+      }
+    );
   }
 
   async activateSubscription(abonnementId: number): Promise<void> {
@@ -240,22 +244,24 @@ export class AdminDashboardPage implements OnInit {
       this.toastService.show('Abonnement parking active avec succes.', 'success');
     } catch (error) {
       console.error('Erreur activation abonnement parking', error);
-      this.toastService.show('Impossible d activer cet abonnement.', 'error');
+      this.toastService.show(this.getErrorMessage(error, 'Impossible d activer cet abonnement.'), 'error');
     }
   }
 
   async suspendSubscription(abonnementId: number): Promise<void> {
-    try {
-      const updated = await this.adminWorkflowService.updateAppSubscriptionStatus(
-        abonnementId,
-        'suspendu'
-      );
-      this.replaceSubscription(updated);
-      this.toastService.show('Abonnement suspendu.', 'info');
-    } catch (error) {
-      console.error('Erreur suspension abonnement parking', error);
-      this.toastService.show('Impossible de suspendre cet abonnement.', 'error');
-    }
+    this.openDecisionModal(
+      'Motif de la suspension de l abonnement',
+      'Indiquez pourquoi cet abonnement est suspendu.',
+      async (reason) => {
+        const updated = await this.adminWorkflowService.updateAppSubscriptionStatus(
+          abonnementId,
+          'suspendu',
+          reason
+        );
+        this.replaceSubscription(updated);
+        this.toastService.show('Abonnement suspendu.', 'info');
+      }
+    );
   }
 
   updateStats(): void {
@@ -402,6 +408,12 @@ export class AdminDashboardPage implements OnInit {
 
   getParkingApprovalHint(parking: AdminParkingRecord): string | null {
     if (parking.validation_status !== 'en_attente_validation') {
+      if (
+        parking.validation_status === 'valide' &&
+        (parking.setup_status === 'en_cours' || parking.setup_status === 'terminee')
+      ) {
+        return 'Parking deja valide. Toute desactivation devra tenir compte de la configuration et des abonnements lies.';
+      }
       return null;
     }
 
@@ -410,6 +422,14 @@ export class AdminDashboardPage implements OnInit {
     }
 
     return 'Verifier les informations avant approbation.';
+  }
+
+  getOwnerDecisionHint(user: AdminUserRecord): string | null {
+    if (user.role !== 'owner') {
+      return null;
+    }
+
+    return user.owner_status_reason || null;
   }
 
   getParkingReviewStepLabel(parking: AdminParkingRecord): string {
@@ -447,6 +467,30 @@ export class AdminDashboardPage implements OnInit {
       default:
         return 'IA non configuree';
     }
+  }
+
+  canActivateSubscription(subscription: AdminAppSubscriptionRecord): boolean {
+    return subscription.owner?.owner_status === 'accepte' && subscription.parking?.validation_status === 'valide';
+  }
+
+  getSubscriptionActionHint(subscription: AdminAppSubscriptionRecord): string | null {
+    if (subscription.admin_status_reason) {
+      return subscription.admin_status_reason;
+    }
+
+    if (subscription.statut === 'actif') {
+      return 'Suspendre l abonnement si le parking ou le compte owner doit etre bloque.';
+    }
+
+    if (subscription.owner?.owner_status !== 'accepte') {
+      return 'Le compte owner doit etre accepte avant activation de cet abonnement.';
+    }
+
+    if (subscription.parking?.validation_status !== 'valide') {
+      return 'Le parking doit etre valide avant activation de cet abonnement.';
+    }
+
+    return 'Abonnement pret pour activation admin.';
   }
 
   async reloadData(): Promise<void> {
@@ -519,5 +563,70 @@ export class AdminDashboardPage implements OnInit {
         : subscription
     );
     this.updateStats();
+  }
+
+  private getErrorMessage(error: unknown, fallback: string): string {
+    const payload = (error as { error?: { msg?: string; error?: string } })?.error;
+    return payload?.msg || payload?.error || fallback;
+  }
+
+  closeDecisionModal(): void {
+    this.decisionModalOpen = false;
+    this.decisionReason = '';
+    this.decisionModalTitle = '';
+    this.decisionModalDescription = '';
+    this.decisionRequiresReason = true;
+    this.decisionConfirmLabel = 'Confirmer';
+    this.pendingDecisionAction = null;
+  }
+
+  async confirmDecisionModal(): Promise<void> {
+    const reason = this.decisionReason.trim();
+    if (this.decisionRequiresReason && !reason) {
+      this.toastService.show('Le motif est obligatoire pour cette action.', 'error');
+      return;
+    }
+
+    const action = this.pendingDecisionAction;
+    if (!action) {
+      this.closeDecisionModal();
+      return;
+    }
+
+    try {
+      await action();
+      this.closeDecisionModal();
+    } catch (error) {
+      console.error('Erreur lors de l execution de la decision admin', error);
+      this.toastService.show(this.getErrorMessage(error, 'Impossible de finaliser cette action.'), 'error');
+    }
+  }
+
+  private openDecisionModal(
+    title: string,
+    description: string,
+    actionFactory: (reason: string) => Promise<void>
+  ): void {
+    this.decisionModalTitle = title;
+    this.decisionModalDescription = description;
+    this.decisionRequiresReason = true;
+    this.decisionConfirmLabel = 'Confirmer';
+    this.decisionReason = '';
+    this.pendingDecisionAction = async () => actionFactory(this.decisionReason.trim());
+    this.decisionModalOpen = true;
+  }
+
+  private openConfirmationModal(
+    title: string,
+    description: string,
+    action: () => Promise<void>
+  ): void {
+    this.decisionModalTitle = title;
+    this.decisionModalDescription = description;
+    this.decisionRequiresReason = false;
+    this.decisionConfirmLabel = 'Supprimer';
+    this.decisionReason = '';
+    this.pendingDecisionAction = action;
+    this.decisionModalOpen = true;
   }
 }

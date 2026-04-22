@@ -195,6 +195,10 @@
               </span>
             </div>
 
+            <div class="user-status" *ngIf="getOwnerDecisionHint(user)">
+              <span class="user-phone">Motif admin : {{ getOwnerDecisionHint(user) }}</span>
+            </div>
+
             <div class="user-date">Inscrit le {{ user.created_at }}</div>
           </div>
 
@@ -319,6 +323,11 @@
             <span>{{ getParkingApprovalHint(parking) }}</span>
           </div>
 
+          <div class="parking-address" *ngIf="parking.validation_reason">
+            <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+            <span>Motif admin : {{ parking.validation_reason }}</span>
+          </div>
+
           <div class="parking-address parking-address--step">
             <ion-icon name="trail-sign-outline"></ion-icon>
             <span>{{ getParkingReviewStepLabel(parking) }}</span>
@@ -418,12 +427,18 @@
             </span>
           </div>
 
+          <div class="parking-address" *ngIf="getSubscriptionActionHint(subscription)">
+            <ion-icon name="information-circle-outline"></ion-icon>
+            <span>{{ getSubscriptionActionHint(subscription) }}</span>
+          </div>
+
           <div class="parking-actions">
             <button
               class="action-btn approve"
               type="button"
               *ngIf="subscription.statut === 'en_attente' || subscription.statut === 'suspendu'"
-              (click)="activateSubscription(subscription.id_abon)">
+              (click)="activateSubscription(subscription.id_abon)"
+              [disabled]="!canActivateSubscription(subscription)">
               <ion-icon name="checkmark-outline"></ion-icon>
               Activer
             </button>
@@ -445,4 +460,32 @@
       </div>
     </section>
   </div>
+
+  <div class="decision-modal__backdrop" *ngIf="decisionModalOpen" (click)="closeDecisionModal()"></div>
+  <section class="decision-modal" *ngIf="decisionModalOpen" aria-modal="true" role="dialog">
+    <div class="decision-modal__header">
+      <div>
+        <p class="hero-kicker">Decision admin</p>
+        <h3>{{ decisionModalTitle }}</h3>
+      </div>
+      <button class="delete-btn" type="button" (click)="closeDecisionModal()">
+        <ion-icon name="close-outline"></ion-icon>
+      </button>
+    </div>
+
+    <p class="decision-modal__description">{{ decisionModalDescription }}</p>
+
+    <label class="decision-modal__field" *ngIf="decisionRequiresReason">
+      <span>Motif</span>
+      <textarea
+        [(ngModel)]="decisionReason"
+        rows="5"
+        placeholder="Saisissez un motif clair pour le proprietaire"></textarea>
+    </label>
+
+    <div class="decision-modal__actions">
+      <button class="ghost-btn" type="button" (click)="closeDecisionModal()">Annuler</button>
+      <button class="primary-btn" type="button" (click)="confirmDecisionModal()">{{ decisionConfirmLabel }}</button>
+    </div>
+  </section>
 </ion-content>

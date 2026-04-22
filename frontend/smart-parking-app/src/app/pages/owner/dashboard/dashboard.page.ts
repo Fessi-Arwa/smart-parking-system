@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { OwnerWorkflowState } from '../../../models/owner-workflow.model';
@@ -133,12 +134,20 @@ export class DashboardPage implements OnInit {
     private parkingAiSourceService: ParkingAiSourceService,
     private parkingService: ParkingService,
     private placeService: PlaceService,
+    private router: Router,
     private reservationService: ReservationService,
     private subscriptionService: SubscriptionService
   ) {}
 
   async ngOnInit(): Promise<void> {
-    await this.loadOwnerData();
+    const workflowState = await this.ownerWorkflowService.refresh();
+    const entryRoute = this.ownerWorkflowService.getEntryRoute(workflowState);
+    if (entryRoute !== '/owner/dashboard') {
+      await this.router.navigateByUrl(entryRoute);
+      return;
+    }
+
+    await this.loadOwnerData(workflowState);
   }
 
   get ownerName(): string {
@@ -609,12 +618,26 @@ export class DashboardPage implements OnInit {
           ? [
               {
                 title: 'Compte owner refuse',
-                description: 'Le compte owner a ete refuse. Verifiez le dossier ou contactez l admin.',
+                description: this.workflowState?.ownerStatusReason
+                  ? `Motif admin: ${this.workflowState.ownerStatusReason}`
+                  : 'Le compte owner a ete refuse. Verifiez le dossier ou contactez l admin.',
                 timestamp: 'Decision admin',
                 icon: 'alert-circle-outline',
                 tone: 'alert' as const,
               },
             ]
+          : this.workflowState?.ownerStatus === 'suspendu'
+            ? [
+                {
+                  title: 'Compte owner suspendu',
+                  description: this.workflowState?.ownerStatusReason
+                    ? `Motif admin: ${this.workflowState.ownerStatusReason}`
+                    : 'Le compte owner est suspendu. Contactez l admin.',
+                  timestamp: 'Decision admin',
+                  icon: 'pause-circle-outline',
+                  tone: 'alert' as const,
+                },
+              ]
           : [];
 
     const parkingValidatedNotification =
@@ -838,13 +861,13 @@ export class DashboardPage implements OnInit {
     });
   }
 
-  private async loadOwnerData(): Promise<void> {
+  private async loadOwnerData(workflowStateOverride?: OwnerWorkflowState): Promise<void> {
     this.isLoading = true;
     try {
       const currentUser = this.authService.getCurrentUser();
       const ownerId = currentUser?.id;
       const [workflowState, parkings, places, reservations, subscriptions] = await Promise.all([
-        this.ownerWorkflowService.refresh(),
+        workflowStateOverride ? Promise.resolve(workflowStateOverride) : this.ownerWorkflowService.refresh(),
         firstValueFrom(this.parkingService.getParkings()),
         firstValueFrom(this.placeService.getPlaces()),
         firstValueFrom(this.reservationService.getOwnerReservations()),

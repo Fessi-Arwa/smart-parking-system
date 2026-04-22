@@ -72,8 +72,12 @@ export class OwnerWorkflowService {
       return '/owner/pending';
     }
 
-    if (state.subscriptionStatus !== 'actif') {
+    if (state.subscriptionStatus === 'non_souscrit') {
       return '/owner/subscription';
+    }
+
+    if (state.subscriptionStatus !== 'actif') {
+      return '/owner/pending';
     }
 
     if (state.parkingSetupStatus !== 'terminee') {
@@ -85,6 +89,16 @@ export class OwnerWorkflowService {
     }
 
     return '/owner/overview';
+  }
+
+  getEntryRoute(state: OwnerWorkflowState = this.getSnapshot()): string {
+    const nextRoute = this.getNextRoute(state);
+    return nextRoute === '/owner/overview' ? '/owner/dashboard' : nextRoute;
+  }
+
+  async resolveEntryRoute(): Promise<string> {
+    const state = await this.refresh();
+    return this.getEntryRoute(state);
   }
 
   async activateAppSubscription(): Promise<OwnerWorkflowState> {

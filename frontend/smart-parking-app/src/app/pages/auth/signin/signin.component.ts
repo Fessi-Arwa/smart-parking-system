@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../services/auth.service';
+import { OwnerWorkflowService } from '../../../services/owner-workflow.service';
 import { ToastService } from '../../../services/toast.service';
 
 @Component({
@@ -20,6 +21,7 @@ export class SigninComponent implements OnInit, AfterViewInit {
   constructor(
     private fb: FormBuilder,
     private authService: AuthService,
+    private ownerWorkflowService: OwnerWorkflowService,
     private router: Router,
     private toastService: ToastService
   ) {
@@ -31,7 +33,7 @@ export class SigninComponent implements OnInit, AfterViewInit {
 
   ngOnInit() {
     if (this.authService.isAuthenticated()) {
-      this.redirectByRole();
+      void this.redirectByRole();
     }
   }
 
@@ -55,7 +57,7 @@ export class SigninComponent implements OnInit, AfterViewInit {
       const { email, password } = this.signinForm.value;
       await firstValueFrom(this.authService.signin(email, password));
       this.toastService.show('Connexion reussie ! Bienvenue sur PARKINI', 'success');
-      this.redirectByRole();
+      await this.redirectByRole();
     } catch (error: any) {
       this.toastService.show(error.error?.msg || error.error?.error || 'Erreur de connexion', 'error');
     } finally {
@@ -83,19 +85,20 @@ export class SigninComponent implements OnInit, AfterViewInit {
     return error?.error?.msg || error?.error?.error || fallback;
   }
 
-  private redirectByRole(): void {
+  private async redirectByRole(): Promise<void> {
     const user = this.authService.getCurrentUser();
 
     if (user?.role === 'admin') {
-      this.router.navigate(['/admin']);
+      await this.router.navigate(['/admin']);
       return;
     }
 
     if (user?.role === 'owner') {
-      this.router.navigate(['/owner/dashboard']);
+      const route = await this.ownerWorkflowService.resolveEntryRoute();
+      await this.router.navigateByUrl(route);
       return;
     }
 
-    this.router.navigate(['/dashboard']);
+    await this.router.navigate(['/dashboard']);
   }
 }
