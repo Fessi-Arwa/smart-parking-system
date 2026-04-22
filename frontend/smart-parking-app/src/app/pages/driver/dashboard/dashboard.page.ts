@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 
@@ -11,7 +11,7 @@ import { CreateSubscriptionPayload, SubscriptionDto, SubscriptionService } from 
 import { ToastService } from '../../../services/toast.service';
 import { VehicleDto, VehicleService } from '../../../services/vehicle.service';
 import { HeaderNotificationItem } from '../../../shared/components/header/header.component';
-import { MapParking } from '../../../shared/components/map/map.component';
+import { MapComponent, MapParking } from '../../../shared/components/map/map.component';
 
 type DriverTab = 'home' | 'historique' | 'profil';
 type PaymentMode = 'en_ligne' | 'sur_place';
@@ -55,6 +55,7 @@ interface ParkingCard {
 
 interface ReservationItem {
   id_res: number;
+  parkingId: number | null;
   parkingNom: string;
   placeLabel: string;
   date_debut: string;
@@ -67,6 +68,7 @@ interface ReservationItem {
 
 interface SubscriptionItem {
   id_abon: number;
+  parkingId: number | null;
   parkingNom: string;
   placeLabel: string;
   type: 'mensuel' | 'trimestriel' | 'annuel';
@@ -93,6 +95,8 @@ interface ParkingStructureSection {
   standalone: false,
 })
 export class DashboardPage implements OnInit, OnDestroy {
+  @ViewChild(MapComponent) private mapComponent?: MapComponent;
+
   private readonly subscriptionAlertWindowDays = 3;
   private readonly liveParkingRefreshIntervalMs = 5000;
   private readonly notifiedSubscriptionIds = new Set<number>();
@@ -194,6 +198,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   reservations: ReservationItem[] = [
     {
       id_res: 8701,
+      parkingId: 1,
       parkingNom: 'Parking Centre Ville',
       placeLabel: 'Place A-14',
       date_debut: '2026-03-24T08:30',
@@ -205,6 +210,7 @@ export class DashboardPage implements OnInit, OnDestroy {
     },
     {
       id_res: 8702,
+      parkingId: 2,
       parkingNom: 'Parking Business Bay',
       placeLabel: 'Place B-07',
       date_debut: '2026-03-26T09:00',
@@ -219,6 +225,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   subscriptions: SubscriptionItem[] = [
     {
       id_abon: 5001,
+      parkingId: 1,
       parkingNom: 'Parking Centre Ville',
       placeLabel: 'Place A-19',
       type: 'mensuel',
@@ -319,20 +326,76 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   get filteredParkings(): ParkingCard[] {
-    const term = this.searchTerm.trim().toLowerCase();
     const frequentParkings = this.parkings.filter((parking) => parking.frequent);
-    const source = frequentParkings.length ? frequentParkings : this.parkings;
+    return frequentParkings.length ? frequentParkings : this.parkings;
+  }
+
+  get searchedParkings(): ParkingCard[] {
+    const term = this.searchTerm.trim();
     if (!term) {
-      return source;
+      return [];
     }
 
-    return source.filter((parking) =>
-      [parking.nom, parking.adresse, parking.ville].some((value) => value.toLowerCase().includes(term))
-    );
+    return this.parkings.filter((parking) => this.matchesParkingSearch(parking, term)).slice(0, 5);
+  }
+
+  get displayedMapParkings(): ParkingCard[] {
+    const term = this.searchTerm.trim();
+    if (!term) {
+      return this.parkings;
+    }
+
+    return this.parkings.filter((parking) => this.matchesParkingSearch(parking, term));
+  }
+
+  get recentParkingActivities(): Array<{
+    parking: ParkingCard;
+    type: 'reservation' | 'abonnement';
+    date: string;
+  }> {
+    const activities = [
+      ...this.reservations.map((reservation) => ({
+        parkingId: reservation.parkingId,
+        type: 'reservation' as const,
+        date: reservation.date_debut,
+      })),
+      ...this.subscriptions.map((subscription) => ({
+        parkingId: subscription.parkingId,
+        type: 'abonnement' as const,
+        date: subscription.date_debut,
+      })),
+    ]
+      .filter((activity) => activity.parkingId !== null)
+      .map((activity) => ({
+        ...activity,
+        parking: this.parkings.find((parking) => parking.id_park === activity.parkingId) ?? null,
+      }))
+      .filter((activity): activity is { parkingId: number; parking: ParkingCard; type: 'reservation' | 'abonnement'; date: string } => Boolean(activity.parking))
+      .sort((first, second) => this.getActivityTimestamp(second.date) - this.getActivityTimestamp(first.date));
+
+    const seenParkingIds = new Set<number>();
+    return activities.filter((activity) => {
+      if (seenParkingIds.has(activity.parking.id_park)) {
+        return false;
+      }
+
+      seenParkingIds.add(activity.parking.id_park);
+      return true;
+    }).slice(0, 3);
   }
 
   get defaultVehicle(): Vehicle | undefined {
     return this.vehicles.find((vehicle) => vehicle.isDefault);
+  }
+
+  get subscriptionHistory(): SubscriptionItem[] {
+    return this.subscriptions;
+  }
+
+  get managedSubscriptions(): SubscriptionItem[] {
+    return this.subscriptions.filter(
+      (subscription) => subscription.statut !== 'suspendu' && !subscription.cancelled_at
+    );
   }
 
   get notificationItems(): HeaderNotificationItem[] {
@@ -573,6 +636,7 @@ export class DashboardPage implements OnInit, OnDestroy {
 
     return {
       id_res: reservation.id_res,
+      parkingId: parking?.id_park ?? place?.parking_id ?? null,
       parkingNom: parking?.nom || 'Parking',
       placeLabel: place
         ? this.buildSpotLabel({
@@ -599,6 +663,7 @@ export class DashboardPage implements OnInit, OnDestroy {
 
     return {
       id_abon: subscription.id_abon,
+      parkingId: parking?.id_park ?? place?.parking_id ?? null,
       parkingNom: parking?.nom || 'Parking',
       placeLabel: place
         ? this.buildSpotLabel({
@@ -671,6 +736,22 @@ export class DashboardPage implements OnInit, OnDestroy {
         spots,
       })),
     }));
+  }
+
+  selectParkingFromSearch(parking: ParkingCard): void {
+    this.searchTerm = parking.nom;
+    window.setTimeout(() => {
+      this.mapComponent?.focusOnParking(this.toMapParking(parking));
+    }, 0);
+  }
+
+  reserveParkingFromSearch(parking: ParkingCard): void {
+    this.searchTerm = '';
+    this.openReservation(parking);
+  }
+
+  getRecentParkingActivityLabel(type: 'reservation' | 'abonnement'): string {
+    return type === 'abonnement' ? 'Dernier abonnement' : 'Derniere reservation';
   }
 
   openReservation(parking?: ParkingCard): void {
@@ -1312,15 +1393,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   get mapParkings(): MapParking[] {
-    return this.parkings.map((parking) => ({
-      id: parking.id_park,
-      nom: parking.nom,
-      adresse: `${parking.adresse}, ${parking.ville}`,
-      latitude: parking.latitude,
-      longitude: parking.longitude,
-      availableSpaces: parking.availablePlaces,
-      price: parking.prix_heure
-    }));
+    return this.displayedMapParkings.map((parking) => this.toMapParking(parking));
   }
 
   get totalAvailableSpaces(): number {
@@ -1460,6 +1533,34 @@ private showLocationToast(latitude: number, longitude: number): void {
   private buildAvatar(name: string): string {
     const parts = name.trim().split(/\s+/).slice(0, 2);
     return parts.map((part) => part.charAt(0).toUpperCase()).join('');
+  }
+
+  private matchesParkingSearch(parking: ParkingCard, term: string): boolean {
+    const normalizedTerm = term.trim().toLowerCase();
+    if (!normalizedTerm) {
+      return true;
+    }
+
+    return [parking.nom, parking.adresse, parking.ville].some((value) =>
+      value.toLowerCase().includes(normalizedTerm)
+    );
+  }
+
+  private getActivityTimestamp(value: string): number {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  }
+
+  private toMapParking(parking: ParkingCard): MapParking {
+    return {
+      id: parking.id_park,
+      nom: parking.nom,
+      adresse: `${parking.adresse}, ${parking.ville}`,
+      latitude: parking.latitude,
+      longitude: parking.longitude,
+      availableSpaces: parking.availablePlaces,
+      price: parking.prix_heure,
+    };
   }
 
   private normalizePlaceStatus(status?: string): ParkingSpot['etat'] {

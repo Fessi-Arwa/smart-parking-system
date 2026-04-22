@@ -1,4 +1,4 @@
-import { Component, HostListener, Input } from '@angular/core';
+import { Component, EventEmitter, HostListener, Input, Output } from '@angular/core';
 
 export interface HeaderNotificationItem {
   title: string;
@@ -17,6 +17,8 @@ export interface HeaderNotificationItem {
 export class HeaderComponent {
   @Input() notificationCount = 0;
   @Input() notifications: HeaderNotificationItem[] = [];
+  @Input() showLogoutButton = false;
+  @Output() logoutRequested = new EventEmitter<void>();
 
   companyName = 'Parking Express';
   avatar = 'assets/default-avatar.png';
@@ -37,5 +39,10 @@ export class HeaderComponent {
 
   onNotificationPanelClick(event: Event): void {
     event.stopPropagation();
+  }
+
+  requestLogout(event: Event): void {
+    event.stopPropagation();
+    this.logoutRequested.emit();
   }
 }

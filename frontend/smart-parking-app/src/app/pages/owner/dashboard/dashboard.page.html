@@ -1,7 +1,9 @@
 <ion-content class="dashboard-container">
   <app-header
     [notificationCount]="notificationsCount"
-    [notifications]="notificationItems"></app-header>
+    [notifications]="notificationItems"
+    [showLogoutButton]="true"
+    (logoutRequested)="logout()"></app-header>
 
   <div class="dashboard-content">
     <section class="overview-shell">

@@ -137,12 +137,14 @@ export class MapComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.parkings.forEach((parking) => {
       const parkingIcon = L.divIcon({
         className: 'parking-marker-custom',
-        html: `<div class="parking-marker-content">
-                <span class="parking-price">${parking.price} EUR</span>
-                <span class="parking-spaces">${parking.availableSpaces}</span>
-               </div>`,
-        iconSize: [50, 40],
-        popupAnchor: [0, -20]
+        html: `
+          <div class="parking-marker-content">
+            <span class="parking-marker-core"></span>
+            <span class="parking-marker-ring"></span>
+          </div>
+        `,
+        iconSize: [26, 26],
+        popupAnchor: [0, -14]
       });
 
       const marker = L.marker([parking.latitude, parking.longitude], { icon: parkingIcon })
@@ -151,7 +153,7 @@ export class MapComponent implements AfterViewInit, OnChanges, OnDestroy {
           <div class="parking-popup">
             <strong>${parking.nom}</strong><br>
             ${parking.adresse}<br>
-            <span class="popup-price">${parking.price} EUR/heure</span><br>
+            <span class="popup-price">${parking.price} DA/heure</span><br>
             <span class="popup-spaces">${parking.availableSpaces} places disponibles</span><br>
             <button class="popup-btn" data-id="${parking.id}">Reserver</button>
           </div>

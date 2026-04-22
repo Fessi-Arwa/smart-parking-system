@@ -141,6 +141,10 @@ export class DashboardPage implements OnInit {
     await this.loadOwnerData();
   }
 
+  logout(): void {
+    this.authService.logout();
+  }
+
   get ownerName(): string {
     return this.authService.getCurrentUser()?.nom || 'owner';
   }

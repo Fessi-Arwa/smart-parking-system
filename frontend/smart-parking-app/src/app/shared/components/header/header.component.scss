@@ -60,6 +60,21 @@
   }
 }
 
+.header-action-btn {
+  margin: 0;
+
+  .header-action-icon {
+    font-size: 24px;
+    color: #475569;
+  }
+}
+
+ion-buttons[slot='end'] {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .notification-panel {
   position: absolute;
   top: calc(100% + 10px);
@@ -205,6 +220,12 @@
       height: 16px;
       font-size: 10px;
       padding: 0 4px;
+    }
+  }
+
+  .header-action-btn {
+    .header-action-icon {
+      font-size: 21px;
     }
   }
 
