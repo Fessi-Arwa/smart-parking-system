@@ -74,6 +74,8 @@ interface SubscriptionItem {
   date_fin: string;
   statut: 'actif' | 'expire' | 'suspendu' | 'en_attente';
   tarif: number;
+  cancelled_at?: string | null;
+  canCancel: boolean;
 }
 
 interface ParkingStructureSection {
@@ -104,6 +106,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   isLoadingReservations = false;
   isLoadingSubscriptions = false;
   isSubscriptionSubmitting = false;
+  cancellingSubscriptionId: number | null = null;
   isProfileSubmitting = false;
   gpsStatus: 'waiting' | 'active' | 'error' = 'waiting';
   isReservationModalOpen = false;
@@ -223,6 +226,8 @@ export class DashboardPage implements OnInit, OnDestroy {
       date_fin: '2026-03-31',
       statut: 'actif',
       tarif: 12000,
+      cancelled_at: null,
+      canCancel: true,
     },
   ];
 
@@ -610,6 +615,8 @@ export class DashboardPage implements OnInit, OnDestroy {
       date_fin: subscription.date_fin,
       statut: subscription.statut,
       tarif: Number(subscription.tarif),
+      cancelled_at: subscription.cancelled_at || null,
+      canCancel: subscription.statut === 'actif' || subscription.statut === 'en_attente',
     };
   }
 
@@ -1035,6 +1042,41 @@ export class DashboardPage implements OnInit, OnDestroy {
     }
   }
 
+  async cancelSubscription(subscription: SubscriptionItem): Promise<void> {
+    if (!subscription.canCancel || this.cancellingSubscriptionId === subscription.id_abon) {
+      return;
+    }
+
+    const isConfirmed = window.confirm(
+      `Voulez-vous vraiment annuler l abonnement de ${subscription.placeLabel} ? ` +
+      'Cette action liberera la place pour un autre conducteur et aucun remboursement ne sera effectue.'
+    );
+
+    if (!isConfirmed) {
+      return;
+    }
+
+    this.cancellingSubscriptionId = subscription.id_abon;
+    try {
+      const response = await firstValueFrom(
+        this.subscriptionService.cancelPlaceSubscription(subscription.id_abon)
+      );
+      await this.loadParkingsAndPlaces();
+      await this.loadSubscriptions();
+      this.toastService.show(
+        response.msg || 'Abonnement annule avec succes',
+        'success'
+      );
+    } catch (error: any) {
+      this.toastService.show(
+        error?.error?.msg || error?.error?.error || 'Impossible d annuler cet abonnement',
+        'error'
+      );
+    } finally {
+      this.cancellingSubscriptionId = null;
+    }
+  }
+
   getStatusLabel(status: ReservationItem['statut'] | SubscriptionItem['statut']): string {
     const labels: Record<string, string> = {
       en_attente: 'En attente',
@@ -1043,7 +1085,7 @@ export class DashboardPage implements OnInit, OnDestroy {
       terminee: 'Terminee',
       actif: 'Actif',
       expire: 'Expire',
-      suspendu: 'Suspendu',
+      suspendu: 'Annule',
     };
 
     return labels[status] ?? status;

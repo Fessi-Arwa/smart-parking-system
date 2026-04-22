@@ -280,6 +280,17 @@
                 <span>Tarif</span>
                 <strong>{{ subscription.tarif }} DA</strong>
               </div>
+
+              <div class="subscription-card__actions" *ngIf="subscription.canCancel">
+                <p>Aucun remboursement ne sera effectue apres annulation.</p>
+                <button
+                  class="secondary-btn subscription-card__cancel-btn"
+                  type="button"
+                  [disabled]="cancellingSubscriptionId === subscription.id_abon"
+                  (click)="cancelSubscription(subscription)">
+                  {{ cancellingSubscriptionId === subscription.id_abon ? 'Annulation...' : 'Annuler l abonnement' }}
+                </button>
+              </div>
             </article>
           </div>
         </div>

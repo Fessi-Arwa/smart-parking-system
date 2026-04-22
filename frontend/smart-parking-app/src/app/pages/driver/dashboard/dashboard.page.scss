@@ -1160,6 +1160,33 @@
     0 18px 34px rgba(15, 23, 42, 0.05);
 }
 
+.subscription-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(191, 219, 254, 0.48);
+}
+
+.subscription-card__actions p {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.subscription-card__cancel-btn {
+  flex-shrink: 0;
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #b91c1c;
+  background: rgba(254, 242, 242, 0.9);
+}
+
+.subscription-card__cancel-btn:hover:not(:disabled) {
+  background: rgba(254, 226, 226, 0.95);
+}
+
 .profile-section--info,
 .profile-section--vehicles,
 .profile-section--subscriptions {

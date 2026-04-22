@@ -101,6 +101,11 @@ def _ensure_runtime_schema_compatibility(app):
             "tarif",
             "tarif NUMERIC(10,2) NOT NULL DEFAULT 0",
         )
+        add_column_if_missing(
+            "abonnement",
+            "cancelled_at",
+            "cancelled_at TIMESTAMP",
+        )
 
         add_column_if_missing(
             "place",

@@ -13,6 +13,7 @@ export interface SubscriptionDto {
   statut: 'actif' | 'expire' | 'suspendu' | 'en_attente';
   tarif: number;
   created_at?: string;
+  cancelled_at?: string | null;
   categorie?: string;
   conducteur_id?: number;
   place_id?: number;
@@ -39,6 +40,17 @@ export interface CreateSubscriptionPayload {
   date_fin: string;
   tarif: number;
   place_id: number;
+}
+
+export interface CancelSubscriptionResponse {
+  msg: string;
+  abonnement: SubscriptionDto;
+  owner_notification?: {
+    parking_id: number;
+    place_id: number;
+    message: string;
+    sent_at?: string | null;
+  } | null;
 }
 
 @Injectable({
@@ -74,5 +86,18 @@ export class SubscriptionService {
       : undefined;
 
     return this.http.post<SubscriptionDto>(`${this.apiUrl}/place`, payload, { headers });
+  }
+
+  cancelPlaceSubscription(abonnementId: number): Observable<CancelSubscriptionResponse> {
+    const token = this.authService.getToken();
+    const headers = token
+      ? new HttpHeaders({ Authorization: `Bearer ${token}` })
+      : undefined;
+
+    return this.http.post<CancelSubscriptionResponse>(
+      `${this.apiUrl}/${abonnementId}/cancel`,
+      {},
+      { headers }
+    );
   }
 }
