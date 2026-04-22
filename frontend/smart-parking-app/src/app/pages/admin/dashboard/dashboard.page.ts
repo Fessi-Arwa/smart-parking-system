@@ -8,6 +8,7 @@ import {
   AdminWorkflowService,
 } from '../../../services/admin-workflow.service';
 import { ToastService } from '../../../services/toast.service';
+import { HeaderNotificationItem } from '../../../shared/components/header/header.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -51,6 +52,61 @@ export class AdminDashboardPage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.loadDashboardData();
+  }
+
+  get notificationItems(): HeaderNotificationItem[] {
+    const items: HeaderNotificationItem[] = [];
+
+    if (this.pendingOwnerApprovalsCount > 0) {
+      items.push({
+        title: 'Owners en attente',
+        description: `${this.pendingOwnerApprovalsCount} compte(s) owner attendent une validation admin.`,
+        timestamp: 'A traiter',
+        icon: 'people-outline',
+        tone: 'warning',
+      });
+    }
+
+    if (this.pendingParkingReviews.length > 0) {
+      items.push({
+        title: 'Parkings a revoir',
+        description: `${this.pendingParkingReviews.length} parking(s) attendent une revue administrative.`,
+        timestamp: 'File de revue',
+        icon: 'business-outline',
+        tone: 'alert',
+      });
+    }
+
+    if (this.stats.pendingSubscriptions > 0) {
+      items.push({
+        title: 'Abonnements parking',
+        description: `${this.stats.pendingSubscriptions} abonnement(s) sont encore en attente.`,
+        timestamp: 'Suivi plateforme',
+        icon: 'card-outline',
+        tone: 'info',
+      });
+    }
+
+    if (!items.length) {
+      items.push({
+        title: 'Aucune alerte critique',
+        description: 'Les validations prioritaires admin sont a jour.',
+        timestamp: 'Etat actuel',
+        icon: 'checkmark-circle-outline',
+        tone: 'success',
+      });
+    }
+
+    return items.slice(0, 4);
+  }
+
+  get notificationsCount(): number {
+    const actionableCount =
+      this.pendingOwnerApprovalsCount +
+      this.pendingParkingReviews.length +
+      this.stats.pendingSubscriptions;
+
+    return actionableCount > 0 ? actionableCount : this.notificationItems.length;
   }
 
   get filteredUsers(): AdminUserRecord[] {

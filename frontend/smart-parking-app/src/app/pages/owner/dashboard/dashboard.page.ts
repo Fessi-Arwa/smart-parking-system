@@ -66,6 +66,7 @@ interface OccupancyChartPoint {
 }
 
 type DashboardPeriod = '7d' | '30d' | '90d';
+type OwnerDashboardSection = 'workflow' | 'parkings' | 'ai';
 
 interface OverviewCard {
   title: string;
@@ -114,6 +115,7 @@ interface DashboardParkingHealth {
 export class DashboardPage implements OnInit {
   private readonly dashboardParkingLimit = 3;
   private readonly ownerSubscriptionAlertWindowDays = 5;
+  activeSection: OwnerDashboardSection = 'workflow';
   parkings: OwnerParking[] = [];
   reservations: ReservationHistoryDto[] = [];
   subscriptions: SubscriptionDto[] = [];
@@ -1147,6 +1149,10 @@ export class DashboardPage implements OnInit {
 
   selectAiParking(parkingId: number): void {
     this.selectedAiParkingId = parkingId;
+  }
+
+  setActiveSection(section: OwnerDashboardSection): void {
+    this.activeSection = section;
   }
 
   showPreview(source: ParkingAISource): boolean {
