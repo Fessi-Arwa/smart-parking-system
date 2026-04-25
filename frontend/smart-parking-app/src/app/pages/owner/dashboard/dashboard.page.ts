@@ -67,6 +67,7 @@ interface OccupancyChartPoint {
 }
 
 type DashboardPeriod = '7d' | '30d' | '90d';
+type OwnerDashboardSection = 'workflow' | 'parkings' | 'ai';
 
 interface OverviewCard {
   title: string;
@@ -115,6 +116,7 @@ interface DashboardParkingHealth {
 export class DashboardPage implements OnInit {
   private readonly dashboardParkingLimit = 3;
   private readonly ownerSubscriptionAlertWindowDays = 5;
+  activeSection: OwnerDashboardSection = 'workflow';
   parkings: OwnerParking[] = [];
   reservations: ReservationHistoryDto[] = [];
   subscriptions: SubscriptionDto[] = [];
@@ -148,6 +150,10 @@ export class DashboardPage implements OnInit {
     }
 
     await this.loadOwnerData(workflowState);
+  }
+
+  logout(): void {
+    this.authService.logout();
   }
 
   get ownerName(): string {
@@ -700,6 +706,14 @@ export class DashboardPage implements OnInit {
       tone: 'success' as const,
     }));
 
+    const cancelledSubscriptionNotifications = this.getRecentCancelledPlaceSubscriptions(3).map((subscription) => ({
+      title: 'Abonnement de place annule',
+      description: `${subscription.parking?.nom || 'Parking'} - Place ${subscription.place?.zone || 'A'}-${subscription.place?.num_place || '--'} liberee pour un autre conducteur.`,
+      timestamp: this.formatOwnerNotificationTimestamp(subscription.cancelled_at || subscription.created_at || subscription.date_fin),
+      icon: 'notifications-outline',
+      tone: 'warning' as const,
+    }));
+
     const subscriptionNotifications = this.getRecentPlaceSubscriptions(3).map((subscription) => ({
       title: 'Nouvel abonnement de place',
       description: `${subscription.parking?.nom || 'Parking'} - Place ${subscription.place?.zone || 'A'}-${subscription.place?.num_place || '--'}`,
@@ -728,6 +742,7 @@ export class DashboardPage implements OnInit {
       ...parkingReviewNotifications,
       ...workflowNotification,
       ...maintenanceNotifications,
+      ...cancelledSubscriptionNotifications,
       ...reservationNotifications,
       ...subscriptionNotifications,
       ...aiNotifications,
@@ -1090,9 +1105,21 @@ export class DashboardPage implements OnInit {
 
   private getRecentPlaceSubscriptions(limit: number): SubscriptionDto[] {
     return [...this.subscriptions]
+      .filter((subscription) => subscription.statut !== 'suspendu')
       .sort((a, b) => {
         const first = new Date(b.created_at || b.date_debut).getTime();
         const second = new Date(a.created_at || a.date_debut).getTime();
+        return first - second;
+      })
+      .slice(0, limit);
+  }
+
+  private getRecentCancelledPlaceSubscriptions(limit: number): SubscriptionDto[] {
+    return [...this.subscriptions]
+      .filter((subscription) => subscription.statut === 'suspendu' && !!subscription.cancelled_at)
+      .sort((a, b) => {
+        const first = new Date(b.cancelled_at || b.created_at || b.date_fin).getTime();
+        const second = new Date(a.cancelled_at || a.created_at || a.date_fin).getTime();
         return first - second;
       })
       .slice(0, limit);
@@ -1145,6 +1172,10 @@ export class DashboardPage implements OnInit {
 
   selectAiParking(parkingId: number): void {
     this.selectedAiParkingId = parkingId;
+  }
+
+  setActiveSection(section: OwnerDashboardSection): void {
+    this.activeSection = section;
   }
 
   showPreview(source: ParkingAISource): boolean {

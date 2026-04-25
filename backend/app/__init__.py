@@ -116,6 +116,11 @@ def _ensure_runtime_schema_compatibility(app):
             "admin_status_reason",
             "admin_status_reason TEXT",
         )
+        add_column_if_missing(
+            "abonnement",
+            "cancelled_at",
+            "cancelled_at TIMESTAMP",
+        )
 
         add_column_if_missing(
             "place",

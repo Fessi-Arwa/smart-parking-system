@@ -5,13 +5,15 @@ import { IonicModule } from '@ionic/angular';
 
 import { AdminRoutingModule } from './admin-routing.module';
 import { AdminDashboardPage } from './dashboard/dashboard.page';
+import { SharedModule } from '../../shared/shared.module';
 
 @NgModule({
   imports: [
     CommonModule,
     FormsModule,
     IonicModule,
-    AdminRoutingModule
+    AdminRoutingModule,
+    SharedModule
   ],
   declarations: [AdminDashboardPage]
 })

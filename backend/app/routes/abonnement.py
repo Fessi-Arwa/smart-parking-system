@@ -1,9 +1,9 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from .. import db
-from ..models.abonnement import Abonnement
+from ..models.abonnement import Abonnement, StatutAbonnement
 from ..models.abonnement_app import AbonnementApp
 from ..models.abonnement_place import AbonnementPlace
 from ..models.compte import Compte, RoleCompte
@@ -58,6 +58,48 @@ def _sync_abonnements_statuses(abonnements):
 
     if has_changes:
         db.session.commit()
+
+
+def _get_place_blocking_subscription(place_id):
+    abonnement_links = (
+        AbonnementPlace.query.filter_by(place_id=place_id)
+        .order_by(AbonnementPlace.id_abon.desc())
+        .all()
+    )
+    if not abonnement_links:
+        return None
+
+    abonnement_ids = [link.id_abon for link in abonnement_links]
+    abonnements = {
+        abonnement.id_abon: abonnement
+        for abonnement in Abonnement.query.filter(Abonnement.id_abon.in_(abonnement_ids)).all()
+    }
+    _sync_abonnements_statuses(abonnements.values())
+
+    for link in abonnement_links:
+        abonnement = abonnements.get(link.id_abon)
+        if abonnement and abonnement.statut in (
+            StatutAbonnement.actif,
+            StatutAbonnement.en_attente,
+        ):
+            return abonnement
+
+    return None
+
+
+def _build_owner_cancellation_notification(abonnement, place, parking):
+    if not place or not parking:
+        return None
+
+    return {
+        "parking_id": parking.id_park,
+        "place_id": place.id_place,
+        "message": (
+            f"Le conducteur a annule l abonnement de la place "
+            f"{place.zone or 'A'}-{place.num_place} du parking {parking.nom}."
+        ),
+        "sent_at": abonnement.cancelled_at.isoformat() if abonnement.cancelled_at else None,
+    }
 
 
 @abonnement_bp.route("/", methods=["GET"])
@@ -208,8 +250,8 @@ def create_abonnement_place():
     if place.etat != StatutPlace.libre:
         return jsonify({"error": "Cette place n est plus disponible pour un abonnement"}), 400
 
-    existing_link = AbonnementPlace.query.filter_by(place_id=place.id_place).first()
-    if existing_link:
+    blocking_abonnement = _get_place_blocking_subscription(place.id_place)
+    if blocking_abonnement:
         return jsonify({"error": "Cette place a deja un abonnement"}), 400
 
     abonnement = _build_abonnement(data)
@@ -260,6 +302,63 @@ def update_abonnement(abonnement_id):
 
     db.session.commit()
     return jsonify(_abonnement_to_dict(abonnement))
+
+
+@abonnement_bp.route("/<int:abonnement_id>/cancel", methods=["POST"])
+@jwt_required()
+def cancel_abonnement_place(abonnement_id):
+    user_id = int(get_jwt_identity())
+    user = Compte.query.get(user_id)
+    abonnement = Abonnement.query.get(abonnement_id)
+
+    if not user:
+        return jsonify({"msg": "Utilisateur introuvable"}), 404
+
+    if not abonnement:
+        return jsonify({"error": "Abonnement not found"}), 404
+
+    abonnement_place = AbonnementPlace.query.get(abonnement_id)
+    if not abonnement_place:
+        return jsonify({"error": "Cet abonnement n est pas lie a une place"}), 400
+
+    if abonnement_place.conducteur_id != user_id:
+        return jsonify({"msg": "Vous ne pouvez annuler que vos propres abonnements"}), 403
+
+    if user.role != RoleCompte.conducteur:
+        return jsonify({"msg": "Seuls les conducteurs peuvent annuler cet abonnement"}), 403
+
+    if abonnement.sync_status_with_dates():
+        db.session.commit()
+
+    if abonnement.statut == StatutAbonnement.suspendu:
+        return jsonify({"msg": "Cet abonnement est deja annule"}), 400
+
+    if abonnement.statut == StatutAbonnement.expire:
+        return jsonify({"msg": "Cet abonnement est deja expire"}), 400
+
+    place = Place.query.get(abonnement_place.place_id)
+    parking = Parking.query.get(place.parking_id) if place else None
+
+    abonnement.statut = StatutAbonnement.suspendu
+    abonnement.cancelled_at = datetime.now(timezone.utc)
+
+    if place:
+        place.release()
+
+    db.session.commit()
+
+    payload = {
+        "msg": "Abonnement annule sans remboursement. Le proprietaire du parking a ete notifie et la place est de nouveau disponible.",
+        "abonnement": _abonnement_to_dict(abonnement),
+        "owner_notification": _build_owner_cancellation_notification(abonnement, place, parking),
+    }
+
+    if place:
+        payload["abonnement"]["place"] = place.to_dict()
+    if parking:
+        payload["abonnement"]["parking"] = parking.to_dict()
+
+    return jsonify(payload), 200
 
 
 @abonnement_bp.route("/<int:abonnement_id>", methods=["DELETE"])

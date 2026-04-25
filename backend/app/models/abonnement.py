@@ -31,6 +31,7 @@ class Abonnement(ModelMixin, db.Model):
         "statut",
         "admin_status_reason",
         "tarif",
+        "cancelled_at",
         "created_at",
     )
     __table_args__ = (
@@ -49,6 +50,7 @@ class Abonnement(ModelMixin, db.Model):
     )
     admin_status_reason = db.Column(db.Text)
     tarif = db.Column(db.Numeric(10, 2), nullable=False)
+    cancelled_at = db.Column(db.DateTime(timezone=True), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
 
     def is_active(self):

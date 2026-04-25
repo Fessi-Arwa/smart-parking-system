@@ -1,11 +1,11 @@
-<ion-footer class="fixed-footer">
-  <ion-tab-bar slot="bottom" class="navbar">
-    <ion-tab-button
-      *ngFor="let item of menuItems"
-      [routerLink]="item.route"
-      routerLinkActive="tab-selected">
-      <ion-icon [name]="item.icon"></ion-icon>
-      <ion-label>{{ item.label }}</ion-label>
-    </ion-tab-button>
-  </ion-tab-bar>
-</ion-footer>
+<nav class="owner-bottom-nav" aria-label="Navigation proprietaire">
+  <a
+    *ngFor="let item of menuItems"
+    class="owner-bottom-nav__item"
+    [routerLink]="item.route"
+    routerLinkActive="is-active"
+    [routerLinkActiveOptions]="{ exact: true }">
+    <ion-icon [name]="item.icon"></ion-icon>
+    <span>{{ item.label }}</span>
+  </a>
+</nav>

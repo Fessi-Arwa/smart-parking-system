@@ -6,7 +6,7 @@
 }
 
 .profile-content {
-  padding: 20px 16px 96px;
+  padding: 20px 16px 112px;
   font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   color: #142132;
   text-rendering: optimizeLegibility;
@@ -65,21 +65,6 @@
   font-size: 14px;
   line-height: 1.68;
   font-weight: 400;
-}
-
-.logout-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
-  color: #475569;
-  font-size: 12px;
-  font-weight: 550;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
 .hero-card,
@@ -1118,7 +1103,7 @@
 
 @media (max-width: 640px) {
   .profile-content {
-    padding: 14px 12px 92px;
+    padding: 14px 12px 114px;
   }
 
   .overview-header,

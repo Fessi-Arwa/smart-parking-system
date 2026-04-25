@@ -9,6 +9,7 @@ import { Component } from '@angular/core';
 export class NavbarComponent {
   menuItems = [
     { icon: 'grid-outline', label: 'Dashboard', route: '/owner/dashboard' },
-    { icon: 'person-outline', label: 'Profil', route: '/owner/profile' }
+    { icon: 'card-outline', label: 'Abonnement', route: '/owner/subscription' },
+    { icon: 'person-outline', label: 'Profil', route: '/owner/profile' },
   ];
 }

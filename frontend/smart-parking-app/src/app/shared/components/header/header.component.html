@@ -6,6 +6,13 @@
     </div>
     
     <ion-buttons slot="end">
+      <ion-button
+        *ngIf="showLogoutButton"
+        class="header-action-btn"
+        (click)="requestLogout($event)"
+        aria-label="Deconnexion">
+        <ion-icon name="log-out-outline" class="header-action-icon"></ion-icon>
+      </ion-button>
       <ion-button class="notification-btn" (click)="toggleNotifications(); $event.stopPropagation()">
         <ion-icon name="notifications-outline" class="notif-icon"></ion-icon>
         <span *ngIf="notificationCount > 0" class="notification-badge">{{ notificationCount }}</span>

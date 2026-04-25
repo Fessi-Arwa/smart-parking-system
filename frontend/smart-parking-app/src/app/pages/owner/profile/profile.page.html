@@ -1,7 +1,9 @@
 <ion-content class="profile-container">
   <app-header
     [notificationCount]="notificationsCount"
-    [notifications]="notificationItems"></app-header>
+    [notifications]="notificationItems"
+    [showLogoutButton]="true"
+    (logoutRequested)="logout()"></app-header>
 
   <div
     class="profile-content"
@@ -14,10 +16,6 @@
           <p class="overview-subtitle">Un seul endroit pour avancer dans le workflow owner.</p>
         </div>
 
-        <button class="logout-btn" type="button" (click)="logout()">
-          <ion-icon name="log-out-outline"></ion-icon>
-          <span>Deconnexion</span>
-        </button>
       </div>
 
       <div class="hero-card">

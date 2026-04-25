@@ -1,56 +1,14 @@
 <ion-content class="admin-container" [fullscreen]="true">
-  <div class="mobile-header">
-    <div class="logo-section">
-      <div class="logo-badge">
-        <ion-icon name="shield-checkmark-outline" class="car-icon"></ion-icon>
-      </div>
-      <div>
-        <span class="app-name">PARKINI ADMIN</span>
-        <small>Supervision de la plateforme</small>
-      </div>
-    </div>
-    <button class="logout-btn" type="button" (click)="logout()">
-      <ion-icon name="log-out-outline"></ion-icon>
-    </button>
-  </div>
+  <app-header
+    [notificationCount]="notificationsCount"
+    [notifications]="notificationItems"
+    [showLogoutButton]="true"
+    (logoutRequested)="logout()"></app-header>
 
   <div class="admin-content">
-    <section class="hero-panel">
-      <div class="hero-copy">
-        <p class="hero-kicker">Administration centrale</p>
-        <h1>Dashboard Admin</h1>
-        <p class="hero-text">
-          Suivez les comptes, validez les parkings et gardez une vue claire sur l'activite globale.
-        </p>
-
-        <div class="hero-chips">
-          <span class="hero-chip">
-            <ion-icon name="time-outline"></ion-icon>
-            {{ stats.pendingParkings }} validation(s) en attente
-          </span>
-          <span class="hero-chip">
-            <ion-icon name="car-sport-outline"></ion-icon>
-            {{ stats.activeParkings }} parking(s) actifs
-          </span>
-        </div>
-      </div>
-
-      <div class="hero-action-card">
-        <p class="hero-action-card__label">Action rapide</p>
-        <strong>{{ nextAdminActionTitle }}</strong>
-        <p>{{ nextAdminActionDescription }}</p>
-        <div class="hero-action-card__meta">
-          <span>{{ pendingOwnerApprovalsCount }} owner(s) en attente</span>
-          <span>{{ pendingParkingReviews.length }} parking(s) a revoir</span>
-          <span *ngIf="blockedPendingParkingReviewsCount > 0">
-            {{ blockedPendingParkingReviewsCount }} dossier(s) bloques par le compte owner
-          </span>
-        </div>
-        <button class="primary-btn" type="button" (click)="reloadData()">
-          Actualiser
-          <ion-icon name="refresh-outline"></ion-icon>
-        </button>
-      </div>
+    <section class="admin-page-title">
+      <p>Administration centrale</p>
+      <h1>Dashboard Admin</h1>
     </section>
 
     <section class="stats-grid">
@@ -170,59 +128,94 @@
         </div>
       </div>
 
-      <div class="users-list">
-        <article *ngFor="let user of filteredUsers" class="user-card">
-          <div class="user-avatar">
-            <span>{{ user.nom.charAt(0) }}{{ user.nom.split(' ')[1]?.charAt(0) || '' }}</span>
+      <div class="admin-table-shell" *ngIf="filteredUsers.length; else emptyUsersState">
+        <div class="admin-table admin-table--users">
+          <div class="admin-table__head admin-table__row admin-table__row--users">
+            <div class="admin-table__cell">Utilisateur</div>
+            <div class="admin-table__cell">Contact</div>
+            <div class="admin-table__cell">Role</div>
+            <div class="admin-table__cell">Workflow owner</div>
+            <div class="admin-table__cell">Inscription</div>
+            <div class="admin-table__cell admin-table__cell--actions">Actions</div>
           </div>
 
-          <div class="user-info">
-            <div class="user-name">
-              <strong>{{ user.nom }}</strong>
-              <span class="role-badge" [class]="getRoleBadgeClass(user.role)">
-                {{ getRoleLabel(user.role) }}
-              </span>
-            </div>
+          <div class="admin-table__body">
+            <div *ngFor="let user of filteredUsers" class="admin-table__row admin-table__row--users">
+              <div class="admin-table__cell">
+                <div class="user-avatar">
+                  <span>{{ user.nom.charAt(0) }}{{ user.nom.split(' ')[1]?.charAt(0) || '' }}</span>
+                </div>
+                <div class="admin-table__identity">
+                  <strong>{{ user.nom }}</strong>
+                </div>
+              </div>
 
-            <div class="user-details">
-              <span class="user-email">{{ user.email }}</span>
-              <span class="user-phone">{{ user.telephone }}</span>
-            </div>
+              <div class="admin-table__cell admin-table__cell--stack">
+                <span>{{ user.email }}</span>
+                <span>{{ user.telephone || 'Telephone indisponible' }}</span>
+              </div>
 
-            <div class="user-status" *ngIf="user.role === 'owner'">
-              <span class="role-badge" [class]="getOwnerStatusBadgeClass(user.owner_status)">
-                Workflow owner: {{ getOwnerStatusLabel(user.owner_status) }}
-              </span>
-            </div>
+              <div class="admin-table__cell">
+                <span class="role-badge" [class]="getRoleBadgeClass(user.role)">
+                  {{ getRoleLabel(user.role) }}
+                </span>
+              </div>
 
-            <div class="user-status" *ngIf="getOwnerDecisionHint(user)">
-              <span class="user-phone">Motif admin : {{ getOwnerDecisionHint(user) }}</span>
-            </div>
+              <div class="admin-table__cell">
+                <ng-container *ngIf="user.role === 'owner'; else noOwnerWorkflow">
+                  <span class="role-badge" [class]="getOwnerStatusBadgeClass(user.owner_status)">
+                    {{ getOwnerStatusLabel(user.owner_status) }}
+                  </span>
+                  <span *ngIf="getOwnerDecisionHint(user)" class="admin-table__note">
+                    Motif admin : {{ getOwnerDecisionHint(user) }}
+                  </span>
+                </ng-container>
+                <ng-template #noOwnerWorkflow>
+                  <span class="admin-table__muted">-</span>
+                </ng-template>
+              </div>
 
-            <div class="user-date">Inscrit le {{ user.created_at }}</div>
+              <div class="admin-table__cell">
+                <span>{{ user.created_at }}</span>
+              </div>
+
+              <div class="admin-table__cell admin-table__cell--actions">
+                <button
+                  class="action-btn approve"
+                  type="button"
+                  *ngIf="user.role === 'owner' && user.owner_status === 'en_attente'"
+                  (click)="approveOwner(user.id_compte)">
+                  <ion-icon name="checkmark-outline"></ion-icon>
+                  Accepter
+                </button>
+                <button
+                  class="action-btn reject"
+                  type="button"
+                  *ngIf="user.role === 'owner' && user.owner_status === 'en_attente'"
+                  (click)="rejectOwner(user.id_compte)">
+                  <ion-icon name="close-outline"></ion-icon>
+                  Refuser
+                </button>
+                <button
+                  class="action-btn delete"
+                  type="button"
+                  *ngIf="user.role !== 'admin'"
+                  (click)="deleteUser(user.id_compte)">
+                  <ion-icon name="trash-outline"></ion-icon>
+                  Supprimer
+                </button>
+              </div>
+            </div>
           </div>
+        </div>
+      </div>
 
-          <div class="user-actions" *ngIf="user.role === 'owner' && user.owner_status === 'en_attente'">
-            <button class="action-btn approve" type="button" (click)="approveOwner(user.id_compte)">
-              <ion-icon name="checkmark-outline"></ion-icon>
-              Accepter
-            </button>
-            <button class="action-btn reject" type="button" (click)="rejectOwner(user.id_compte)">
-              <ion-icon name="close-outline"></ion-icon>
-              Refuser
-            </button>
-          </div>
-
-          <button class="delete-btn" type="button" (click)="deleteUser(user.id_compte)" *ngIf="user.role !== 'admin'">
-            <ion-icon name="trash-outline"></ion-icon>
-          </button>
-        </article>
-
-        <div *ngIf="filteredUsers.length === 0" class="empty-state">
+      <ng-template #emptyUsersState>
+        <div class="empty-state">
           <ion-icon name="people-outline"></ion-icon>
           <p>Aucun utilisateur trouve</p>
         </div>
-      </div>
+      </ng-template>
     </section>
 
     <section
@@ -283,83 +276,92 @@
         </div>
       </div>
 
-      <div class="parkings-list">
-        <article *ngFor="let parking of filteredParkings" class="parking-card">
-          <div class="parking-header">
-            <div class="parking-icon">
-              <ion-icon name="car-outline"></ion-icon>
+      <div class="admin-table-shell" *ngIf="filteredParkings.length; else emptyParkingsState">
+        <div class="admin-table admin-table--parkings">
+          <div class="admin-table__head admin-table__row admin-table__row--parkings">
+            <div class="admin-table__cell">Parking</div>
+            <div class="admin-table__cell">Adresse</div>
+            <div class="admin-table__cell">Statuts</div>
+            <div class="admin-table__cell">Configuration</div>
+            <div class="admin-table__cell">Etape</div>
+            <div class="admin-table__cell admin-table__cell--actions">Actions</div>
+          </div>
+
+          <div class="admin-table__body">
+            <div *ngFor="let parking of filteredParkings" class="admin-table__row admin-table__row--parkings">
+              <div class="admin-table__cell">
+                <div class="parking-icon">
+                  <ion-icon name="car-outline"></ion-icon>
+                </div>
+                <div class="admin-table__identity">
+                  <strong>{{ parking.nom }}</strong>
+                  <span>{{ parking.owner_name || getParkingOwnerName(parking.owner_id) }}</span>
+                  <span class="admin-table__price">{{ parking.prix_heure }} TND/h</span>
+                </div>
+              </div>
+
+              <div class="admin-table__cell admin-table__cell--multiline">
+                <span>{{ parking.adresse }}</span>
+                <span *ngIf="getParkingApprovalHint(parking)" class="admin-table__note">{{ getParkingApprovalHint(parking) }}</span>
+                <span *ngIf="parking.validation_reason" class="admin-table__note">Motif admin : {{ parking.validation_reason }}</span>
+              </div>
+
+              <div class="admin-table__cell admin-table__cell--badges">
+                <span class="validation-badge" [class]="getOwnerStatusBadgeClass(parking.owner_status)">
+                  Owner: {{ getOwnerStatusLabel(parking.owner_status) }}
+                </span>
+                <span class="status-badge" [class]="parking.statut === 'actif' ? 'active' : 'inactive'">
+                  {{ parking.statut === 'actif' ? 'Actif' : 'Inactif' }}
+                </span>
+                <span class="validation-badge" [class]="getValidationBadgeClass(parking.validation_status)">
+                  {{ getValidationLabel(parking.validation_status) }}
+                </span>
+              </div>
+
+              <div class="admin-table__cell admin-table__cell--stack">
+                <span>{{ parking.capacite || 0 }} places</span>
+                <span>{{ getSetupStatusLabel(parking.setup_status) }}</span>
+                <span>{{ getAiSetupStatusLabel(parking.ai_setup_status) }}</span>
+              </div>
+
+              <div class="admin-table__cell">
+                <span>{{ getParkingReviewStepLabel(parking) }}</span>
+              </div>
+
+              <div class="admin-table__cell admin-table__cell--actions">
+                <button
+                  class="action-btn approve"
+                  type="button"
+                  *ngIf="parking.validation_status === 'en_attente_validation'"
+                  (click)="approveParking(parking.id_park)"
+                  [disabled]="!canApproveParking(parking)">
+                  <ion-icon name="checkmark-outline"></ion-icon>
+                  Approuver
+                </button>
+                <button
+                  class="action-btn reject"
+                  type="button"
+                  *ngIf="parking.validation_status === 'en_attente_validation'"
+                  (click)="rejectParking(parking.id_park)">
+                  <ion-icon name="close-outline"></ion-icon>
+                  Rejeter
+                </button>
+                <button class="action-btn delete" type="button" (click)="deleteParking(parking.id_park)">
+                  <ion-icon name="trash-outline"></ion-icon>
+                  Supprimer
+                </button>
+              </div>
             </div>
-            <div class="parking-title">
-              <h3>{{ parking.nom }}</h3>
-              <p>{{ parking.owner_name || getParkingOwnerName(parking.owner_id) }}</p>
-            </div>
-            <div class="parking-price">{{ parking.prix_heure }} TND/h</div>
           </div>
+        </div>
+      </div>
 
-          <div class="parking-address">
-            <ion-icon name="location-outline"></ion-icon>
-            <span>{{ parking.adresse }}</span>
-          </div>
-
-          <div class="parking-badges">
-            <span class="validation-badge" [class]="getOwnerStatusBadgeClass(parking.owner_status)">
-              Owner: {{ getOwnerStatusLabel(parking.owner_status) }}
-            </span>
-            <span class="status-badge" [class]="parking.statut === 'actif' ? 'active' : 'inactive'">
-              {{ parking.statut === 'actif' ? 'Actif' : 'Inactif' }}
-            </span>
-            <span class="validation-badge" [class]="getValidationBadgeClass(parking.validation_status)">
-              {{ getValidationLabel(parking.validation_status) }}
-            </span>
-          </div>
-
-          <div class="parking-address">
-            <ion-icon name="grid-outline"></ion-icon>
-            <span>{{ parking.capacite || 0 }} places • {{ getSetupStatusLabel(parking.setup_status) }} • {{ getAiSetupStatusLabel(parking.ai_setup_status) }}</span>
-          </div>
-
-          <div class="parking-address" *ngIf="getParkingApprovalHint(parking)">
-            <ion-icon name="information-circle-outline"></ion-icon>
-            <span>{{ getParkingApprovalHint(parking) }}</span>
-          </div>
-
-          <div class="parking-address" *ngIf="parking.validation_reason">
-            <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
-            <span>Motif admin : {{ parking.validation_reason }}</span>
-          </div>
-
-          <div class="parking-address parking-address--step">
-            <ion-icon name="trail-sign-outline"></ion-icon>
-            <span>{{ getParkingReviewStepLabel(parking) }}</span>
-          </div>
-
-          <div class="parking-actions" *ngIf="parking.validation_status === 'en_attente_validation'">
-            <button class="action-btn approve" type="button" (click)="approveParking(parking.id_park)" [disabled]="!canApproveParking(parking)">
-              <ion-icon name="checkmark-outline"></ion-icon>
-              Approuver
-            </button>
-            <button class="action-btn reject" type="button" (click)="rejectParking(parking.id_park)">
-              <ion-icon name="close-outline"></ion-icon>
-              Rejeter
-            </button>
-            <button class="action-btn delete" type="button" (click)="deleteParking(parking.id_park)">
-              <ion-icon name="trash-outline"></ion-icon>
-            </button>
-          </div>
-
-          <div class="parking-actions" *ngIf="parking.validation_status !== 'en_attente_validation'">
-            <button class="action-btn delete" type="button" (click)="deleteParking(parking.id_park)">
-              <ion-icon name="trash-outline"></ion-icon>
-              Supprimer
-            </button>
-          </div>
-        </article>
-
-        <div *ngIf="filteredParkings.length === 0" class="empty-state">
+      <ng-template #emptyParkingsState>
+        <div class="empty-state">
           <ion-icon name="business-outline"></ion-icon>
           <p>Aucun parking trouve</p>
         </div>
-      </div>
+      </ng-template>
     </section>
 
     <section
@@ -400,64 +402,84 @@
         </div>
       </div>
 
-      <div class="parkings-list">
-        <article *ngFor="let subscription of filteredSubscriptions" class="parking-card">
-          <div class="parking-header">
-            <div class="parking-icon">
-              <ion-icon name="ribbon-outline"></ion-icon>
+      <div class="admin-table-shell" *ngIf="filteredSubscriptions.length; else emptySubscriptionsState">
+        <div class="admin-table admin-table--subscriptions">
+          <div class="admin-table__head admin-table__row admin-table__row--subscriptions">
+            <div class="admin-table__cell">Parking</div>
+            <div class="admin-table__cell">Owner</div>
+            <div class="admin-table__cell">Periode</div>
+            <div class="admin-table__cell">Statut</div>
+            <div class="admin-table__cell">Tarif</div>
+            <div class="admin-table__cell admin-table__cell--actions">Actions</div>
+          </div>
+
+          <div class="admin-table__body">
+            <div *ngFor="let subscription of filteredSubscriptions" class="admin-table__row admin-table__row--subscriptions">
+              <div class="admin-table__cell">
+                <div class="parking-icon">
+                  <ion-icon name="ribbon-outline"></ion-icon>
+                </div>
+                <div class="admin-table__identity">
+                  <strong>{{ subscription.parking?.nom || ('Parking #' + subscription.parking_id) }}</strong>
+                  <span>{{ subscription.type }}</span>
+                </div>
+              </div>
+
+              <div class="admin-table__cell">
+                <span>{{ subscription.owner?.nom || 'Owner inconnu' }}</span>
+              </div>
+
+              <div class="admin-table__cell admin-table__cell--stack">
+                <span>Du {{ subscription.date_debut }}</span>
+                <span>Au {{ subscription.date_fin }}</span>
+              </div>
+
+              <div class="admin-table__cell admin-table__cell--badges">
+                <span class="validation-badge" [class]="getSubscriptionBadgeClass(subscription.statut)">
+                  {{ getSubscriptionStatusLabel(subscription.statut) }}
+                </span>
+                <span class="status-badge active">
+                  {{ subscription.parking?.validation_status || 'parking' }}
+                </span>
+                <span *ngIf="getSubscriptionActionHint(subscription)" class="admin-table__note">
+                  {{ getSubscriptionActionHint(subscription) }}
+                </span>
+              </div>
+
+              <div class="admin-table__cell">
+                <span class="admin-table__price">{{ subscription.tarif }} TND</span>
+              </div>
+
+              <div class="admin-table__cell admin-table__cell--actions">
+                <button
+                  class="action-btn approve"
+                  type="button"
+                  *ngIf="subscription.statut === 'en_attente' || subscription.statut === 'suspendu'"
+                  (click)="activateSubscription(subscription.id_abon)"
+                  [disabled]="!canActivateSubscription(subscription)">
+                  <ion-icon name="checkmark-outline"></ion-icon>
+                  Activer
+                </button>
+                <button
+                  class="action-btn reject"
+                  type="button"
+                  *ngIf="subscription.statut === 'actif'"
+                  (click)="suspendSubscription(subscription.id_abon)">
+                  <ion-icon name="pause-outline"></ion-icon>
+                  Suspendre
+                </button>
+              </div>
             </div>
-            <div class="parking-title">
-              <h3>{{ subscription.parking?.nom || ('Parking #' + subscription.parking_id) }}</h3>
-              <p>{{ subscription.owner?.nom || 'Owner inconnu' }}</p>
-            </div>
-            <div class="parking-price">{{ subscription.tarif }} TND</div>
           </div>
+        </div>
+      </div>
 
-          <div class="parking-address">
-            <ion-icon name="calendar-outline"></ion-icon>
-            <span>{{ subscription.type }} • du {{ subscription.date_debut }} au {{ subscription.date_fin }}</span>
-          </div>
-
-          <div class="parking-badges">
-            <span class="validation-badge" [class]="getSubscriptionBadgeClass(subscription.statut)">
-              {{ getSubscriptionStatusLabel(subscription.statut) }}
-            </span>
-            <span class="status-badge active">
-              {{ subscription.parking?.validation_status || 'parking' }}
-            </span>
-          </div>
-
-          <div class="parking-address" *ngIf="getSubscriptionActionHint(subscription)">
-            <ion-icon name="information-circle-outline"></ion-icon>
-            <span>{{ getSubscriptionActionHint(subscription) }}</span>
-          </div>
-
-          <div class="parking-actions">
-            <button
-              class="action-btn approve"
-              type="button"
-              *ngIf="subscription.statut === 'en_attente' || subscription.statut === 'suspendu'"
-              (click)="activateSubscription(subscription.id_abon)"
-              [disabled]="!canActivateSubscription(subscription)">
-              <ion-icon name="checkmark-outline"></ion-icon>
-              Activer
-            </button>
-            <button
-              class="action-btn reject"
-              type="button"
-              *ngIf="subscription.statut === 'actif'"
-              (click)="suspendSubscription(subscription.id_abon)">
-              <ion-icon name="pause-outline"></ion-icon>
-              Suspendre
-            </button>
-          </div>
-        </article>
-
-        <div *ngIf="filteredSubscriptions.length === 0" class="empty-state">
+      <ng-template #emptySubscriptionsState>
+        <div class="empty-state">
           <ion-icon name="card-outline"></ion-icon>
           <p>Aucun abonnement parking trouve</p>
         </div>
-      </div>
+      </ng-template>
     </section>
   </div>
 
