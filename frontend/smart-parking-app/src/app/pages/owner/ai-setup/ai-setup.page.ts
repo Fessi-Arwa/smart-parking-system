@@ -45,6 +45,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   isLoadingCalibration = false;
   isSavingCalibration = false;
   reanalyzingSourceIds = new Set<number>();
+  autoUpdatingCameraIds = new Set<number>();
   aiSources: ParkingAISource[] = [];
   calibrationPlaces: PlaceDto[] = [];
   calibrationSlots: ParkingAISlot[] = [];
@@ -185,7 +186,12 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
       this.aiSources = [source, ...this.aiSources];
       this.cameraDraft = { label: '', streamUrl: '' };
-      this.toastService.show('Camera ajoutee avec succes.', 'success');
+      this.toastService.show(
+        source.camera_processing_mode === 'edge_required'
+          ? 'Camera ajoutee. Ce flux necessite un worker local pour le suivi automatique.'
+          : 'Camera ajoutee avec succes.',
+        source.camera_processing_mode === 'edge_required' ? 'info' : 'success'
+      );
     } catch (error) {
       console.error('Erreur ajout camera IA', error);
       this.toastService.show(this.getErrorMessage(error, 'Impossible d enregistrer cette camera.'), 'error');
@@ -307,7 +313,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   async reanalyzeSource(source: ParkingAISource): Promise<void> {
-    if (this.isCameraSource(source) || this.reanalyzingSourceIds.has(source.id_source)) {
+    if (this.reanalyzingSourceIds.has(source.id_source)) {
       return;
     }
 
@@ -323,7 +329,9 @@ export class AiSetupPage implements OnInit, OnDestroy {
         this.calibrationSource = updatedSource;
       }
       this.toastService.show(
-        this.isVideoSource(updatedSource)
+        this.isCameraSource(updatedSource)
+          ? 'Capture du flux lancee. Le resultat annote est disponible ci-dessous.'
+          : this.isVideoSource(updatedSource)
           ? 'Retraitement video lance. Les resultats apparaitront automatiquement.'
           : 'Source retraitee avec succes.',
         'success'
@@ -513,6 +521,107 @@ export class AiSetupPage implements OnInit, OnDestroy {
     });
   }
 
+  async goToOwnerHome(): Promise<void> {
+    await this.router.navigate(['/owner/dashboard']);
+  }
+
+  openCameraStream(source: ParkingAISource): void {
+    if (!source.stream_url) {
+      this.toastService.show('Aucun flux camera disponible pour cette source.', 'error');
+      return;
+    }
+
+    window.open(source.stream_url, '_blank', 'noopener');
+  }
+
+  getCameraStatusLabel(source: ParkingAISource): string {
+    switch (source.camera_status) {
+      case 'active':
+        return 'Active';
+      case 'offline':
+        return 'Hors ligne';
+      case 'error':
+        return 'Erreur';
+      default:
+        return 'En attente';
+    }
+  }
+
+  getCameraStatusTone(source: ParkingAISource): 'success' | 'warning' | 'danger' | 'neutral' {
+    switch (source.camera_status) {
+      case 'active':
+        return 'success';
+      case 'offline':
+        return 'warning';
+      case 'error':
+        return 'danger';
+      default:
+        return 'neutral';
+    }
+  }
+
+  getCameraLastProcessedLabel(source: ParkingAISource): string | null {
+    if (!source.last_processed_at) {
+      return null;
+    }
+
+    const date = new Date(source.last_processed_at);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    return `Dernier traitement: ${date.toLocaleString('fr-FR')}`;
+  }
+
+  getCameraProcessingModeLabel(source: ParkingAISource): string | null {
+    if (!this.isCameraSource(source)) {
+      return null;
+    }
+
+    if (source.camera_processing_mode === 'edge_required') {
+      return 'Worker local requis';
+    }
+
+    if (source.camera_processing_mode === 'cloud') {
+      return 'Traitement cloud';
+    }
+
+    return null;
+  }
+
+  isAutoUpdatingCamera(sourceId: number): boolean {
+    return this.autoUpdatingCameraIds.has(sourceId);
+  }
+
+  async toggleCameraAutoProcessing(source: ParkingAISource): Promise<void> {
+    if (!this.isCameraSource(source) || this.autoUpdatingCameraIds.has(source.id_source)) {
+      return;
+    }
+
+    this.autoUpdatingCameraIds.add(source.id_source);
+    try {
+      const updatedSource = await this.parkingAiSourceService.updateCameraAutoProcessing(source.id_source, {
+        enabled: !source.auto_processing_enabled,
+        interval_seconds: source.auto_process_interval_seconds || 30,
+      });
+      this.aiSources = this.aiSources.map((item) =>
+        item.id_source === updatedSource.id_source ? updatedSource : item
+      );
+      this.syncPollingState();
+      this.toastService.show(
+        updatedSource.auto_processing_enabled
+          ? 'Suivi automatique active pour cette camera.'
+          : 'Suivi automatique desactive pour cette camera.',
+        'success'
+      );
+    } catch (error) {
+      console.error('Erreur activation suivi auto camera', error);
+      this.toastService.show(this.getErrorMessage(error, 'Impossible de modifier le suivi auto de cette camera.'), 'error');
+    } finally {
+      this.autoUpdatingCameraIds.delete(source.id_source);
+    }
+  }
+
   async saveCalibration(): Promise<void> {
     if (!this.activeParkingId || !this.calibrationSource) {
       return;
@@ -636,7 +745,7 @@ export class AiSetupPage implements OnInit, OnDestroy {
   }
 
   isImageAnalysis(source: ParkingAISource): boolean {
-    return this.isImageSource(source) && !!this.getAnalysisOutputUrl(source);
+    return (this.isImageSource(source) || this.isCameraSource(source)) && !!this.getAnalysisOutputUrl(source);
   }
 
   isVideoAnalysis(source: ParkingAISource): boolean {
@@ -1042,15 +1151,18 @@ export class AiSetupPage implements OnInit, OnDestroy {
     const hasRunningJob = this.aiSources.some((source) =>
       source.analysis?.status === 'pending' || source.analysis?.status === 'processing'
     );
+    const hasAutoCamera = this.aiSources.some((source) =>
+      this.isCameraSource(source) && !!source.auto_processing_enabled
+    );
 
-    if (hasRunningJob && !this.pollingTimer) {
+    if ((hasRunningJob || hasAutoCamera) && !this.pollingTimer) {
       this.pollingTimer = setInterval(() => {
         void this.loadSources();
-      }, 5000);
+      }, hasAutoCamera ? 10000 : 5000);
       return;
     }
 
-    if (!hasRunningJob) {
+    if (!hasRunningJob && !hasAutoCamera) {
       this.stopPolling();
     }
   }

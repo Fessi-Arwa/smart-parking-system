@@ -9,7 +9,15 @@
     <form [formGroup]="vehicleForm" (ngSubmit)="onSubmit()">
       <div class="input-group">
         <label>Matricule</label>
-        <input type="text" formControlName="matricule" placeholder="123 TU 4567" />
+        <input
+          type="text"
+          formControlName="matricule"
+          placeholder="742 تونس 113"
+          inputmode="text"
+          dir="auto"
+          autocapitalize="off"
+          spellcheck="false" />
+        <small>Format attendu: chiffres puis تونس puis chiffres</small>
       </div>
 
       <div class="input-group">

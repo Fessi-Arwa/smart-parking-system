@@ -3,6 +3,8 @@ import { Component, OnInit } from '@angular/core';
 import { AuthService } from '../../../services/auth.service';
 import {
   AdminAppSubscriptionRecord,
+  AdminCameraHealthRecord,
+  AdminCameraHealthResponse,
   AdminParkingRecord,
   AdminUserRecord,
   AdminWorkflowService,
@@ -34,6 +36,10 @@ export class AdminDashboardPage implements OnInit {
   users: AdminUserRecord[] = [];
   parkings: AdminParkingRecord[] = [];
   subscriptions: AdminAppSubscriptionRecord[] = [];
+  cameraHealth: AdminCameraHealthResponse = {
+    summary: { total: 0, active: 0, offline: 0, error: 0, auto_enabled: 0 },
+    items: [],
+  };
   isLoading = false;
 
   userSearchTerm = '';
@@ -203,6 +209,31 @@ export class AdminDashboardPage implements OnInit {
     }
 
     return filtered;
+  }
+
+  get hasCameraHealth(): boolean {
+    return this.cameraHealth.summary.total > 0;
+  }
+
+  getCameraStatusLabel(status?: string | null): string {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'offline':
+        return 'Hors ligne';
+      case 'error':
+        return 'Erreur';
+      default:
+        return 'En attente';
+    }
+  }
+
+  formatCameraTimestamp(value?: string | null): string {
+    if (!value) {
+      return 'Jamais traitee';
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Jamais traitee' : date.toLocaleString('fr-FR');
   }
 
   async approveOwner(userId: number): Promise<void> {
@@ -591,15 +622,17 @@ export class AdminDashboardPage implements OnInit {
     this.isLoading = true;
 
     try {
-      const [users, parkings, subscriptions] = await Promise.all([
+      const [users, parkings, subscriptions, cameraHealth] = await Promise.all([
         this.adminWorkflowService.getUsers(),
         this.adminWorkflowService.getParkings(),
         this.adminWorkflowService.getAppSubscriptions(),
+        this.adminWorkflowService.getCameraHealth(),
       ]);
 
       this.users = users;
       this.parkings = parkings;
       this.subscriptions = subscriptions;
+      this.cameraHealth = cameraHealth;
       this.updateStats();
     } catch (error) {
       console.error('Erreur chargement dashboard admin', error);

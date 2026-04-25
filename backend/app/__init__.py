@@ -95,6 +95,31 @@ def _ensure_runtime_schema_compatibility(app):
             "bucket_key",
             "bucket_key TEXT",
         )
+        add_column_if_missing(
+            "parking_ai_source",
+            "camera_status",
+            "camera_status VARCHAR(30) NOT NULL DEFAULT 'idle'",
+        )
+        add_column_if_missing(
+            "parking_ai_source",
+            "auto_processing_enabled",
+            "auto_processing_enabled BOOLEAN NOT NULL DEFAULT FALSE",
+        )
+        add_column_if_missing(
+            "parking_ai_source",
+            "auto_process_interval_seconds",
+            "auto_process_interval_seconds INTEGER NOT NULL DEFAULT 30",
+        )
+        add_column_if_missing(
+            "parking_ai_source",
+            "last_processed_at",
+            "last_processed_at TIMESTAMP",
+        )
+        add_column_if_missing(
+            "parking_ai_source",
+            "last_error",
+            "last_error TEXT",
+        )
 
         add_column_if_missing(
             "abonnement",
@@ -242,6 +267,9 @@ def create_app():
 
     with app.app_context():
         _ensure_runtime_schema_compatibility(app)
+
+    from .services.ai_service import ParkingSourceAIService
+    ParkingSourceAIService.start_camera_scheduler(app, app.config["UPLOAD_FOLDER"])
 
     # routes
     from .routes.abonnement import abonnement_bp

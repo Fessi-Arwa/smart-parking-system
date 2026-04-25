@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 import shutil
@@ -207,6 +207,18 @@ def _select_workflow_parking(user):
 
 def _source_to_dict(source, ai_service=None):
     data = source.to_dict()
+    stream_url = (getattr(source, "stream_url", None) or "").strip()
+    if source.source_type == TypeSourceIA.camera and stream_url:
+        try:
+            service = ai_service or _get_ai_source_service()
+            processing_mode, processing_hint = service.get_camera_processing_mode(stream_url)
+        except Exception:
+            processing_mode, processing_hint = "unknown", None
+        data["camera_processing_mode"] = processing_mode
+        data["camera_processing_hint"] = processing_hint
+    else:
+        data["camera_processing_mode"] = None
+        data["camera_processing_hint"] = None
     data["preview_url"] = (
         f"/api/owner/ai-sources/{source.id_source}/file"
         if source.file_path or getattr(source, "bucket_key", None)
@@ -471,10 +483,92 @@ def create_camera_source(parking_id):
         source_type=TypeSourceIA.camera,
         label=(data.get("label") or "Camera surveillance").strip() or "Camera surveillance",
         stream_url=stream_url,
+        camera_status="idle",
+        auto_processing_enabled=bool(data.get("auto_processing_enabled", False)),
+        auto_process_interval_seconds=max(10, int(data.get("auto_process_interval_seconds") or 30)),
     )
     db.session.add(source)
     db.session.commit()
     return jsonify(_source_to_dict(source)), 201
+
+
+@owner_workflow_bp.route("/ai-sources/<int:source_id>/auto-processing", methods=["POST"])
+@jwt_required()
+def update_ai_source_auto_processing(source_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    source = ParkingAISource.query.get(source_id)
+    if not source:
+        return jsonify({"msg": "Source IA introuvable"}), 404
+    if source.source_type != TypeSourceIA.camera:
+        return jsonify({"msg": "Le suivi automatique est reserve aux cameras"}), 400
+
+    parking = _get_owner_parking(user, source.parking_id)
+    if not parking:
+        return jsonify({"msg": "Acces non autorise"}), 403
+    approval_error = _ensure_owner_approved(user)
+    if approval_error:
+        return approval_error
+
+    data = request.get_json() or {}
+    enabled = bool(data.get("enabled", False))
+    interval_seconds = max(10, min(3600, int(data.get("interval_seconds") or source.auto_process_interval_seconds or 30)))
+
+    source.auto_processing_enabled = enabled
+    source.auto_process_interval_seconds = interval_seconds
+    if not enabled:
+        source.camera_status = "idle"
+    db.session.commit()
+    return jsonify(_source_to_dict(source)), 200
+
+
+@owner_workflow_bp.route("/ai-sources/<int:source_id>/camera-frame-upload", methods=["POST"])
+@jwt_required()
+def upload_camera_frame_for_analysis(source_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    source = ParkingAISource.query.get(source_id)
+    if not source:
+        return jsonify({"msg": "Source IA introuvable"}), 404
+    if source.source_type != TypeSourceIA.camera:
+        return jsonify({"msg": "Cette route est reservee aux cameras"}), 400
+
+    parking = _get_owner_parking(user, source.parking_id)
+    if not parking:
+        return jsonify({"msg": "Acces non autorise"}), 403
+    approval_error = _ensure_owner_approved(user)
+    if approval_error:
+        return approval_error
+
+    uploaded_file = request.files.get("file")
+    if not uploaded_file or not uploaded_file.filename:
+        return jsonify({"msg": "Aucune image n a ete envoyee"}), 400
+
+    upload_root = Path(current_app.config["UPLOAD_FOLDER"]) / "camera_edge_frames" / str(parking.id_park)
+    upload_root.mkdir(parents=True, exist_ok=True)
+    safe_name = secure_filename(uploaded_file.filename) or f"camera_frame_{uuid4().hex}.jpg"
+    frame_path = upload_root / f"{uuid4().hex}_{safe_name}"
+    uploaded_file.save(frame_path)
+
+    service = _get_ai_source_service()
+    try:
+        analysis = service.analyze_camera_frame_file(source, frame_path)
+    except Exception as exc:
+        source.camera_status = "error"
+        source.last_processed_at = datetime.now(timezone.utc)
+        source.last_error = str(exc)
+        db.session.commit()
+        return jsonify({"msg": str(exc)}), 400
+    finally:
+        frame_path.unlink(missing_ok=True)
+
+    payload = _source_to_dict(source, ai_service=service)
+    payload["analysis"] = analysis
+    return jsonify(payload), 200
 
 
 @owner_workflow_bp.route("/parkings/<int:parking_id>/ai-sources/upload", methods=["POST"])
@@ -867,9 +961,6 @@ def reanalyze_ai_source(source_id):
     if approval_error:
         return approval_error
 
-    if source.source_type == TypeSourceIA.camera:
-        return jsonify({"msg": "Le retraitement n est pas disponible pour les cameras"}), 400
-
     service = _get_ai_source_service()
     try:
         if source.source_type == TypeSourceIA.video:
@@ -880,6 +971,11 @@ def reanalyze_ai_source(source_id):
 
         analysis = service.analyze_source(source)
     except Exception as exc:
+        if source.source_type == TypeSourceIA.camera:
+            source.camera_status = "offline" if "flux" in str(exc).lower() else "error"
+            source.last_processed_at = datetime.now(timezone.utc)
+            source.last_error = str(exc)
+            db.session.commit()
         return jsonify({"msg": str(exc)}), 400
 
     payload = _source_to_dict(source, ai_service=service)

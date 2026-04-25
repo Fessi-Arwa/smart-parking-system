@@ -35,6 +35,10 @@ export class SubscriptionPage implements OnInit {
     private toastService: ToastService
   ) {}
 
+  async goToOwnerHome(): Promise<void> {
+    await this.router.navigate(['/owner/dashboard']);
+  }
+
   async ngOnInit(): Promise<void> {
     await this.refreshStatus();
   }

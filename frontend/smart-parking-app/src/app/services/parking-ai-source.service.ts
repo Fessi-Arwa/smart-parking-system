@@ -16,6 +16,13 @@ export interface ParkingAISource {
   original_name?: string;
   mime_type?: string;
   stream_url?: string;
+  camera_status?: 'idle' | 'active' | 'offline' | 'error' | string;
+  auto_processing_enabled?: boolean;
+  auto_process_interval_seconds?: number;
+  camera_processing_mode?: 'cloud' | 'edge_required' | 'unknown' | null;
+  camera_processing_hint?: string | null;
+  last_processed_at?: string | null;
+  last_error?: string | null;
   preview_url?: string | null;
   calibration_preview_url?: string | null;
   created_at?: string;
@@ -277,6 +284,21 @@ export class ParkingAiSourceService {
       this.http.post<ParkingAISource>(
         `${this.apiUrl}/ai-sources/${sourceId}/reanalyze`,
         {},
+        { headers: this.buildAuthHeaders() }
+      )
+    );
+
+    return this.normalizeSource(source);
+  }
+
+  async updateCameraAutoProcessing(
+    sourceId: number,
+    payload: { enabled: boolean; interval_seconds?: number }
+  ): Promise<ParkingAISource> {
+    const source = await firstValueFrom(
+      this.http.post<ParkingAISource>(
+        `${this.apiUrl}/ai-sources/${sourceId}/auto-processing`,
+        payload,
         { headers: this.buildAuthHeaders() }
       )
     );

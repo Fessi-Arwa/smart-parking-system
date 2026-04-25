@@ -153,6 +153,10 @@ export class ParkingSetupPage implements OnInit {
     await this.completeSetup();
   }
 
+  async goToOwnerHome(): Promise<void> {
+    await this.router.navigate(['/owner/dashboard']);
+  }
+
   addFloor(): void {
     this.structureDraft = [
       ...this.structureDraft,

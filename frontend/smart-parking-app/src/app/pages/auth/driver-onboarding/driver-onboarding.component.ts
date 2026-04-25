@@ -47,7 +47,17 @@ export class DriverOnboardingComponent implements AfterViewInit {
 
     this.isLoading = true;
     try {
-      const { matricule, marque, type } = this.vehicleForm.value;
+      const matricule = this.vehicleService.normalizePlate(this.vehicleForm.value.matricule);
+      const marque = String(this.vehicleForm.value.marque || '').trim();
+      const type = String(this.vehicleForm.value.type || '').trim();
+
+      this.vehicleForm.patchValue({ matricule, marque, type }, { emitEvent: false });
+
+      if (!this.vehicleService.isSupportedPlateFormat(matricule)) {
+        this.toastService.show('Le matricule doit etre au format: chiffres تونس chiffres', 'error');
+        return;
+      }
+
       await firstValueFrom(
         this.vehicleService.createVehicle({
           matricule,

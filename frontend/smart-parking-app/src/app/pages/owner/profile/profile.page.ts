@@ -96,6 +96,9 @@ export class ProfilePage implements OnInit, OnDestroy {
   workflowState: OwnerWorkflowState | null = null;
   private previewErrorIds = new Set<number>();
   private sourceBlobs = new Map<number, string>();
+  private reanalyzingSourceIds = new Set<number>();
+  private autoUpdatingCameraIds = new Set<number>();
+  private selectedParkingPollingTimer: ReturnType<typeof setInterval> | null = null;
 
   editProfileData = {
     nom: '',
@@ -176,6 +179,7 @@ export class ProfilePage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.stopSelectedParkingPolling();
     this.clearSourceBlobs();
   }
 
@@ -536,6 +540,7 @@ export class ProfilePage implements OnInit, OnDestroy {
     try {
       this.selectedParkingSources = await this.parkingAiSourceService.getSources(parking.id_park);
       await this.loadBlobUrlsForSources();
+      this.syncSelectedParkingPolling();
     } catch (error) {
       console.error('Erreur chargement sources IA parking', error);
       this.toastService.show(this.getErrorMessage(error, 'Impossible de charger les videos de ce parking.'), 'error');
@@ -545,6 +550,7 @@ export class ProfilePage implements OnInit, OnDestroy {
   backToList(): void {
     this.selectedParking = null;
     this.selectedParkingSources = [];
+    this.stopSelectedParkingPolling();
     this.previewErrorIds.clear();
     this.clearSourceBlobs();
     this.showAddParking = false;
@@ -826,6 +832,110 @@ export class ProfilePage implements OnInit, OnDestroy {
     return !!this.getSourceMediaUrl(source) && !this.previewErrorIds.has(source.id_source);
   }
 
+  async goToOwnerHome(): Promise<void> {
+    await this.router.navigate(['/owner/dashboard']);
+  }
+
+  canManageSource(source: ParkingAISource): boolean {
+    return source.source_type === 'image' || source.source_type === 'video' || source.source_type === 'camera';
+  }
+
+  isReanalyzingSource(sourceId: number): boolean {
+    return this.reanalyzingSourceIds.has(sourceId);
+  }
+
+  isAutoUpdatingCamera(sourceId: number): boolean {
+    return this.autoUpdatingCameraIds.has(sourceId);
+  }
+
+  getCameraStatusLabel(source: ParkingAISource): string {
+    switch (source.camera_status) {
+      case 'active':
+        return 'Active';
+      case 'offline':
+        return 'Hors ligne';
+      case 'error':
+        return 'Erreur';
+      default:
+        return 'En attente';
+    }
+  }
+
+  getCameraLastProcessedLabel(source: ParkingAISource): string | null {
+    if (!source.last_processed_at) {
+      return null;
+    }
+
+    const date = new Date(source.last_processed_at);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    return `Dernier traitement: ${date.toLocaleString('fr-FR')}`;
+  }
+
+  openSourceExternal(source: ParkingAISource): void {
+    const target =
+      source.source_type === 'camera'
+        ? source.stream_url || ''
+        : this.getSourceMediaUrl(source);
+
+    if (!target) {
+      this.toastService.show('Aucun media disponible pour cette source.', 'error');
+      return;
+    }
+
+    window.open(target, '_blank', 'noopener');
+  }
+
+  async reanalyzeSelectedSource(source: ParkingAISource): Promise<void> {
+    if (!this.canManageSource(source) || this.reanalyzingSourceIds.has(source.id_source)) {
+      return;
+    }
+
+    this.reanalyzingSourceIds.add(source.id_source);
+    try {
+      const updatedSource = await this.parkingAiSourceService.reanalyzeSource(source.id_source);
+      this.selectedParkingSources = this.selectedParkingSources.map((item) =>
+        item.id_source === updatedSource.id_source ? updatedSource : item
+      );
+      this.previewErrorIds.delete(source.id_source);
+      this.clearSourceBlobForId(source.id_source);
+      if (updatedSource.preview_url) {
+        const blobUrl = await this.parkingAiSourceService.fetchProtectedMediaObjectUrl(updatedSource.id_source);
+        if (blobUrl) {
+          this.sourceBlobs.set(updatedSource.id_source, blobUrl);
+        }
+      }
+      this.syncSelectedParkingPolling();
+      this.toastService.show(
+        updatedSource.source_type === 'camera'
+          ? 'Capture du flux lancee avec succes.'
+          : 'Retraitement lance avec succes.',
+        'success'
+      );
+    } catch (error) {
+      console.error('Erreur retraitement source parking', error);
+      this.toastService.show(this.getErrorMessage(error, 'Impossible de retraiter cette source.'), 'error');
+    } finally {
+      this.reanalyzingSourceIds.delete(source.id_source);
+    }
+  }
+
+  async deleteSelectedSource(source: ParkingAISource): Promise<void> {
+    try {
+      await this.parkingAiSourceService.deleteSource(source.id_source);
+      this.clearSourceBlobForId(source.id_source);
+      this.previewErrorIds.delete(source.id_source);
+      this.selectedParkingSources = this.selectedParkingSources.filter((item) => item.id_source !== source.id_source);
+      this.syncSelectedParkingPolling();
+      this.toastService.show('Source supprimee avec succes.', 'success');
+    } catch (error) {
+      console.error('Erreur suppression source parking', error);
+      this.toastService.show(this.getErrorMessage(error, 'Impossible de supprimer cette source.'), 'error');
+    }
+  }
+
   markPreviewError(source: ParkingAISource): void {
     this.previewErrorIds.add(source.id_source);
   }
@@ -836,6 +946,35 @@ export class ProfilePage implements OnInit, OnDestroy {
 
   getSourceMediaUrl(source: ParkingAISource): string {
     return this.sourceBlobs.get(source.id_source) || source.preview_url || '';
+  }
+
+  async toggleCameraAutoProcessing(source: ParkingAISource): Promise<void> {
+    if (!this.canManageSource(source) || source.source_type !== 'camera' || this.autoUpdatingCameraIds.has(source.id_source)) {
+      return;
+    }
+
+    this.autoUpdatingCameraIds.add(source.id_source);
+    try {
+      const updatedSource = await this.parkingAiSourceService.updateCameraAutoProcessing(source.id_source, {
+        enabled: !source.auto_processing_enabled,
+        interval_seconds: source.auto_process_interval_seconds || 30,
+      });
+      this.selectedParkingSources = this.selectedParkingSources.map((item) =>
+        item.id_source === updatedSource.id_source ? updatedSource : item
+      );
+      this.syncSelectedParkingPolling();
+      this.toastService.show(
+        updatedSource.auto_processing_enabled
+          ? 'Suivi automatique active pour cette camera.'
+          : 'Suivi automatique desactive pour cette camera.',
+        'success'
+      );
+    } catch (error) {
+      console.error('Erreur suivi auto camera', error);
+      this.toastService.show(this.getErrorMessage(error, 'Impossible de modifier le suivi automatique.'), 'error');
+    } finally {
+      this.autoUpdatingCameraIds.delete(source.id_source);
+    }
   }
 
   private async loadOwnerParkings(selectedParkingId?: number): Promise<void> {
@@ -967,6 +1106,55 @@ export class ProfilePage implements OnInit, OnDestroy {
   private clearSourceBlobs(): void {
     this.sourceBlobs.forEach((blobUrl) => URL.revokeObjectURL(blobUrl));
     this.sourceBlobs.clear();
+  }
+
+  private clearSourceBlobForId(sourceId: number): void {
+    const blobUrl = this.sourceBlobs.get(sourceId);
+    if (blobUrl) {
+      URL.revokeObjectURL(blobUrl);
+      this.sourceBlobs.delete(sourceId);
+    }
+  }
+
+  private async refreshSelectedParkingSourcesSilently(): Promise<void> {
+    if (!this.selectedParking) {
+      return;
+    }
+
+    try {
+      this.selectedParkingSources = await this.parkingAiSourceService.getSources(this.selectedParking.id_park);
+      await this.loadBlobUrlsForSources();
+      this.syncSelectedParkingPolling();
+    } catch (error) {
+      console.warn('Refresh silencieux des sources camera impossible.', error);
+    }
+  }
+
+  private syncSelectedParkingPolling(): void {
+    const shouldPoll = this.selectedParkingSources.some(
+      (source) =>
+        source.source_type === 'camera' && !!source.auto_processing_enabled
+    );
+
+    if (shouldPoll && !this.selectedParkingPollingTimer) {
+      this.selectedParkingPollingTimer = setInterval(() => {
+        void this.refreshSelectedParkingSourcesSilently();
+      }, 10000);
+      return;
+    }
+
+    if (!shouldPoll) {
+      this.stopSelectedParkingPolling();
+    }
+  }
+
+  private stopSelectedParkingPolling(): void {
+    if (!this.selectedParkingPollingTimer) {
+      return;
+    }
+
+    clearInterval(this.selectedParkingPollingTimer);
+    this.selectedParkingPollingTimer = null;
   }
 
   private extractCity(address: string): string {

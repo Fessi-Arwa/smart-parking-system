@@ -25,6 +25,11 @@ class ParkingAISource(ModelMixin, db.Model):
         "original_name",
         "mime_type",
         "stream_url",
+        "camera_status",
+        "auto_processing_enabled",
+        "auto_process_interval_seconds",
+        "last_processed_at",
+        "last_error",
         "created_at",
     )
     __table_args__ = (
@@ -47,4 +52,9 @@ class ParkingAISource(ModelMixin, db.Model):
     original_name = db.Column(db.String(255))
     mime_type = db.Column(db.String(120))
     stream_url = db.Column(db.Text)
+    camera_status = db.Column(db.String(30), nullable=False, server_default="idle")
+    auto_processing_enabled = db.Column(db.Boolean, nullable=False, server_default="false")
+    auto_process_interval_seconds = db.Column(db.Integer, nullable=False, server_default="30")
+    last_processed_at = db.Column(db.DateTime(timezone=True))
+    last_error = db.Column(db.Text)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())

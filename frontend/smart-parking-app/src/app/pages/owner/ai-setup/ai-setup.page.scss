@@ -407,6 +407,14 @@
   border: 1px solid rgba(148, 163, 184, 0.16);
 }
 
+.camera-form__hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #52606d;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -498,6 +506,11 @@
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.source-card__tag--camera-mode {
+  background: #ecfeff;
+  color: #0f766e;
 }
 
 .source-card__aside {

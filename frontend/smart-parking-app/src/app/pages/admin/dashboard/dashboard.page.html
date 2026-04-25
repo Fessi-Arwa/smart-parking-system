@@ -61,6 +61,52 @@
       </article>
     </section>
 
+    <section class="data-card" *ngIf="hasCameraHealth">
+      <div class="card-header">
+        <div class="header-left">
+          <div class="header-icon-wrapper">
+            <ion-icon name="videocam-outline" class="header-icon"></ion-icon>
+          </div>
+          <div>
+            <h2>Surveillance camera</h2>
+            <p>Etat global des flux automatiques</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="ai-summary-strip">
+        <article>
+          <span>Total</span>
+          <strong>{{ cameraHealth.summary.total }}</strong>
+        </article>
+        <article>
+          <span>Actives</span>
+          <strong>{{ cameraHealth.summary.active }}</strong>
+        </article>
+        <article>
+          <span>Hors ligne</span>
+          <strong>{{ cameraHealth.summary.offline }}</strong>
+        </article>
+        <article>
+          <span>Auto ON</span>
+          <strong>{{ cameraHealth.summary.auto_enabled }}</strong>
+        </article>
+      </div>
+
+      <div class="review-queue__list">
+        <article class="review-queue__item" *ngFor="let camera of cameraHealth.items | slice:0:4">
+          <div>
+            <strong>{{ camera.label || 'Camera' }} - {{ camera.parking_name }}</strong>
+            <p>{{ camera.owner_name || 'Owner' }} | {{ formatCameraTimestamp(camera.last_processed_at) }}</p>
+            <p *ngIf="camera.last_error">{{ camera.last_error }}</p>
+          </div>
+          <span class="validation-badge" [class]="getValidationBadgeClass(camera.camera_status === 'active' ? 'valide' : camera.camera_status === 'offline' ? 'en_attente_validation' : 'rejete')">
+            {{ getCameraStatusLabel(camera.camera_status) }}
+          </span>
+        </article>
+      </div>
+    </section>
+
     <section class="section-switcher">
       <button
         type="button"

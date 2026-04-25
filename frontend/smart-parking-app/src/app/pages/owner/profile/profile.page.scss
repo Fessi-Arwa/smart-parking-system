@@ -803,6 +803,34 @@
   font-weight: 400;
 }
 
+.wizard-focus__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.wizard-focus__action--secondary {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.video-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.video-card__actions .btn-outline,
+.video-card__actions .btn-danger {
+  min-height: 38px;
+  box-shadow: none;
+}
+
+.btn-danger--compact,
+.btn-outline--compact {
+  min-width: unset;
+}
+
 .empty-state--compact {
   min-height: 120px;
 }

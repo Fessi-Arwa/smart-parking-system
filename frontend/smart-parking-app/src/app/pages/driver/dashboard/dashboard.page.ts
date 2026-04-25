@@ -15,6 +15,7 @@ import { MapComponent, MapParking } from '../../../shared/components/map/map.com
 
 type DriverTab = 'home' | 'historique' | 'profil';
 type PaymentMode = 'en_ligne' | 'sur_place';
+type ParkingListFilter = 'closest' | 'available' | 'budget';
 
 interface DriverProfile {
   nom: string;
@@ -101,6 +102,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   private readonly liveParkingRefreshIntervalMs = 5000;
   private readonly notifiedSubscriptionIds = new Set<number>();
   activeTab: DriverTab = 'home';
+  activeParkingFilter: ParkingListFilter = 'closest';
   searchTerm = '';
   isDriverLocationFocused = false;
   isReservationSubmitting = false;
@@ -325,9 +327,58 @@ export class DashboardPage implements OnInit, OnDestroy {
     this.activeTab = tab;
   }
 
+  setActiveParkingFilter(filter: ParkingListFilter): void {
+    this.activeParkingFilter = filter;
+  }
+
   get filteredParkings(): ParkingCard[] {
-    const frequentParkings = this.parkings.filter((parking) => parking.frequent);
-    return frequentParkings.length ? frequentParkings : this.parkings;
+    const parkings = [...this.parkings];
+
+    if (this.activeParkingFilter === 'available') {
+      return parkings
+        .filter((parking) => parking.availablePlaces > 0)
+        .sort((first, second) => {
+          if (second.availablePlaces === first.availablePlaces) {
+            return first.distanceKm - second.distanceKm;
+          }
+
+          return second.availablePlaces - first.availablePlaces;
+        });
+    }
+
+    if (this.activeParkingFilter === 'budget') {
+      return parkings.sort((first, second) => {
+        if (first.prix_heure === second.prix_heure) {
+          return first.distanceKm - second.distanceKm;
+        }
+
+        return first.prix_heure - second.prix_heure;
+      });
+    }
+
+    return parkings.sort((first, second) => {
+      if (first.distanceKm === second.distanceKm) {
+        return second.availablePlaces - first.availablePlaces;
+      }
+
+      return first.distanceKm - second.distanceKm;
+    });
+  }
+
+  get nearbyParkings(): ParkingCard[] {
+    return [...this.parkings]
+      .sort((first, second) => {
+        if (first.distanceKm === second.distanceKm) {
+          return second.availablePlaces - first.availablePlaces;
+        }
+
+        return first.distanceKm - second.distanceKm;
+      })
+      .slice(0, 4);
+  }
+
+  get highlightedNearbyParking(): ParkingCard | null {
+    return this.nearbyParkings[0] ?? null;
   }
 
   get searchedParkings(): ParkingCard[] {
@@ -396,6 +447,33 @@ export class DashboardPage implements OnInit, OnDestroy {
     return this.subscriptions.filter(
       (subscription) => subscription.statut !== 'suspendu' && !subscription.cancelled_at
     );
+  }
+
+  get completedReservationsCount(): number {
+    return this.reservations.filter((reservation) => reservation.statut === 'terminee').length;
+  }
+
+  get activeSubscriptionsCount(): number {
+    return this.subscriptions.filter((subscription) => subscription.statut === 'actif' && !subscription.cancelled_at).length;
+  }
+
+  get latestHistoryItem(): { type: 'reservation' | 'abonnement'; title: string; subtitle: string; date: string } | null {
+    const reservationItems = this.reservations.map((reservation) => ({
+      type: 'reservation' as const,
+      title: reservation.parkingNom,
+      subtitle: `${reservation.placeLabel} - ${this.getStatusLabel(reservation.statut)}`,
+      date: reservation.date_debut,
+    }));
+
+    const subscriptionItems = this.subscriptions.map((subscription) => ({
+      type: 'abonnement' as const,
+      title: subscription.parkingNom,
+      subtitle: `${subscription.placeLabel} - ${this.getStatusLabel(subscription.statut)}`,
+      date: subscription.date_debut,
+    }));
+
+    return [...reservationItems, ...subscriptionItems]
+      .sort((first, second) => this.getActivityTimestamp(second.date) - this.getActivityTimestamp(first.date))[0] ?? null;
   }
 
   get notificationItems(): HeaderNotificationItem[] {
@@ -961,13 +1039,24 @@ export class DashboardPage implements OnInit, OnDestroy {
       return;
     }
 
+    const matricule = this.vehicleService.normalizePlate(this.vehicleForm.value.matricule);
+    const marque = String(this.vehicleForm.value.marque || '').trim();
+    const type = String(this.vehicleForm.value.type || '').trim();
+
+    this.vehicleForm.patchValue({ matricule, marque, type }, { emitEvent: false });
+
+    if (!this.vehicleService.isSupportedPlateFormat(matricule)) {
+      this.toastService.show('Le matricule doit etre au format: chiffres تونس chiffres', 'error');
+      return;
+    }
+
     this.isVehicleSubmitting = true;
     try {
       await firstValueFrom(
         this.vehicleService.createVehicle({
-          matricule: this.vehicleForm.value.matricule,
-          marque: this.vehicleForm.value.marque,
-          type: this.vehicleForm.value.type,
+          matricule,
+          marque,
+          type,
         })
       );
 
@@ -1178,6 +1267,10 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   trackByParking(_: number, parking: ParkingCard): number {
     return parking.id_park;
+  }
+
+  trackByRecentActivity(_: number, activity: { parking: ParkingCard }): number {
+    return activity.parking.id_park;
   }
 
   trackByReservation(_: number, reservation: ReservationItem): number {

@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
+import re
+import unicodedata
 
 from .. import db
 from ..models.compte import Compte, RoleCompte
@@ -7,6 +9,13 @@ from ..models.vehicule import Vehicule
 
 
 vehicule_bp = Blueprint("vehicule", __name__)
+TUNISIAN_PLATE_PATTERN = re.compile(r"^\d+\s+تونس\s+\d+$")
+
+
+def normalize_vehicle_plate(value):
+    normalized = unicodedata.normalize("NFKC", str(value or ""))
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
 
 
 @vehicule_bp.route("/", methods=["GET"])
@@ -42,9 +51,18 @@ def create_vehicle():
     if user.role != RoleCompte.conducteur:
         return jsonify({"msg": "Seuls les conducteurs peuvent ajouter un vehicule"}), 403
 
-    matricule = data.get("matricule")
+    matricule = normalize_vehicle_plate(data.get("matricule"))
     if not matricule:
         return jsonify({"msg": "matricule est obligatoire"}), 400
+
+    if len(matricule) < 3:
+        return jsonify({"msg": "Le matricule saisi est trop court"}), 400
+
+    if len(matricule) > 50:
+        return jsonify({"msg": "Le matricule saisi est trop long"}), 400
+
+    if not TUNISIAN_PLATE_PATTERN.match(matricule):
+        return jsonify({"msg": "Le matricule doit etre au format: chiffres تونس chiffres"}), 400
 
     existing_vehicle = Vehicule.query.filter_by(matricule=matricule).first()
     if existing_vehicle:

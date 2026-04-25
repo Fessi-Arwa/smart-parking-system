@@ -39,16 +39,17 @@
               "buildOptimizer": false,
               "optimization": false,
               "extractLicenses": false,
+              "allowedCommonJsDependencies": ["leaflet"],
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "2mb",
-                  "maximumError": "5mb"
+                  "maximumWarning": "5mb",
+                  "maximumError": "7mb"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "24kb",
-                  "maximumError": "48kb"
+                  "maximumWarning": "50kb",
+                  "maximumError": "64kb"
                 }
               ],
               "fileReplacements": [

@@ -8,6 +8,7 @@ from ..models.compte import Compte, RoleCompte, StatutValidationOwner
 from ..models.feedback import Feedback
 from ..models.paiement import Paiement
 from ..models.parking import Parking, StatutConfigurationIA, StatutConfigurationParking, StatutValidationParking
+from ..models.parking_ai_source import ParkingAISource, TypeSourceIA
 from ..models.place import Place
 from ..models.reservation import Reservation
 
@@ -66,6 +67,34 @@ def _get_subscription_related_parking(abonnement_id):
         return None, None
     parking = Parking.query.get(link.parking_id)
     return link, parking
+
+
+def _camera_source_to_admin_dict(source):
+    parking = Parking.query.get(source.parking_id)
+    owner = Compte.query.get(parking.owner_id) if parking else None
+    analysis = (
+        {
+            "status": "done",
+            "free": None,
+            "occupied": None,
+            "total": None,
+        }
+    )
+    return {
+        "id_source": source.id_source,
+        "parking_id": source.parking_id,
+        "parking_name": parking.nom if parking else f"Parking #{source.parking_id}",
+        "owner_id": parking.owner_id if parking else None,
+        "owner_name": owner.nom if owner else None,
+        "label": source.label,
+        "stream_url": source.stream_url,
+        "camera_status": source.camera_status,
+        "auto_processing_enabled": bool(source.auto_processing_enabled),
+        "auto_process_interval_seconds": source.auto_process_interval_seconds,
+        "last_processed_at": source.last_processed_at.isoformat() if source.last_processed_at else None,
+        "last_error": source.last_error,
+        "created_at": source.created_at.isoformat() if source.created_at else None,
+    }
 
 
 @admin_bp.route("/stats", methods=["GET"])
@@ -294,6 +323,34 @@ def update_parking_validation_status(parking_id):
     has_active_or_pending_subscription = any(
         abonnement.statut in {StatutAbonnement.actif, StatutAbonnement.en_attente}
         for abonnement in subscriptions
+    )
+
+
+@admin_bp.route("/camera-health", methods=["GET"])
+@jwt_required()
+def get_camera_health():
+    _, error_response = _require_admin()
+    if error_response:
+        return error_response
+
+    sources = (
+        ParkingAISource.query.filter_by(source_type=TypeSourceIA.camera)
+        .order_by(ParkingAISource.last_processed_at.desc().nullslast(), ParkingAISource.id_source.desc())
+        .all()
+    )
+
+    payload = [_camera_source_to_admin_dict(source) for source in sources]
+    return jsonify(
+        {
+            "summary": {
+                "total": len(payload),
+                "active": sum(1 for item in payload if item["camera_status"] == "active"),
+                "offline": sum(1 for item in payload if item["camera_status"] == "offline"),
+                "error": sum(1 for item in payload if item["camera_status"] == "error"),
+                "auto_enabled": sum(1 for item in payload if item["auto_processing_enabled"]),
+            },
+            "items": payload[:12],
+        }
     )
 
     if (

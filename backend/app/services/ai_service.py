@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import ipaddress
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import cv2
 from flask import current_app
@@ -63,6 +67,9 @@ class ParkingSourceAnalysisResult:
 class ParkingSourceAIService:
     _executor = ThreadPoolExecutor(max_workers=max(1, int(os.getenv("SMART_PARKING_MAX_VIDEO_JOBS", "2"))))
     _video_jobs: dict[int, Future] = {}
+    _camera_scheduler_started = False
+    _camera_scheduler_lock = threading.Lock()
+    _camera_processing_ids: set[int] = set()
 
     def __init__(self, upload_root: str) -> None:
         self.flask_app = current_app._get_current_object()
@@ -110,18 +117,49 @@ class ParkingSourceAIService:
         self.debug_enabled = os.getenv("SMART_PARKING_AI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
         self._ensure_storage()
 
+    @classmethod
+    def start_camera_scheduler(cls, app: Any, upload_root: str) -> None:
+        if os.getenv("SMART_PARKING_DISABLE_CAMERA_SCHEDULER", "").strip().lower() in {"1", "true", "yes", "on"}:
+            return
+
+        with cls._camera_scheduler_lock:
+            if cls._camera_scheduler_started:
+                return
+            cls._camera_scheduler_started = True
+
+        worker = threading.Thread(
+            target=cls._camera_scheduler_loop,
+            args=(app, upload_root),
+            name="smart-parking-camera-scheduler",
+            daemon=True,
+        )
+        worker.start()
+
+    @classmethod
+    def _camera_scheduler_loop(cls, app: Any, upload_root: str) -> None:
+        sleep_seconds = max(5, int(os.getenv("SMART_PARKING_CAMERA_SCHEDULER_SLEEP", "10")))
+        while True:
+            try:
+                with app.app_context():
+                    service = cls(upload_root)
+                    service.process_due_camera_sources()
+            except Exception as exc:
+                app.logger.warning("Camera scheduler iteration failed: %s", exc)
+            time.sleep(sleep_seconds)
+
     def analyze_source(self, source: ParkingAISource) -> dict[str, Any]:
         source_type = source.source_type.value if isinstance(source.source_type, TypeSourceIA) else str(source.source_type)
         source_id = source.id_source
         parking_id = source.parking_id
-        file_path = self.resolve_source_path(source)
         if source_type == TypeSourceIA.camera.value:
-            return self.record_error(
-                source_id=source_id,
-                parking_id=parking_id,
-                source_type=source_type,
-                error="Le traitement automatique n'est pas disponible pour les cameras.",
-            )
+            db.session.expunge(source)
+            db.session.remove()
+            result = self._analyze_camera(source)
+            self._upsert_history_entry(result.to_dict())
+            self._persist_camera_processing_state(source_id, result=result.to_dict())
+            return self._attach_output_url(result.to_dict())
+
+        file_path = self.resolve_source_path(source)
 
         if not file_path or not file_path.exists():
             return self.record_error(
@@ -150,6 +188,50 @@ class ParkingSourceAIService:
 
         self._upsert_history_entry(result.to_dict())
         return self._attach_output_url(result.to_dict())
+
+    def process_due_camera_sources(self) -> None:
+        now = datetime.now(timezone.utc)
+        sources = (
+            ParkingAISource.query.filter_by(source_type=TypeSourceIA.camera, auto_processing_enabled=True)
+            .order_by(ParkingAISource.id_source.asc())
+            .all()
+        )
+
+        for source in sources:
+            if not self.can_process_camera_in_cloud(source):
+                continue
+
+            interval_seconds = max(10, int(getattr(source, "auto_process_interval_seconds", 30) or 30))
+            last_processed_at = getattr(source, "last_processed_at", None)
+            if last_processed_at is not None:
+                if last_processed_at.tzinfo is None:
+                    last_processed_at = last_processed_at.replace(tzinfo=timezone.utc)
+                if now - last_processed_at < timedelta(seconds=interval_seconds):
+                    continue
+
+            source_id = int(source.id_source)
+            with self._camera_scheduler_lock:
+                if source_id in self._camera_processing_ids:
+                    continue
+                self._camera_processing_ids.add(source_id)
+
+            try:
+                result = self.analyze_source(source)
+                self._persist_camera_processing_state(source_id, result=result)
+            except Exception as exc:
+                self.record_error(source_id, source.parking_id, TypeSourceIA.camera.value, str(exc))
+                self._persist_camera_processing_state(source_id, error=str(exc))
+            finally:
+                with self._camera_scheduler_lock:
+                    self._camera_processing_ids.discard(source_id)
+
+    def can_process_camera_in_cloud(self, source: ParkingAISource) -> bool:
+        stream_url = (source.stream_url or "").strip()
+        if not stream_url:
+            return False
+
+        mode, _ = self.get_camera_processing_mode(stream_url)
+        return mode == "cloud"
 
     def enqueue_video_analysis(self, source: ParkingAISource) -> dict[str, Any]:
         source_type = source.source_type.value if isinstance(source.source_type, TypeSourceIA) else str(source.source_type)
@@ -327,6 +409,26 @@ class ParkingSourceAIService:
         self._upsert_history_entry(result.to_dict())
         return self._attach_output_url(result.to_dict())
 
+    def _persist_camera_processing_state(
+        self,
+        source_id: int,
+        result: dict[str, Any] | None = None,
+        error: str | None = None,
+    ) -> None:
+        source = ParkingAISource.query.get(source_id)
+        if not source or source.source_type != TypeSourceIA.camera:
+            return
+
+        source.last_processed_at = datetime.now(timezone.utc)
+        if error:
+            lowered = error.lower()
+            source.camera_status = "offline" if "ouvrir ce flux" in lowered or "lire une image exploitable" in lowered else "error"
+            source.last_error = error
+        else:
+            source.camera_status = "active"
+            source.last_error = None
+        db.session.commit()
+
     def _build_status_result(
         self,
         source_id: int,
@@ -347,6 +449,126 @@ class ParkingSourceAIService:
         )
 
     def _analyze_image(self, source: ParkingAISource, file_path: Path) -> ParkingSourceAnalysisResult:
+        self._log_debug(
+            "image-process-start parking_id=%s source_id=%s file=%s model=%s slots=%s imgsz=%s padding=%s total_slots=%s",
+            source.parking_id,
+            source.id_source,
+            file_path,
+            self.model_path,
+            self.video_service.get_slots_path(source.parking_id),
+            self.classify_imgsz,
+            self.slot_padding_ratio,
+            len(self.video_service.get_slots(source.parking_id)[0]),
+        )
+        frame = cv2.imread(str(file_path))
+        if frame is None:
+            raise RuntimeError("Impossible de lire cette image.")
+        return self._analyze_frame(
+            source=source,
+            frame=frame,
+            source_type=TypeSourceIA.image.value,
+            title="Smart Parking Image Analysis",
+            output_filename=f"source_{source.id_source}_annotated.jpg",
+        )
+
+    def _analyze_camera(self, source: ParkingAISource) -> ParkingSourceAnalysisResult:
+        frame, resolution = self._capture_camera_frame(source)
+        return self._analyze_frame(
+            source=source,
+            frame=frame,
+            source_type=TypeSourceIA.camera.value,
+            title="Smart Parking Camera Analysis",
+            resolution=resolution,
+            output_filename=f"source_{source.id_source}_camera_annotated.jpg",
+        )
+
+    def analyze_camera_frame_file(self, source: ParkingAISource, frame_path: Path) -> dict[str, Any]:
+        frame = cv2.imread(str(frame_path))
+        if frame is None:
+            raise RuntimeError("Impossible de lire l image envoyee par le worker local.")
+
+        height, width = frame.shape[:2]
+        result = self._analyze_frame(
+            source=source,
+            frame=frame,
+            source_type=TypeSourceIA.camera.value,
+            title="Smart Parking Edge Camera Analysis",
+            resolution=f"{width}x{height}",
+            output_filename=f"source_{source.id_source}_camera_annotated.jpg",
+        )
+        self._upsert_history_entry(result.to_dict())
+        self._persist_camera_processing_state(source.id_source, result=result.to_dict())
+        return self._attach_output_url(result.to_dict())
+
+    def _capture_camera_frame(self, source: ParkingAISource) -> tuple[Any, str]:
+        stream_url = (source.stream_url or "").strip()
+        if not stream_url:
+            raise RuntimeError("Aucun flux camera n est configure pour cette source.")
+
+        self._validate_camera_stream_url(stream_url)
+
+        cap = cv2.VideoCapture(stream_url)
+        if not cap.isOpened():
+            raise RuntimeError("Impossible d ouvrir ce flux camera.")
+
+        frame = None
+        try:
+            for _ in range(12):
+                ok, candidate = cap.read()
+                if ok and candidate is not None:
+                    frame = candidate
+        finally:
+            cap.release()
+
+        if frame is None:
+            raise RuntimeError("Impossible de lire une image exploitable depuis ce flux camera.")
+
+        height, width = frame.shape[:2]
+        return frame, f"{width}x{height}"
+
+    @classmethod
+    def get_camera_processing_mode(cls, stream_url: str) -> tuple[str, str | None]:
+        try:
+            cls._validate_camera_stream_url(stream_url)
+        except RuntimeError as exc:
+            return "edge_required", str(exc)
+        return "cloud", None
+
+    @staticmethod
+    def _validate_camera_stream_url(stream_url: str) -> None:
+        try:
+            parsed = urlparse(stream_url)
+        except Exception:
+            return
+
+        hostname = (parsed.hostname or "").strip().lower()
+        if not hostname:
+            return
+
+        if hostname in {"localhost", "host.docker.internal"}:
+            raise RuntimeError(
+                "Ce flux camera utilise une adresse locale non accessible depuis le serveur Railway. Utilisez une URL publique ou un proxy accessible depuis internet."
+            )
+
+        try:
+            ip = ipaddress.ip_address(hostname)
+        except ValueError:
+            return
+
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            raise RuntimeError(
+                "Ce flux camera pointe vers une IP privee non accessible depuis Railway. Deployee en cloud, l API ne peut pas joindre 192.168.x.x/10.x.x.x/172.16-31.x.x. Utilisez une URL publique, un tunnel, un VPN ou un worker local proche de la camera."
+            )
+
+    def _analyze_frame(
+        self,
+        source: ParkingAISource,
+        frame: Any,
+        source_type: str,
+        title: str,
+        resolution: str | None = None,
+        output_filename: str | None = None,
+    ) -> ParkingSourceAnalysisResult:
         slots, slots_path = self.video_service.get_slots(source.parking_id)
         slot_mapping = self._ensure_slot_mapping(source.parking_id, slots)
         slots = slot_mapping["slots"]
@@ -354,20 +576,6 @@ class ParkingSourceAIService:
             slots_path = self.video_service.get_slots_config_path(source.parking_id)
         if not slots:
             raise RuntimeError("Aucun slot n est configure pour ce parking. Ouvrez d abord la calibration et dessinez les places.")
-        self._log_debug(
-            "image-process-start parking_id=%s source_id=%s file=%s model=%s slots=%s imgsz=%s padding=%s total_slots=%s",
-            source.parking_id,
-            source.id_source,
-            file_path,
-            self.model_path,
-            slots_path,
-            self.classify_imgsz,
-            self.slot_padding_ratio,
-            len(slots),
-        )
-        frame = cv2.imread(str(file_path))
-        if frame is None:
-            raise RuntimeError("Impossible de lire cette image.")
 
         height, width = frame.shape[:2]
         free_count = 0
@@ -395,11 +603,11 @@ class ParkingSourceAIService:
                 is_free=is_free,
             )
 
-        self._draw_header(frame, free_count, occupied_count, len(slots), "Smart Parking Image Analysis")
+        self._draw_header(frame, free_count, occupied_count, len(slots), title)
         parking_output_dir = self.output_root / str(source.parking_id)
         parking_output_dir.mkdir(parents=True, exist_ok=True)
-        output_filename = f"source_{source.id_source}_annotated.jpg"
-        output_path = parking_output_dir / output_filename
+        final_output_filename = output_filename or f"source_{source.id_source}_annotated.jpg"
+        output_path = parking_output_dir / final_output_filename
 
         if not cv2.imwrite(str(output_path), frame):
             raise RuntimeError("Impossible d'ecrire l'image annotee.")
@@ -424,13 +632,14 @@ class ParkingSourceAIService:
         return ParkingSourceAnalysisResult(
             source_id=source.id_source,
             parking_id=source.parking_id,
-            source_type=TypeSourceIA.image.value,
+            source_type=source_type,
             status="done",
             processed_at=datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
             free=free_count,
             occupied=occupied_count,
             total=len(slots),
-            resolution=f"{width}x{height}",
+            processed_frames=1 if source_type == TypeSourceIA.camera.value else None,
+            resolution=resolution or f"{width}x{height}",
             class_mapping=class_mapping,
             slot_debug=slot_debug,
             model_path=str(self.model_path),
@@ -439,7 +648,7 @@ class ParkingSourceAIService:
             synced_places=sync_result["synced_places"],
             sync_warning=sync_warning,
             output_path=str(output_path),
-            output_filename=output_filename,
+            output_filename=final_output_filename,
             output_mimetype="image/jpeg",
         )
 

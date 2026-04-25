@@ -56,9 +56,14 @@
       <section class="wizard-focus">
         <span>Action actuelle</span>
         <strong>{{ portfolioNextActionTitle }}</strong>
-        <button class="btn-primary wizard-focus__action" type="button" (click)="handleProfilePrimaryAction()">
-          {{ profilePrimaryActionLabel }}
-        </button>
+        <div class="wizard-focus__actions">
+          <button class="btn-primary wizard-focus__action" type="button" (click)="handleProfilePrimaryAction()">
+            {{ profilePrimaryActionLabel }}
+          </button>
+          <button class="btn-outline wizard-focus__action wizard-focus__action--secondary" type="button" (click)="goToOwnerHome()">
+            Retour a l accueil
+          </button>
+        </div>
       </section>
 
       <div class="workflow-banner workflow-banner--info" *ngIf="workflowState?.ownerStatus !== 'accepte' && parkings.length === 0">
@@ -364,6 +369,17 @@
                   <div class="video-card__body">
                     <strong>{{ source.label || source.original_name || 'Image du parking' }}</strong>
                     <p>{{ source.original_name || source.mime_type || 'Source image' }}</p>
+                    <div class="video-card__actions">
+                      <button class="btn-outline btn-outline--compact" type="button" (click)="openSourceExternal(source)">
+                        Voir
+                      </button>
+                      <button class="btn-outline btn-outline--compact" type="button" (click)="reanalyzeSelectedSource(source)" [disabled]="isReanalyzingSource(source.id_source)">
+                        {{ isReanalyzingSource(source.id_source) ? 'Traitement...' : 'Retraiter' }}
+                      </button>
+                      <button class="btn-danger btn-danger--compact" type="button" (click)="deleteSelectedSource(source)">
+                        Supprimer
+                      </button>
+                    </div>
                   </div>
                 </article>
               </div>
@@ -398,6 +414,17 @@
                   <div class="video-card__body">
                     <strong>{{ source.label || source.original_name || 'Video du parking' }}</strong>
                     <p>{{ source.original_name || source.mime_type || 'Source video' }}</p>
+                    <div class="video-card__actions">
+                      <button class="btn-outline btn-outline--compact" type="button" (click)="openSourceExternal(source)">
+                        Voir
+                      </button>
+                      <button class="btn-outline btn-outline--compact" type="button" (click)="reanalyzeSelectedSource(source)" [disabled]="isReanalyzingSource(source.id_source)">
+                        {{ isReanalyzingSource(source.id_source) ? 'Traitement...' : 'Traiter' }}
+                      </button>
+                      <button class="btn-danger btn-danger--compact" type="button" (click)="deleteSelectedSource(source)">
+                        Supprimer
+                      </button>
+                    </div>
                   </div>
                 </article>
               </div>
@@ -406,6 +433,60 @@
                 <div class="empty-state empty-state--compact">
                   <ion-icon name="videocam-outline"></ion-icon>
                   <p>Aucune video n a encore ete ajoutee pour ce parking.</p>
+                </div>
+              </ng-template>
+            </div>
+
+            <div class="detail-media">
+              <div class="detail-media__header">
+                <p class="section-kicker">Sources camera du parking</p>
+                <strong>{{ selectedParkingCameras.length }}</strong>
+              </div>
+
+              <div class="video-grid" *ngIf="selectedParkingCameras.length > 0; else emptyParkingCameras">
+                <article class="video-card" *ngFor="let source of selectedParkingCameras">
+                  <div class="video-card__preview video-card__preview--fallback">
+                    <ion-icon name="videocam-outline"></ion-icon>
+                    <span>Flux camera</span>
+                  </div>
+
+                  <div class="video-card__body">
+                    <strong>{{ source.label || 'Camera du parking' }}</strong>
+                    <p>{{ source.stream_url || 'Flux camera protege' }}</p>
+                    <p>Statut: {{ getCameraStatusLabel(source) }} | Suivi auto: {{ source.auto_processing_enabled ? 'ON' : 'OFF' }}</p>
+                    <p *ngIf="getCameraLastProcessedLabel(source)">{{ getCameraLastProcessedLabel(source) }}</p>
+                    <p *ngIf="source.last_error">{{ source.last_error }}</p>
+                    <p *ngIf="source.analysis?.status === 'done'">
+                      {{ source.analysis?.free ?? 0 }} libres | {{ source.analysis?.occupied ?? 0 }} occupees | {{ source.analysis?.total ?? 0 }} total
+                    </p>
+                    <div class="video-card__actions">
+                      <button class="btn-outline btn-outline--compact" type="button" (click)="openSourceExternal(source)">
+                        Ouvrir le flux
+                      </button>
+                      <button class="btn-outline btn-outline--compact" type="button" (click)="reanalyzeSelectedSource(source)" [disabled]="isReanalyzingSource(source.id_source)">
+                        {{ isReanalyzingSource(source.id_source) ? 'Traitement...' : 'Traiter le flux' }}
+                      </button>
+                      <button class="btn-outline btn-outline--compact" type="button" (click)="toggleCameraAutoProcessing(source)" [disabled]="isAutoUpdatingCamera(source.id_source)">
+                        {{
+                          isAutoUpdatingCamera(source.id_source)
+                            ? 'Mise a jour...'
+                            : source.auto_processing_enabled
+                              ? 'Couper auto'
+                              : 'Activer auto'
+                        }}
+                      </button>
+                      <button class="btn-danger btn-danger--compact" type="button" (click)="deleteSelectedSource(source)">
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              </div>
+
+              <ng-template #emptyParkingCameras>
+                <div class="empty-state empty-state--compact">
+                  <ion-icon name="videocam-outline"></ion-icon>
+                  <p>Aucune camera n a encore ete ajoutee pour ce parking.</p>
                 </div>
               </ng-template>
             </div>

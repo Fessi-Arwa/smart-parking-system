@@ -92,6 +92,9 @@
       <strong *ngIf="aiSources.length === 0">Ajouter au moins une source IA.</strong>
       <strong *ngIf="aiSources.length > 0 && !calibrationSource">Verifier les sources puis activer l IA.</strong>
       <strong *ngIf="calibrationSource">Terminer la calibration avant l activation.</strong>
+      <button class="owner-step__secondary" type="button" (click)="goToOwnerHome()">
+        Retour a l accueil
+      </button>
     </section>
 
     <section class="ai-panel">
@@ -143,6 +146,11 @@
         <button class="owner-step__secondary" type="button" (click)="addCamera()" [disabled]="isAddingCamera">
           {{ isAddingCamera ? 'Ajout camera...' : 'Ajouter une camera' }}
         </button>
+
+        <p class="camera-form__hint">
+          Les flux `localhost`, `192.168.x.x`, `10.x.x.x` ou `172.16-31.x.x` ne sont pas lisibles directement depuis Railway.
+          Pour eux, utilisez le worker local camera.
+        </p>
       </div>
 
       <div class="sources-list" *ngIf="!isLoadingSources && aiSources.length > 0">
@@ -184,8 +192,62 @@
             <div class="source-card__tags">
               <span *ngIf="isImageSource(source)">Calibration</span>
               <span *ngIf="isVideoSource(source)">Analyse video</span>
-              <span *ngIf="isCameraSource(source)">Surveillance</span>
+              <span *ngIf="isCameraSource(source)">Flux live</span>
+              <span *ngIf="isCameraSource(source)">Suivi auto: {{ source.auto_processing_enabled ? 'ON' : 'OFF' }}</span>
+              <span *ngIf="isCameraSource(source) && getCameraProcessingModeLabel(source)" class="source-card__tag source-card__tag--camera-mode">
+                {{ getCameraProcessingModeLabel(source) }}
+              </span>
             </div>
+
+            <p *ngIf="isCameraSource(source)">{{ getCameraLastProcessedLabel(source) }}</p>
+            <p *ngIf="isCameraSource(source) && source.camera_processing_hint" class="source-analysis__warning">
+              {{ source.camera_processing_hint }}
+            </p>
+            <p *ngIf="isCameraSource(source) && source.last_error" class="source-analysis__warning">{{ source.last_error }}</p>
+            <div class="source-analysis" *ngIf="isCameraSource(source)">
+              <span
+                class="source-analysis__badge"
+                [ngClass]="{
+                  'source-analysis__badge--pending': getCameraStatusTone(source) === 'neutral',
+                  'source-analysis__badge--processing': getCameraStatusTone(source) === 'success',
+                  'source-analysis__badge--warning': getCameraStatusTone(source) === 'warning',
+                  'source-analysis__badge--error': getCameraStatusTone(source) === 'danger'
+                }">
+                {{ getCameraStatusLabel(source) }}
+              </span>
+            </div>
+
+            <button
+              class="owner-step__secondary"
+              type="button"
+              *ngIf="isCameraSource(source)"
+              (click)="openCameraStream(source)">
+              Ouvrir le flux camera
+            </button>
+
+            <button
+              class="owner-step__secondary"
+              type="button"
+              *ngIf="isCameraSource(source)"
+              (click)="reanalyzeSource(source)"
+              [disabled]="isReanalyzingSource(source.id_source)">
+              {{ isReanalyzingSource(source.id_source) ? 'Traitement...' : 'Traiter le flux' }}
+            </button>
+
+            <button
+              class="owner-step__secondary"
+              type="button"
+              *ngIf="isCameraSource(source)"
+              (click)="toggleCameraAutoProcessing(source)"
+              [disabled]="isAutoUpdatingCamera(source.id_source)">
+              {{
+                isAutoUpdatingCamera(source.id_source)
+                  ? 'Mise a jour...'
+                  : source.auto_processing_enabled
+                    ? 'Desactiver le suivi auto'
+                    : 'Activer le suivi auto'
+              }}
+            </button>
 
             <div class="source-analysis source-analysis--warning" *ngIf="!isCameraSource(source) && !showSourcePreview(source)">
               <span class="source-analysis__badge source-analysis__badge--warning">Apercu indisponible</span>
@@ -388,6 +450,9 @@
     </section>
 
     <div class="owner-step__actions">
+      <button class="owner-step__secondary" type="button" (click)="goToOwnerHome()">
+        Retour a l accueil
+      </button>
       <button
         class="owner-step__primary"
         type="button"

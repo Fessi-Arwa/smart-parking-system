@@ -61,6 +61,33 @@ export interface AdminAppSubscriptionRecord {
   } | null;
 }
 
+export interface AdminCameraHealthRecord {
+  id_source: number;
+  parking_id: number;
+  parking_name: string;
+  owner_id?: number | null;
+  owner_name?: string | null;
+  label?: string;
+  stream_url?: string;
+  camera_status?: 'idle' | 'active' | 'offline' | 'error' | string;
+  auto_processing_enabled?: boolean;
+  auto_process_interval_seconds?: number;
+  last_processed_at?: string | null;
+  last_error?: string | null;
+  created_at?: string | null;
+}
+
+export interface AdminCameraHealthResponse {
+  summary: {
+    total: number;
+    active: number;
+    offline: number;
+    error: number;
+    auto_enabled: number;
+  };
+  items: AdminCameraHealthRecord[];
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -107,6 +134,14 @@ export class AdminWorkflowService {
         { owner_status: ownerStatus, reason: reason || null },
         { headers: this.buildAuthHeaders() }
       )
+    );
+  }
+
+  getCameraHealth(): Promise<AdminCameraHealthResponse> {
+    return firstValueFrom(
+      this.http.get<AdminCameraHealthResponse>(`${this.apiUrl}/camera-health`, {
+        headers: this.buildAuthHeaders(),
+      })
     );
   }
 

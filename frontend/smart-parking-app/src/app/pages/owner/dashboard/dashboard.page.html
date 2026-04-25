@@ -281,6 +281,10 @@
           <span>Repartition</span>
           <strong>{{ aiSummary }}</strong>
         </article>
+        <article>
+          <span>Cameras actives</span>
+          <strong>{{ cameraHealthSummary.active }}/{{ cameraHealthSummary.total }}</strong>
+        </article>
       </div>
 
       <div class="ai-parking-tabs" *ngIf="aiParkingGroups.length > 0">
@@ -348,7 +352,16 @@
                 <span *ngIf="isImageSource(source)">Image statique</span>
                 <span *ngIf="isVideoSource(source)">Sequence video</span>
                 <span *ngIf="isCameraSource(source)">Flux camera</span>
+                <span *ngIf="isCameraSource(source)">Suivi auto: {{ source.auto_processing_enabled ? 'ON' : 'OFF' }}</span>
               </div>
+
+              <p *ngIf="isCameraSource(source)">Statut: {{ getCameraStatusLabel(source) }}</p>
+              <p *ngIf="isCameraSource(source) && getCameraLastProcessedLabel(source)">
+                Dernier traitement: {{ getCameraLastProcessedLabel(source) }}
+              </p>
+              <p class="ai-source-analysis__warning" *ngIf="isCameraSource(source) && source.last_error">
+                {{ source.last_error }}
+              </p>
 
               <div class="ai-source-analysis ai-source-analysis--success" *ngIf="hasProcessedAnalysis(source)">
                 <span class="ai-source-analysis__badge">Analyse terminee</span>

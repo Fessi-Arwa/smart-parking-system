@@ -24,8 +24,20 @@ export interface CreateVehiclePayload {
 })
 export class VehicleService {
   private apiUrl = `${environment.apiBaseUrl}/vehicules`;
+  private readonly tunisianPlatePattern = /^\d+\s+تونس\s+\d+$/;
 
   constructor(private http: HttpClient, private authService: AuthService) {}
+
+  normalizePlate(value: string): string {
+    return String(value || '')
+      .normalize('NFKC')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  isSupportedPlateFormat(value: string): boolean {
+    return this.tunisianPlatePattern.test(this.normalizePlate(value));
+  }
 
   getVehicles(): Observable<VehicleDto[]> {
     const token = this.authService.getToken();
@@ -41,7 +53,13 @@ export class VehicleService {
     const headers = token
       ? new HttpHeaders({ Authorization: `Bearer ${token}` })
       : undefined;
+    const normalizedPayload: CreateVehiclePayload = {
+      ...payload,
+      matricule: this.normalizePlate(payload.matricule),
+      marque: payload.marque?.trim(),
+      type: payload.type?.trim(),
+    };
 
-    return this.http.post(`${this.apiUrl}/`, payload, { headers });
+    return this.http.post(`${this.apiUrl}/`, normalizedPayload, { headers });
   }
 }

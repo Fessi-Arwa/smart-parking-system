@@ -7,78 +7,49 @@
       (logoutRequested)="logout()"></app-header>
 
     <main class="driver-content">
-    <section *ngIf="activeTab === 'home'" class="page-section">
- <!-- Carte interactive -->
-<div class="map-card">
-  <div class="section-heading">
-    <div class="section-heading__group">
-      <div class="section-heading__icon">
-        <ion-icon name="map-outline"></ion-icon>
-      </div>
-      <div>
-        <h2>Parkings à proximité</h2>
-      </div>
-    </div>
-  </div>
+      <section *ngIf="activeTab === 'home'" class="page-section">
+        <div class="activity-card" *ngIf="recentParkingActivities.length">
+          <div class="section-heading">
+            <div class="section-heading__group">
+              <div class="section-heading__icon">
+                <ion-icon name="flash-outline"></ion-icon>
+              </div>
+              <div>
+                <h2>Reprendre rapidement</h2>
+                <p class="list-card__subtitle">Vos derniers parkings utilises pour relancer une action en un geste.</p>
+              </div>
+            </div>
+          </div>
 
-  <label class="search-box search-box--map">
-    <span class="search-box__icon">
-      <ion-icon name="search-outline"></ion-icon>
-    </span>
-    <div class="search-box__content">
+          <div class="recent-activity-strip">
+            <article *ngFor="let activity of recentParkingActivities; trackBy: trackByRecentActivity" class="recent-activity-card">
+              <div class="recent-activity-card__top">
+                <span class="recent-activity-card__badge">{{ getRecentParkingActivityLabel(activity.type) }}</span>
+                <span class="recent-activity-card__date">{{ activity.date | date: 'dd/MM' }}</span>
+              </div>
 
-      <input
-        [(ngModel)]="searchTerm"
-        placeholder="Rechercher un parking disponible"
-        type="text">
-    </div>
-  </label>
+              <div>
+                <h3>{{ activity.parking.nom }}</h3>
+                <p>{{ activity.parking.adresse }}, {{ activity.parking.ville }}</p>
+              </div>
 
-  <div class="map-search-results" *ngIf="searchTerm.trim()">
-    <button
-      *ngFor="let parking of searchedParkings; trackBy: trackByParking"
-      class="map-search-result"
-      type="button"
-      (click)="selectParkingFromSearch(parking)">
-      <div class="map-search-result__content">
-        <strong>{{ parking.nom }}</strong>
-        <span>{{ parking.adresse }}, {{ parking.ville }}</span>
-      </div>
-      <span class="map-search-result__meta">{{ parking.availablePlaces }} libres</span>
-    </button>
+              <div class="recent-activity-card__meta">
+                <span>
+                  <ion-icon name="navigate-outline"></ion-icon>
+                  {{ activity.parking.distanceKm | number:'1.1-1' }} km
+                </span>
+                <span>
+                  <ion-icon name="car-outline"></ion-icon>
+                  {{ activity.parking.availablePlaces }} places libres
+                </span>
+              </div>
 
-    <div class="map-search-empty" *ngIf="!searchedParkings.length">
-      Aucun parking disponible ne correspond a votre recherche.
-    </div>
-  </div>
-
-  <app-map
-  [parkings]="mapParkings"
-  [userLatitude]="driverPosition.latitude"
-  [userLongitude]="driverPosition.longitude"
-(parkingSelected)="handleMapParkingSelected($event)">
-</app-map>
-
-  <!-- 👇 AJOUTE CETTE SECTION APRÈS LA CARTE -->
-  <div class="gps-status" [class.active]="gpsStatus === 'active'" [class.error]="gpsStatus === 'error'">
-    <ion-icon name="location-outline"></ion-icon>
-    <span *ngIf="gpsStatus === 'waiting'">Recherche de position...</span>
-    <span *ngIf="gpsStatus === 'active'">GPS actif - Position en temps réel</span>
-    <span *ngIf="gpsStatus === 'error'">GPS indisponible - Position approximative</span>
-  </div>
-
-  <div class="map-stats">
-    <div class="stat-badge">
-      <ion-icon name="location-outline"></ion-icon>
-      <span>{{ parkings.length }} parkings à proximité</span>
-    </div>
-    <div class="stat-badge">
-      <ion-icon name="car-outline"></ion-icon>
-      <span>{{ totalAvailableSpaces }} places libres</span>
-    </div>
-  </div>
-
-</div>
+              <button class="recent-activity-card__cta" type="button" (click)="openReservation(activity.parking)">
+                Reserver a nouveau
+              </button>
+            </article>
+          </div>
+        </div>
 
         <div class="list-card">
           <div class="section-heading">
@@ -87,16 +58,105 @@
                 <ion-icon name="business-outline"></ion-icon>
               </div>
               <div>
-              
-                <h2>Parkings que vous utilisez souvent</h2>
+                <h2>Parkings à proximité</h2>
+                <p class="list-card__subtitle">Comparez rapidement la distance, la disponibilite et le prix avant de lancer une reservation.</p>
               </div>
             </div>
+          </div>
+
+          <div class="map-overview" *ngIf="highlightedNearbyParking as highlighted">
+            <div class="map-overview__content">
+              <span class="map-overview__eyebrow">Le plus proche</span>
+              <strong>{{ highlighted.nom }}</strong>
+              <span>{{ highlighted.adresse }}, {{ highlighted.ville }}</span>
+              <div class="map-overview__details">
+                <span>{{ highlighted.prix_heure }} DA/h</span>
+                <span>{{ highlighted.availablePlaces < 5 ? 'Disponibilite limitee' : 'Bonne disponibilite' }}</span>
+              </div>
+            </div>
+            <div class="map-overview__stats">
+              <span class="map-overview__pill">{{ highlighted.distanceKm | number:'1.1-1' }} km</span>
+              <span class="map-overview__pill map-overview__pill--success">{{ highlighted.availablePlaces }} libres</span>
+              <button class="map-overview__action" type="button" (click)="openReservation(highlighted)">
+                Reserver
+                <ion-icon name="arrow-forward-outline"></ion-icon>
+              </button>
+            </div>
+          </div>
+
+          <label class="search-box search-box--map">
+            <span class="search-box__icon">
+              <ion-icon name="search-outline"></ion-icon>
+            </span>
+            <div class="search-box__content">
+              <input
+                [(ngModel)]="searchTerm"
+                placeholder="Rechercher un parking disponible"
+                type="text">
+            </div>
+          </label>
+
+          <div class="map-search-results" *ngIf="searchTerm.trim()">
+            <button
+              *ngFor="let parking of searchedParkings; trackBy: trackByParking"
+              class="map-search-result"
+              type="button"
+              (click)="selectParkingFromSearch(parking)">
+              <div class="map-search-result__content">
+                <strong>{{ parking.nom }}</strong>
+                <span>{{ parking.adresse }}, {{ parking.ville }}</span>
+              </div>
+              <span class="map-search-result__meta">{{ parking.availablePlaces }} libres</span>
+            </button>
+
+            <div class="map-search-empty" *ngIf="!searchedParkings.length">
+              Aucun parking disponible ne correspond a votre recherche.
+            </div>
+          </div>
+
+          <app-map
+            [parkings]="mapParkings"
+            [userLatitude]="driverPosition.latitude"
+            [userLongitude]="driverPosition.longitude"
+            (parkingSelected)="handleMapParkingSelected($event)">
+          </app-map>
+
+          <div class="gps-status" [class.active]="gpsStatus === 'active'" [class.error]="gpsStatus === 'error'">
+            <ion-icon name="location-outline"></ion-icon>
+            <span *ngIf="gpsStatus === 'waiting'">Recherche de position...</span>
+            <span *ngIf="gpsStatus === 'active'">GPS actif - Position en temps reel</span>
+            <span *ngIf="gpsStatus === 'error'">GPS indisponible - Position approximative</span>
+          </div>
+
+          <div class="parking-toolbar">
+            <button
+              type="button"
+              class="parking-filter-chip"
+              [class.active]="activeParkingFilter === 'closest'"
+              (click)="setActiveParkingFilter('closest')">
+              Plus proches
+            </button>
+            <button
+              type="button"
+              class="parking-filter-chip"
+              [class.active]="activeParkingFilter === 'available'"
+              (click)="setActiveParkingFilter('available')">
+              Disponibles
+            </button>
+            <button
+              type="button"
+              class="parking-filter-chip"
+              [class.active]="activeParkingFilter === 'budget'"
+              (click)="setActiveParkingFilter('budget')">
+              Petit budget
+            </button>
           </div>
 
           <div class="parking-list">
             <article *ngFor="let parking of filteredParkings; trackBy: trackByParking" class="parking-card">
               <div class="parking-card__top">
                 <div class="parking-card__identity">
+                  <span class="parking-badge">{{ parking.distanceKm | number:'1.1-1' }} km</span>
                   <h3>{{ parking.nom }}</h3>
                   <p>{{ parking.adresse }}, {{ parking.ville }}</p>
                 </div>
@@ -106,18 +166,73 @@
               <div class="parking-meta">
                 <span>
                   <ion-icon name="navigate-outline"></ion-icon>
-                  <strong>3 km</strong>
+                  <strong>{{ parking.distanceKm | number:'1.1-1' }} km</strong>
+                </span>
+                <span>
                   <ion-icon name="car-outline"></ion-icon>
                   <strong>{{ parking.availablePlaces }} places libres</strong>
                 </span>
               </div>
 
+              <div class="parking-card__insights">
+                <span>{{ parking.availablePlaces < 5 ? 'Disponibilite limitee' : 'Entree fluide' }}</span>
+                <span>{{ parking.prix_heure <= 160 ? 'Tarif malin' : 'Tarif premium' }}</span>
+              </div>
+
+              <div class="parking-card__footer">
+                <span class="parking-card__tone" [class.parking-card__tone--tight]="parking.availablePlaces < 5">
+                  {{ parking.availablePlaces < 5 ? 'Disponibilite limitee' : 'Acces rapide' }}
+                </span>
+                <button class="parking-card__cta" type="button" (click)="openReservation(parking)">
+                  Reserver ce parking
+                  <ion-icon name="arrow-forward-outline"></ion-icon>
+                </button>
+              </div>
             </article>
           </div>
         </div>
       </section>
 
       <section *ngIf="activeTab === 'historique'" class="page-section">
+        <div class="history-hero history-hero--driver">
+          <div class="history-hero__icon">
+            <ion-icon name="time-outline"></ion-icon>
+          </div>
+
+          <div class="history-hero__content">
+            <p class="eyebrow">Historique conducteur</p>
+            <h1>Vos mouvements recents</h1>
+            <p>Retrouvez vos reservations, vos abonnements et les actions les plus utiles sans fouiller dans la liste.</p>
+          </div>
+        </div>
+
+        <div class="history-summary-grid">
+          <article class="history-summary-card">
+            <span class="history-summary-card__label">Reservations terminees</span>
+            <strong>{{ completedReservationsCount }}</strong>
+            <p>{{ reservations.length }} reservation(s) au total</p>
+          </article>
+
+          <article class="history-summary-card">
+            <span class="history-summary-card__label">Abonnements actifs</span>
+            <strong>{{ activeSubscriptionsCount }}</strong>
+            <p>{{ subscriptionHistory.length }} abonnement(s) enregistre(s)</p>
+          </article>
+
+        </div>
+
+        <div class="history-highlight" *ngIf="latestHistoryItem as latest">
+          <div class="history-highlight__copy">
+            <span class="history-highlight__eyebrow">Derniere activite</span>
+            <strong>{{ latest.title }}</strong>
+            <p>{{ latest.subtitle }}</p>
+          </div>
+          <div class="history-highlight__meta">
+            <span class="history-highlight__badge">{{ latest.type === 'reservation' ? 'Reservation' : 'Abonnement' }}</span>
+            <span class="history-highlight__date">{{ latest.date | date: 'dd/MM/yyyy HH:mm' }}</span>
+          </div>
+        </div>
+
         <div class="history-screen">
           <section class="history-section history-section--compact">
             <div class="history-section__header">
@@ -205,8 +320,8 @@
           </section>
         </div>
       </section>
-      <section *ngIf="activeTab === 'profil'" class="page-section">
 
+      <section *ngIf="activeTab === 'profil'" class="page-section">
         <div class="profile-section profile-section--info">
           <div class="section-heading">
             <div class="section-heading__group section-heading__group--inline">
@@ -235,7 +350,7 @@
               <span class="info-value">{{ driverProfile.email }}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Téléphone</span>
+              <span class="info-label">Telephone</span>
               <span class="info-value">{{ driverProfile.telephone }}</span>
             </div>
           </div>
@@ -248,8 +363,8 @@
                 <ion-icon name="car-outline"></ion-icon>
               </div>
               <div>
-                <p class="eyebrow">Véhicules</p>
-                <h2>Vos voitures enregistrées</h2>
+                <p class="eyebrow">Vehicules</p>
+                <h2>Vos voitures enregistrees</h2>
               </div>
             </div>
             <button class="primary-btn" type="button" (click)="openVehicleModal()">Ajouter une voiture</button>
@@ -258,12 +373,12 @@
           <div class="vehicle-list">
             <article *ngFor="let vehicle of vehicles; trackBy: trackByVehicle" class="vehicle-card">
               <div class="vehicle-card__identity">
-                <span class="vehicle-badge">{{ vehicle.isDefault ? 'Par défaut' : 'Véhicule' }}</span>
+                <span class="vehicle-badge">{{ vehicle.isDefault ? 'Par defaut' : 'Vehicule' }}</span>
                 <h3>{{ vehicle.marque }} {{ vehicle.type }}</h3>
                 <p>{{ vehicle.matricule }}</p>
               </div>
               <button class="default-toggle" type="button" [class.active]="vehicle.isDefault" (click)="setDefaultVehicle(vehicle.id)">
-                {{ vehicle.isDefault ? 'Voiture par défaut' : 'Définir par défaut' }}
+                {{ vehicle.isDefault ? 'Voiture par defaut' : 'Definir par defaut' }}
               </button>
             </article>
           </div>
@@ -299,7 +414,7 @@
                   <span>{{ subscription.type | titlecase }}</span>
                 </div>
                 <div>
-                  <strong>Période</strong>
+                  <strong>Periode</strong>
                   <span>{{ subscription.date_debut | date: 'dd/MM/yyyy' }} - {{ subscription.date_fin | date: 'dd/MM/yyyy' }}</span>
                 </div>
               </div>
@@ -354,7 +469,7 @@
     type="button"
     (click)="openReservation()">
     <ion-icon name="add-circle-outline"></ion-icon>
-    <span>Réserver</span>
+    <span>Reserver</span>
   </button>
 </div>
 
@@ -362,8 +477,8 @@
 <section *ngIf="isReservationModalOpen" class="modal-panel">
   <div class="modal-header">
     <div>
-      <p class="eyebrow">Réservation</p>
-      <h2>{{ selectedParking?.nom || 'Nouvelle réservation' }}</h2>
+      <p class="eyebrow">Reservation</p>
+      <h2>{{ selectedParking?.nom || 'Nouvelle reservation' }}</h2>
     </div>
     <button type="button" class="close-btn" (click)="closeReservationModal()">×</button>
   </div>
@@ -376,7 +491,7 @@
       </select>
     </label>
     <label>
-      <span>Véhicule</span>
+      <span>Vehicule</span>
       <select formControlName="vehicule_id">
         <option *ngFor="let vehicle of vehicles; trackBy: trackByVehicle" [value]="vehicle.id">{{ vehicle.marque }} {{ vehicle.type }} - {{ vehicle.matricule }}</option>
       </select>
@@ -437,7 +552,7 @@
       </div>
     </div>
     <label>
-      <span>Date de début</span>
+      <span>Date de debut</span>
       <input formControlName="date_debut" type="datetime-local">
     </label>
     <label>
@@ -451,7 +566,7 @@
         <strong>{{ selectedReservationParking?.prix_heure ?? 0 }} DA/h</strong>
       </div>
       <div class="reservation-total-row">
-        <span>Durée estimée</span>
+        <span>Duree estimee</span>
         <strong>
           {{ reservationDurationHours !== null ? (reservationDurationHours + ' h') : 'Choisissez les dates' }}
         </strong>
@@ -470,14 +585,14 @@
         <input formControlName="payment_mode" type="radio" value="en_ligne">
         <div>
           <strong>En ligne</strong>
-          <small>Payer la réservation immédiatement</small>
+          <small>Payer la reservation immediatement</small>
         </div>
       </label>
       <label class="radio-card">
         <input formControlName="payment_mode" type="radio" value="sur_place">
         <div>
           <strong>Sur place</strong>
-          <small>Payer à l’arrivée au parking</small>
+          <small>Payer a l arrivee au parking</small>
         </div>
       </label>
     </div>
@@ -486,7 +601,7 @@
       <div class="online-payment-card__header">
         <div>
           <p class="eyebrow">Paiement en ligne</p>
-          <h3>Continuer la procédure de paiement</h3>
+          <h3>Continuer la procedure de paiement</h3>
         </div>
         <span class="payment-amount-pill">
           {{ reservationEstimatedTotal !== null ? (reservationEstimatedTotal + ' DA') : '--' }}
@@ -494,7 +609,7 @@
       </div>
 
       <label>
-        <span>Méthode de paiement</span>
+        <span>Methode de paiement</span>
         <select formControlName="payment_method">
           <option value="carte_bancaire">Carte bancaire</option>
           <option value="carte_edahabia">Carte Edahabia</option>
@@ -503,11 +618,11 @@
 
       <label>
         <span>Nom du porteur</span>
-        <input formControlName="card_holder" type="text" placeholder="Nom indiqué sur la carte">
+        <input formControlName="card_holder" type="text" placeholder="Nom indique sur la carte">
       </label>
 
       <label>
-        <span>Numéro de carte</span>
+        <span>Numero de carte</span>
         <input formControlName="card_number" type="text" inputmode="numeric" placeholder="0000 0000 0000 0000">
       </label>
 
@@ -524,7 +639,7 @@
 
       <div class="online-payment-note">
         <ion-icon name="shield-checkmark-outline"></ion-icon>
-        <span>Le conducteur vérifie le montant avant de confirmer le paiement sécurisé.</span>
+        <span>Le conducteur verifie le montant avant de confirmer le paiement securise.</span>
       </div>
     </div>
 
@@ -554,8 +669,8 @@
       <input formControlName="email" type="email" placeholder="Votre email">
     </label>
     <label>
-      <span>Téléphone</span>
-      <input formControlName="telephone" type="text" placeholder="Votre téléphone">
+      <span>Telephone</span>
+      <input formControlName="telephone" type="text" placeholder="Votre telephone">
     </label>
     <button class="primary-btn full-width" type="submit" [disabled]="isProfileSubmitting">
       {{ isProfileSubmitting ? 'Enregistrement...' : 'Enregistrer' }}
@@ -567,7 +682,7 @@
 <section *ngIf="isVehicleModalOpen" class="modal-panel">
   <div class="modal-header">
     <div>
-      <p class="eyebrow">Véhicule</p>
+      <p class="eyebrow">Vehicule</p>
       <h2>Ajouter une nouvelle voiture</h2>
     </div>
     <button type="button" class="close-btn" (click)="closeVehicleModal()">×</button>
@@ -576,7 +691,15 @@
   <form [formGroup]="vehicleForm" class="modal-form" (ngSubmit)="submitVehicle()">
     <label>
       <span>Matricule</span>
-      <input formControlName="matricule" type="text">
+      <input
+        formControlName="matricule"
+        type="text"
+        placeholder="742 تونس 113"
+        inputmode="text"
+        dir="auto"
+        autocapitalize="off"
+        spellcheck="false">
+      <small>Format attendu: chiffres puis تونس puis chiffres</small>
     </label>
     <label>
       <span>Marque</span>
@@ -586,7 +709,7 @@
       <span>Type</span>
       <input formControlName="type" type="text">
     </label>
-    <button class="primary-btn full-width" type="submit">Ajouter le véhicule</button>
+    <button class="primary-btn full-width" type="submit">Ajouter le vehicule</button>
   </form>
 </section>
 
@@ -595,7 +718,7 @@
   <div class="modal-header">
     <div>
       <p class="eyebrow">Abonnement</p>
-      <h2>Souscrire à une place</h2>
+      <h2>Souscrire a une place</h2>
     </div>
     <button type="button" class="close-btn" (click)="closeSubscriptionModal()">×</button>
   </div>
@@ -620,7 +743,7 @@
           <p class="eyebrow">Structure</p>
           <h3>Choisissez la place de votre abonnement sur le plan du parking</h3>
         </div>
-        <span class="parking-structure-selector__hint">Les places libres sont sélectionnables</span>
+        <span class="parking-structure-selector__hint">Les places libres sont selectionnables</span>
       </div>
 
       <div class="parking-structure-selector__floors">
@@ -655,7 +778,7 @@
       </div>
     </div>
     <label>
-      <span>Type d’abonnement</span>
+      <span>Type d abonnement</span>
       <select formControlName="type">
         <option value="mensuel">Mensuel</option>
         <option value="trimestriel">Trimestriel</option>
@@ -663,11 +786,9 @@
       </select>
     </label>
     <label>
-      <span>Date de début</span>
+      <span>Date de debut</span>
       <input formControlName="date_debut" type="date">
     </label>
-    <button class="primary-btn full-width" type="submit">Créer l’abonnement</button>
+    <button class="primary-btn full-width" type="submit">Creer l abonnement</button>
   </form>
 </section>
-
-

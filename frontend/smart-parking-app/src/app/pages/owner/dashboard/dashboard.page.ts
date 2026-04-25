@@ -107,6 +107,14 @@ interface DashboardParkingHealth {
   maintenance: number;
 }
 
+interface CameraHealthSummary {
+  total: number;
+  active: number;
+  offline: number;
+  error: number;
+  autoEnabled: number;
+}
+
 @Component({
   selector: 'app-dashboard',
   templateUrl: './dashboard.page.html',
@@ -462,6 +470,38 @@ export class DashboardPage implements OnInit {
     const cameras = this.aiSources.filter((source) => source.source_type === 'camera').length;
 
     return `${images} image(s), ${videos} video(s), ${cameras} camera(s)`;
+  }
+
+  get cameraHealthSummary(): CameraHealthSummary {
+    const cameras = this.aiSources.filter((source) => source.source_type === 'camera');
+    return {
+      total: cameras.length,
+      active: cameras.filter((source) => source.camera_status === 'active').length,
+      offline: cameras.filter((source) => source.camera_status === 'offline').length,
+      error: cameras.filter((source) => source.camera_status === 'error').length,
+      autoEnabled: cameras.filter((source) => source.auto_processing_enabled).length,
+    };
+  }
+
+  getCameraStatusLabel(source: ParkingAISource): string {
+    switch (source.camera_status) {
+      case 'active':
+        return 'Active';
+      case 'offline':
+        return 'Hors ligne';
+      case 'error':
+        return 'Erreur';
+      default:
+        return 'En attente';
+    }
+  }
+
+  getCameraLastProcessedLabel(source: ParkingAISource): string | null {
+    if (!source.last_processed_at) {
+      return null;
+    }
+    const date = new Date(source.last_processed_at);
+    return Number.isNaN(date.getTime()) ? null : date.toLocaleString('fr-FR');
   }
 
   get occupancyChartData(): OccupancyChartPoint[] {

@@ -117,4 +117,8 @@ export class PendingPage implements OnInit {
 
     await this.refreshStatus();
   }
+
+  async goToOwnerHome(): Promise<void> {
+    await this.router.navigate(['/owner/dashboard']);
+  }
 }
