@@ -16,9 +16,13 @@ import cv2
 from flask import current_app
 
 from .. import db
+from ..models.plate_check import PlateCheck, PlateMatchStatus
 from ..models.place import Place, StatutPlace
 from ..models.parking_ai_source import ParkingAISource, TypeSourceIA
+from ..models.reservation import Reservation, StatutReservation
+from ..models.vehicule import Vehicule
 from .object_storage import ObjectStorageService
+from .plate_recognition_service import PlateRecognitionService, normalize_plate
 from .slot_mapping_service import assign_slots_to_places
 from .video_ai_service import (
     BUSY_LABEL,
@@ -58,6 +62,8 @@ class ParkingSourceAnalysisResult:
     output_preview_path: str | None = None
     output_preview_filename: str | None = None
     output_preview_mimetype: str | None = None
+    plate_summary: dict[str, Any] | None = None
+    plate_checks: list[dict[str, Any]] | None = None
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -78,6 +84,7 @@ class ParkingSourceAIService:
         self.analysis_root = self.upload_root / "ai_source_analysis"
         self.output_root = self.analysis_root / "output"
         self.calibration_root = self.analysis_root / "calibration_frames"
+        self.plate_check_root = self.analysis_root / "plate_checks"
         self.source_cache_root = self.analysis_root / "source_cache"
         self.history_path = self.analysis_root / "history.json"
         self.object_storage = ObjectStorageService()
@@ -110,10 +117,19 @@ class ParkingSourceAIService:
         )
         self.model = load_model(str(self.model_path))
         self.video_service = ParkingVideoAIService(upload_root)
+        self.plate_service = PlateRecognitionService(
+            api_url=self.flask_app.config.get("PLATE_RECOGNITION_API_URL"),
+            timeout=self.flask_app.config.get("PLATE_RECOGNITION_API_TIMEOUT", 15),
+            api_token=self.flask_app.config.get("PLATE_RECOGNITION_API_TOKEN"),
+        )
         # Match the standalone ai-module defaults so backend and local runs
         # produce the same crops and classification behavior unless explicitly overridden.
         self.classify_imgsz = max(96, int(os.getenv("SMART_PARKING_CLASSIFY_IMGSZ", "160")))
         self.slot_padding_ratio = max(0.0, float(os.getenv("SMART_PARKING_SLOT_PADDING_RATIO", "0.0")))
+        self.plate_min_confidence = max(
+            0.0,
+            float(self.flask_app.config.get("PLATE_RECOGNITION_MIN_CONFIDENCE", 0.0)),
+        )
         self.debug_enabled = os.getenv("SMART_PARKING_AI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
         self._ensure_storage()
 
@@ -298,6 +314,52 @@ class ParkingSourceAIService:
         if not path.exists():
             return None, None
         return path, entry.get("output_preview_mimetype")
+
+    def rerun_plate_checks(self, source: ParkingAISource) -> dict[str, Any]:
+        analysis = self.get_analysis(source.id_source)
+        if not analysis:
+            raise RuntimeError("Analyse IA introuvable. Lancez d'abord l'analyse de cette source.")
+
+        slot_debug = analysis.get("slot_debug") or []
+        if not isinstance(slot_debug, list) or not slot_debug:
+            raise RuntimeError("Aucun slot exploitable n'a ete trouve dans l'analyse courante.")
+
+        slots: list[dict[str, Any]] = []
+        slot_states: list[str] = []
+        for index, slot in enumerate(slot_debug, start=1):
+            try:
+                slots.append(
+                    {
+                        "slot_index": int(slot.get("slot_index") or index),
+                        "place_id": slot.get("place_id"),
+                        "x": int(slot["x"]),
+                        "y": int(slot["y"]),
+                        "w": int(slot["w"]),
+                        "h": int(slot["h"]),
+                    }
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                raise RuntimeError("Le format des slots en historique est invalide pour la verification plaque.") from exc
+            slot_states.append(str(slot.get("label") or BUSY_LABEL).lower())
+
+        frame_path = self._resolve_plate_frame_path(source)
+        frame = cv2.imread(str(frame_path))
+        if frame is None:
+            raise RuntimeError("Impossible de lire l'image de verification pour cette source.")
+
+        plate_checks, plate_summary = self._run_plate_checks_for_frame(
+            source=source,
+            frame=frame,
+            slots=slots,
+            slot_states=slot_states,
+        )
+        self._update_history_plate_section(source.id_source, plate_checks, plate_summary)
+        return {
+            "source_id": source.id_source,
+            "parking_id": source.parking_id,
+            "plate_checks": plate_checks,
+            "plate_summary": plate_summary,
+        }
 
     def _run_video_analysis_job(self, source_id: int) -> None:
         with self.flask_app.app_context():
@@ -577,6 +639,7 @@ class ParkingSourceAIService:
         if not slots:
             raise RuntimeError("Aucun slot n est configure pour ce parking. Ouvrez d abord la calibration et dessinez les places.")
 
+        original_frame = frame.copy()
         height, width = frame.shape[:2]
         free_count = 0
         occupied_count = 0
@@ -613,6 +676,12 @@ class ParkingSourceAIService:
             raise RuntimeError("Impossible d'ecrire l'image annotee.")
 
         sync_result = self._sync_places_with_slots(source.parking_id, slots, slot_states)
+        plate_checks, plate_summary = self._run_plate_checks_for_frame(
+            source=source,
+            frame=original_frame,
+            slots=slots,
+            slot_states=slot_states,
+        )
         sync_warning = self._merge_warnings(slot_mapping.get("warning"), sync_result["warning"])
         slot_debug = [
             {
@@ -650,6 +719,8 @@ class ParkingSourceAIService:
             output_path=str(output_path),
             output_filename=final_output_filename,
             output_mimetype="image/jpeg",
+            plate_summary=plate_summary,
+            plate_checks=plate_checks,
         )
 
     def _analyze_video(self, source: ParkingAISource, file_path: Path) -> ParkingSourceAnalysisResult:
@@ -666,6 +737,15 @@ class ParkingSourceAIService:
         preview_path = self._extract_video_output_preview(source.parking_id, source.id_source, output_path)
         slots, _ = self.video_service.get_slots(source.parking_id)
         sync_result = self._sync_places_with_slots(source.parking_id, slots, video_result.slot_states)
+        plate_frame = None
+        if preview_path and preview_path.exists():
+            plate_frame = cv2.imread(str(preview_path))
+        plate_checks, plate_summary = self._run_plate_checks_for_frame(
+            source=source,
+            frame=plate_frame,
+            slots=slots,
+            slot_states=video_result.slot_states,
+        )
         sync_warning = self._merge_warnings(slot_mapping.get("warning"), sync_result["warning"])
 
         return ParkingSourceAnalysisResult(
@@ -693,6 +773,8 @@ class ParkingSourceAIService:
             output_preview_path=str(preview_path) if preview_path else None,
             output_preview_filename=preview_path.name if preview_path else None,
             output_preview_mimetype="image/jpeg" if preview_path else None,
+            plate_summary=plate_summary,
+            plate_checks=plate_checks,
         )
 
     def _sync_places_with_slots(
@@ -784,6 +866,344 @@ class ParkingSourceAIService:
             "warning": " ".join(warning_parts) if warning_parts else None,
         }
 
+    def _run_plate_checks_for_frame(
+        self,
+        *,
+        source: ParkingAISource,
+        frame: Any | None,
+        slots: list[dict[str, Any]],
+        slot_states: list[str],
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        if not self.plate_service.is_configured:
+            return [], {
+                "status": "disabled",
+                "message": "Le service distant de reconnaissance de plaques n'est pas configure.",
+                "eligible_slots": 0,
+                "checked": 0,
+                "match": 0,
+                "mismatch": 0,
+                "no_plate_detected": 0,
+                "error": 0,
+            }
+
+        if frame is None:
+            return [], {
+                "status": "no_frame",
+                "message": "Aucune image exploitable n'est disponible pour verifier les plaques.",
+                "eligible_slots": 0,
+                "checked": 0,
+                "match": 0,
+                "mismatch": 0,
+                "no_plate_detected": 0,
+                "error": 0,
+            }
+
+        slot_places = self._resolve_slot_places(source.parking_id, slots)
+        place_ids = [place.id_place for place in slot_places if place]
+        active_reservations = self._get_active_reservations_by_place(place_ids)
+
+        eligible_slots = 0
+        counts = {
+            PlateMatchStatus.match.value: 0,
+            PlateMatchStatus.mismatch.value: 0,
+            PlateMatchStatus.no_plate_detected.value: 0,
+            PlateMatchStatus.error.value: 0,
+        }
+        persisted_checks: list[PlateCheck] = []
+
+        for index, (slot, slot_state, place) in enumerate(zip(slots, slot_states, slot_places), start=1):
+            if slot_state != BUSY_LABEL or place is None:
+                continue
+
+            reservation = active_reservations.get(place.id_place)
+            if not reservation:
+                continue
+
+            eligible_slots += 1
+            vehicle = Vehicule.query.get(reservation.vehicule_id) if reservation.vehicule_id else None
+            expected_plate = vehicle.matricule if vehicle else None
+            normalized_expected_plate = normalize_plate(expected_plate)
+
+            crop = self._extract_slot_crop(frame, slot)
+            if crop is None:
+                persisted_checks.append(
+                    self._create_plate_check_record(
+                        source=source,
+                        place=place,
+                        reservation=reservation,
+                        slot_index=int(slot.get("slot_index") or index),
+                        expected_plate=expected_plate,
+                        normalized_expected_plate=normalized_expected_plate,
+                        match_status=PlateMatchStatus.error,
+                        confidence=None,
+                        bbox=None,
+                        service_payload={"status": "error", "error": "Impossible de generer le crop de verification."},
+                        evidence_image_path=None,
+                    )
+                )
+                counts[PlateMatchStatus.error.value] += 1
+                continue
+
+            recognition = self.plate_service.recognize(
+                crop,
+                parking_id=source.parking_id,
+                place_id=place.id_place,
+                source_id=source.id_source,
+                captured_at=datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+            )
+            normalized_detected_plate = normalize_plate(
+                recognition.normalized_plate or recognition.plate_text or recognition.raw_text
+            )
+
+            if recognition.status != "ok":
+                match_status = PlateMatchStatus.error
+            elif (
+                recognition.confidence is not None
+                and recognition.confidence < self.plate_min_confidence
+                and not normalized_detected_plate
+            ):
+                match_status = PlateMatchStatus.no_plate_detected
+            elif not normalized_detected_plate:
+                match_status = PlateMatchStatus.no_plate_detected
+            elif normalized_expected_plate and normalized_detected_plate == normalized_expected_plate:
+                match_status = PlateMatchStatus.match
+            else:
+                match_status = PlateMatchStatus.mismatch
+
+            evidence_image_path = self._save_plate_check_evidence(
+                crop=crop,
+                source=source,
+                place_id=place.id_place,
+                slot_index=int(slot.get("slot_index") or index),
+                bbox=recognition.bbox,
+            )
+            persisted_checks.append(
+                self._create_plate_check_record(
+                    source=source,
+                    place=place,
+                    reservation=reservation,
+                    slot_index=int(slot.get("slot_index") or index),
+                    expected_plate=expected_plate,
+                    normalized_expected_plate=normalized_expected_plate,
+                    detected_plate=recognition.plate_text or recognition.raw_text,
+                    normalized_detected_plate=normalized_detected_plate,
+                    match_status=match_status,
+                    confidence=recognition.confidence,
+                    bbox=recognition.bbox,
+                    service_payload=recognition.to_dict(),
+                    evidence_image_path=evidence_image_path,
+                )
+            )
+            counts[match_status.value] += 1
+
+        if persisted_checks:
+            db.session.commit()
+
+        serialized_checks = [self._serialize_plate_check(check) for check in persisted_checks]
+        summary_status = "done" if serialized_checks else "no_active_reservations"
+        summary_message = None
+        if summary_status == "no_active_reservations":
+            summary_message = "Aucune reservation active occupee n'a necessite de verification plaque."
+
+        return serialized_checks, {
+            "status": summary_status,
+            "message": summary_message,
+            "eligible_slots": eligible_slots,
+            "checked": len(serialized_checks),
+            "match": counts[PlateMatchStatus.match.value],
+            "mismatch": counts[PlateMatchStatus.mismatch.value],
+            "no_plate_detected": counts[PlateMatchStatus.no_plate_detected.value],
+            "error": counts[PlateMatchStatus.error.value],
+        }
+
+    def _resolve_plate_frame_path(self, source: ParkingAISource) -> Path:
+        source_type = source.source_type.value if isinstance(source.source_type, TypeSourceIA) else str(source.source_type)
+        if source_type == TypeSourceIA.image.value:
+            path = self.resolve_source_path(source)
+            if not path or not path.exists():
+                raise RuntimeError("Le fichier image source est introuvable.")
+            return path
+
+        if source_type == TypeSourceIA.video.value:
+            preview_path, _ = self.resolve_output_preview_path(source.id_source)
+            if preview_path and preview_path.exists():
+                return preview_path
+
+            calibration_path, _ = self.extract_calibration_frame(source)
+            if calibration_path and calibration_path.exists():
+                return calibration_path
+
+            raise RuntimeError("Aucun apercu video n'est disponible pour verifier les plaques.")
+
+        raise RuntimeError("La verification plaque n'est pas disponible pour les sources camera.")
+
+    def _resolve_slot_places(self, parking_id: int, slots: list[dict[str, Any]]) -> list[Place | None]:
+        places = (
+            Place.query.filter_by(parking_id=parking_id)
+            .order_by(Place.num_place.asc(), Place.id_place.asc())
+            .all()
+        )
+        if not places:
+            return [None for _ in slots]
+
+        explicit_place_ids = [slot.get("place_id") for slot in slots]
+        has_explicit_mapping = any(place_id is not None for place_id in explicit_place_ids)
+        if has_explicit_mapping:
+            places_by_id = {place.id_place: place for place in places}
+            resolved_places: list[Place | None] = []
+            for slot in slots:
+                place_id = slot.get("place_id")
+                if place_id is None:
+                    resolved_places.append(None)
+                    continue
+                try:
+                    resolved_places.append(places_by_id.get(int(place_id)))
+                except (TypeError, ValueError):
+                    resolved_places.append(None)
+            return resolved_places
+
+        return [places[index] if index < len(places) else None for index in range(len(slots))]
+
+    @staticmethod
+    def _get_active_reservations_by_place(place_ids: list[int]) -> dict[int, Reservation]:
+        if not place_ids:
+            return {}
+
+        now = datetime.now(timezone.utc)
+        reservations = (
+            Reservation.query.filter(
+                Reservation.place_id.in_(place_ids),
+                Reservation.statut != StatutReservation.annulee,
+                Reservation.date_debut <= now,
+                Reservation.date_fin >= now,
+            )
+            .order_by(Reservation.date_debut.desc(), Reservation.id_res.desc())
+            .all()
+        )
+        active_by_place: dict[int, Reservation] = {}
+        for reservation in reservations:
+            active_by_place.setdefault(reservation.place_id, reservation)
+        return active_by_place
+
+    def _extract_slot_crop(self, frame: Any, slot: dict[str, Any]) -> Any | None:
+        x, y, w, h = int(slot["x"]), int(slot["y"]), int(slot["w"]), int(slot["h"])
+        frame_height, frame_width = frame.shape[:2]
+        pad_x = int(round(w * max(self.slot_padding_ratio, 0.18)))
+        pad_y = int(round(h * max(self.slot_padding_ratio, 0.18)))
+        x1 = max(0, x - pad_x)
+        y1 = max(0, y - pad_y)
+        x2 = min(frame_width, x + w + pad_x)
+        y2 = min(frame_height, y + h + pad_y)
+        crop = frame[y1:y2, x1:x2]
+        if crop.size == 0:
+            return None
+        return crop.copy()
+
+    def _save_plate_check_evidence(
+        self,
+        *,
+        crop: Any,
+        source: ParkingAISource,
+        place_id: int,
+        slot_index: int,
+        bbox: dict[str, Any] | None,
+    ) -> str | None:
+        evidence_dir = self.plate_check_root / str(source.parking_id)
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        evidence_path = evidence_dir / (
+            f"source_{source.id_source}_place_{place_id}_slot_{slot_index}_"
+            f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}.jpg"
+        )
+
+        evidence = crop.copy()
+        if isinstance(bbox, dict):
+            try:
+                x = int(bbox.get("x", 0))
+                y = int(bbox.get("y", 0))
+                w = int(bbox.get("w", 0))
+                h = int(bbox.get("h", 0))
+                if w > 0 and h > 0:
+                    cv2.rectangle(evidence, (x, y), (x + w, y + h), (0, 200, 255), 2)
+            except (TypeError, ValueError):
+                pass
+
+        if not cv2.imwrite(str(evidence_path), evidence):
+            return None
+        return str(evidence_path)
+
+    def _create_plate_check_record(
+        self,
+        *,
+        source: ParkingAISource,
+        place: Place,
+        reservation: Reservation,
+        slot_index: int,
+        expected_plate: str | None,
+        normalized_expected_plate: str | None,
+        match_status: PlateMatchStatus,
+        confidence: float | None,
+        bbox: dict[str, Any] | None,
+        service_payload: dict[str, Any],
+        evidence_image_path: str | None,
+        detected_plate: str | None = None,
+        normalized_detected_plate: str | None = None,
+    ) -> PlateCheck:
+        plate_check = PlateCheck(
+            parking_id=source.parking_id,
+            place_id=place.id_place,
+            reservation_id=reservation.id_res,
+            source_id=source.id_source,
+            slot_index=slot_index,
+            detected_plate=detected_plate,
+            expected_plate=expected_plate,
+            normalized_detected_plate=normalized_detected_plate,
+            normalized_expected_plate=normalized_expected_plate,
+            match_status=match_status,
+            confidence=confidence,
+            bbox_json=json.dumps(bbox, ensure_ascii=False) if bbox else None,
+            evidence_image_path=evidence_image_path,
+            service_response=json.dumps(service_payload, ensure_ascii=False),
+        )
+        db.session.add(plate_check)
+        db.session.flush()
+        return plate_check
+
+    def _serialize_plate_check(self, plate_check: PlateCheck) -> dict[str, Any]:
+        payload = plate_check.to_dict()
+        payload["bbox"] = None
+        payload["service_response_json"] = None
+
+        if plate_check.bbox_json:
+            try:
+                payload["bbox"] = json.loads(plate_check.bbox_json)
+            except json.JSONDecodeError:
+                payload["bbox"] = plate_check.bbox_json
+
+        if plate_check.service_response:
+            try:
+                payload["service_response_json"] = json.loads(plate_check.service_response)
+            except json.JSONDecodeError:
+                payload["service_response_json"] = plate_check.service_response
+
+        if plate_check.evidence_image_path and Path(plate_check.evidence_image_path).exists():
+            payload["evidence_url"] = f"/api/ai/plate-checks/{plate_check.id}/evidence"
+        return payload
+
+    def _update_history_plate_section(
+        self,
+        source_id: int,
+        plate_checks: list[dict[str, Any]],
+        plate_summary: dict[str, Any],
+    ) -> None:
+        history = self._read_history()
+        for entry in history:
+            if int(entry.get("source_id", -1)) != source_id:
+                continue
+            entry["plate_checks"] = plate_checks
+            entry["plate_summary"] = plate_summary
+            break
+        self.history_path.write_text(json.dumps(history[:300], indent=2), encoding="utf-8")
+
     def _ensure_slot_mapping(self, parking_id: int, slots: list[dict[str, Any]]) -> dict[str, Any]:
         mapping = assign_slots_to_places(parking_id, slots)
         if mapping["changed"]:
@@ -798,7 +1218,7 @@ class ParkingSourceAIService:
         return " ".join(dict.fromkeys(parts))
 
     def _ensure_storage(self) -> None:
-        for directory in (self.analysis_root, self.output_root, self.calibration_root, self.source_cache_root):
+        for directory in (self.analysis_root, self.output_root, self.calibration_root, self.plate_check_root, self.source_cache_root):
             directory.mkdir(parents=True, exist_ok=True)
         if not self.history_path.exists():
             self.history_path.write_text("[]", encoding="utf-8")

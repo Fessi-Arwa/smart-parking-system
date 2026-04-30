@@ -1,4 +1,7 @@
+import json
 from datetime import datetime
+from pathlib import Path
+
 from flask import Blueprint, current_app, jsonify, request, send_file
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
@@ -6,6 +9,8 @@ from .. import db
 from ..models.compte import Compte, RoleCompte, StatutValidationOwner
 from ..models.detection import DetectionIA, DetectionPlace, DetectionVehicule
 from ..models.parking import Parking
+from ..models.parking_ai_source import ParkingAISource
+from ..models.plate_check import PlateCheck
 from ..services.video_ai_service import ParkingVideoAIService
 
 
@@ -77,6 +82,35 @@ def _get_admin_user():
 
 def _get_video_service():
     return ParkingVideoAIService(current_app.config["UPLOAD_FOLDER"], current_app._get_current_object())
+
+
+def _get_source_ai_service():
+    from ..services.ai_service import ParkingSourceAIService
+
+    return ParkingSourceAIService(current_app.config["UPLOAD_FOLDER"])
+
+
+def _plate_check_to_dict(plate_check: PlateCheck):
+    data = plate_check.to_dict()
+    data["bbox"] = None
+    data["service_response_json"] = None
+
+    if plate_check.bbox_json:
+        try:
+            data["bbox"] = json.loads(plate_check.bbox_json)
+        except json.JSONDecodeError:
+            data["bbox"] = plate_check.bbox_json
+
+    if plate_check.service_response:
+        try:
+            data["service_response_json"] = json.loads(plate_check.service_response)
+        except json.JSONDecodeError:
+            data["service_response_json"] = plate_check.service_response
+
+    if plate_check.evidence_image_path and Path(plate_check.evidence_image_path).exists():
+        data["evidence_url"] = f"/api/ai/plate-checks/{plate_check.id}/evidence"
+
+    return data
 
 
 @ai_bp.route("/", methods=["GET"])
@@ -306,3 +340,100 @@ def download_video_result(parking_id, result_id):
         return jsonify({"msg": "Video resultat introuvable"}), 404
 
     return send_file(output_path, mimetype="video/mp4", as_attachment=True, download_name=output_path.name)
+
+
+@ai_bp.route("/parkings/<int:parking_id>/plate-checks", methods=["GET"])
+@jwt_required()
+def list_plate_checks(parking_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    parking = _get_owner_parking(user, parking_id)
+    if not parking:
+        return jsonify({"msg": "Parking introuvable"}), 404
+
+    query = PlateCheck.query.filter_by(parking_id=parking.id_park)
+
+    source_id = request.args.get("source_id", type=int)
+    if source_id:
+        query = query.filter(PlateCheck.source_id == source_id)
+
+    place_id = request.args.get("place_id", type=int)
+    if place_id:
+        query = query.filter(PlateCheck.place_id == place_id)
+
+    match_status = request.args.get("match_status")
+    if match_status:
+        query = query.filter(PlateCheck.match_status == match_status)
+
+    limit = max(1, min(request.args.get("limit", default=50, type=int), 200))
+    plate_checks = (
+        query.order_by(PlateCheck.created_at.desc(), PlateCheck.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return jsonify([_plate_check_to_dict(plate_check) for plate_check in plate_checks]), 200
+
+
+@ai_bp.route("/plate-checks/<int:plate_check_id>", methods=["GET"])
+@jwt_required()
+def get_plate_check(plate_check_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    plate_check = PlateCheck.query.get(plate_check_id)
+    if not plate_check:
+        return jsonify({"msg": "Controle plaque introuvable"}), 404
+
+    parking = _get_owner_parking(user, plate_check.parking_id)
+    if not parking:
+        return jsonify({"msg": "Acces non autorise"}), 403
+
+    return jsonify(_plate_check_to_dict(plate_check)), 200
+
+
+@ai_bp.route("/plate-checks/<int:plate_check_id>/evidence", methods=["GET"])
+@jwt_required()
+def get_plate_check_evidence(plate_check_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    plate_check = PlateCheck.query.get(plate_check_id)
+    if not plate_check:
+        return jsonify({"msg": "Controle plaque introuvable"}), 404
+
+    parking = _get_owner_parking(user, plate_check.parking_id)
+    if not parking:
+        return jsonify({"msg": "Acces non autorise"}), 403
+
+    evidence_path = Path(plate_check.evidence_image_path or "")
+    if not evidence_path.exists():
+        return jsonify({"msg": "Preuve image introuvable"}), 404
+
+    return send_file(evidence_path, mimetype="image/jpeg")
+
+
+@ai_bp.route("/ai-sources/<int:source_id>/plate-checks/reanalyze", methods=["POST"])
+@jwt_required()
+def reanalyze_source_plate_checks(source_id):
+    user, error_response = _get_owner_user()
+    if error_response:
+        return error_response
+
+    source = ParkingAISource.query.get(source_id)
+    if not source:
+        return jsonify({"msg": "Source IA introuvable"}), 404
+
+    parking = _get_owner_parking(user, source.parking_id)
+    if not parking:
+        return jsonify({"msg": "Acces non autorise"}), 403
+
+    try:
+        result = _get_source_ai_service().rerun_plate_checks(source)
+    except Exception as exc:
+        return jsonify({"msg": str(exc)}), 400
+
+    return jsonify(result), 200

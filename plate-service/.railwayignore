@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.venv/
+venv/
+node_modules/
+plate_crop*.jpg
+*.webp
+*.mp4

@@ -25,6 +25,10 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "smart-parking-jwt-dev-secret-key-2026")
+    PLATE_RECOGNITION_API_URL = os.getenv("PLATE_RECOGNITION_API_URL", "").strip()
+    PLATE_RECOGNITION_API_TOKEN = os.getenv("PLATE_RECOGNITION_API_TOKEN", "").strip()
+    PLATE_RECOGNITION_API_TIMEOUT = max(3, int(os.getenv("PLATE_RECOGNITION_API_TIMEOUT", "15")))
+    PLATE_RECOGNITION_MIN_CONFIDENCE = max(0.0, float(os.getenv("PLATE_RECOGNITION_MIN_CONFIDENCE", "0.0")))
     UPLOAD_FOLDER = os.getenv(
         "UPLOAD_FOLDER",
         str(Path(__file__).resolve().parents[1] / "uploads"),
