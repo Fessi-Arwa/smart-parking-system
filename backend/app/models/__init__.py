@@ -12,3 +12,4 @@ from .abonnement_app import AbonnementApp
 from .abonnement_place import AbonnementPlace
 from .detection import DetectionIA, DetectionPlace, DetectionVehicule
 from .parking_ai_source import ParkingAISource
+from .plate_check import PlateCheck
