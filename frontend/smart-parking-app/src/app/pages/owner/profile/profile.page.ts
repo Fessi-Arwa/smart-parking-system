@@ -592,9 +592,11 @@ export class ProfilePage implements OnInit, OnDestroy {
     });
   }
 
-  startEditParking(): void {
-    if (this.selectedParking) {
-      this.editParkingData = { ...this.selectedParking };
+  startEditParking(parking?: ParkingInfo | null): void {
+    const targetParking = parking ?? this.selectedParking;
+    if (targetParking) {
+      this.selectedParking = targetParking;
+      this.editParkingData = { ...targetParking };
       this.isEditingParking = true;
     }
   }

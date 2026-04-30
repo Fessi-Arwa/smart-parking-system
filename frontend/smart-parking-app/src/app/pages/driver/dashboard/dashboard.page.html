@@ -52,37 +52,6 @@
         </div>
 
         <div class="list-card">
-          <div class="section-heading">
-            <div class="section-heading__group">
-              <div class="section-heading__icon">
-                <ion-icon name="business-outline"></ion-icon>
-              </div>
-              <div>
-                <h2>Parkings à proximité</h2>
-                <p class="list-card__subtitle">Comparez rapidement la distance, la disponibilite et le prix avant de lancer une reservation.</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="map-overview" *ngIf="highlightedNearbyParking as highlighted">
-            <div class="map-overview__content">
-              <span class="map-overview__eyebrow">Le plus proche</span>
-              <strong>{{ highlighted.nom }}</strong>
-              <span>{{ highlighted.adresse }}, {{ highlighted.ville }}</span>
-              <div class="map-overview__details">
-                <span>{{ highlighted.prix_heure }} DA/h</span>
-                <span>{{ highlighted.availablePlaces < 5 ? 'Disponibilite limitee' : 'Bonne disponibilite' }}</span>
-              </div>
-            </div>
-            <div class="map-overview__stats">
-              <span class="map-overview__pill">{{ highlighted.distanceKm | number:'1.1-1' }} km</span>
-              <span class="map-overview__pill map-overview__pill--success">{{ highlighted.availablePlaces }} libres</span>
-              <button class="map-overview__action" type="button" (click)="openReservation(highlighted)">
-                Reserver
-                <ion-icon name="arrow-forward-outline"></ion-icon>
-              </button>
-            </div>
-          </div>
 
           <label class="search-box search-box--map">
             <span class="search-box__icon">
@@ -136,13 +105,7 @@
               (click)="setActiveParkingFilter('closest')">
               Plus proches
             </button>
-            <button
-              type="button"
-              class="parking-filter-chip"
-              [class.active]="activeParkingFilter === 'available'"
-              (click)="setActiveParkingFilter('available')">
-              Disponibles
-            </button>
+  
             <button
               type="button"
               class="parking-filter-chip"
@@ -150,6 +113,12 @@
               (click)="setActiveParkingFilter('budget')">
               Petit budget
             </button>
+          </div>
+
+          <div class="parking-slider-header">
+            <div>
+              <h2>Parkings disponibles</h2>
+            </div>
           </div>
 
           <div class="parking-list">
@@ -160,29 +129,20 @@
                   <h3>{{ parking.nom }}</h3>
                   <p>{{ parking.adresse }}, {{ parking.ville }}</p>
                 </div>
-                <span class="price-pill">{{ parking.prix_heure }} DA/h</span>
+                <span class="price-pill">{{ parking.prix_heure }} DT/h</span>
               </div>
 
               <div class="parking-meta">
-                <span>
-                  <ion-icon name="navigate-outline"></ion-icon>
-                  <strong>{{ parking.distanceKm | number:'1.1-1' }} km</strong>
-                </span>
+              
                 <span>
                   <ion-icon name="car-outline"></ion-icon>
                   <strong>{{ parking.availablePlaces }} places libres</strong>
                 </span>
               </div>
 
-              <div class="parking-card__insights">
-                <span>{{ parking.availablePlaces < 5 ? 'Disponibilite limitee' : 'Entree fluide' }}</span>
-                <span>{{ parking.prix_heure <= 160 ? 'Tarif malin' : 'Tarif premium' }}</span>
-              </div>
+         
 
               <div class="parking-card__footer">
-                <span class="parking-card__tone" [class.parking-card__tone--tight]="parking.availablePlaces < 5">
-                  {{ parking.availablePlaces < 5 ? 'Disponibilite limitee' : 'Acces rapide' }}
-                </span>
                 <button class="parking-card__cta" type="button" (click)="openReservation(parking)">
                   Reserver ce parking
                   <ion-icon name="arrow-forward-outline"></ion-icon>
@@ -200,38 +160,11 @@
           </div>
 
           <div class="history-hero__content">
-            <p class="eyebrow">Historique conducteur</p>
-            <h1>Vos mouvements recents</h1>
-            <p>Retrouvez vos reservations, vos abonnements et les actions les plus utiles sans fouiller dans la liste.</p>
+            <h1>Historique</h1>
           </div>
         </div>
 
-        <div class="history-summary-grid">
-          <article class="history-summary-card">
-            <span class="history-summary-card__label">Reservations terminees</span>
-            <strong>{{ completedReservationsCount }}</strong>
-            <p>{{ reservations.length }} reservation(s) au total</p>
-          </article>
 
-          <article class="history-summary-card">
-            <span class="history-summary-card__label">Abonnements actifs</span>
-            <strong>{{ activeSubscriptionsCount }}</strong>
-            <p>{{ subscriptionHistory.length }} abonnement(s) enregistre(s)</p>
-          </article>
-
-        </div>
-
-        <div class="history-highlight" *ngIf="latestHistoryItem as latest">
-          <div class="history-highlight__copy">
-            <span class="history-highlight__eyebrow">Derniere activite</span>
-            <strong>{{ latest.title }}</strong>
-            <p>{{ latest.subtitle }}</p>
-          </div>
-          <div class="history-highlight__meta">
-            <span class="history-highlight__badge">{{ latest.type === 'reservation' ? 'Reservation' : 'Abonnement' }}</span>
-            <span class="history-highlight__date">{{ latest.date | date: 'dd/MM/yyyy HH:mm' }}</span>
-          </div>
-        </div>
 
         <div class="history-screen">
           <section class="history-section history-section--compact">
@@ -266,7 +199,7 @@
 
                 <div class="history-card__bottom">
                   <span>Total</span>
-                  <strong>{{ reservation.prix_total }} DA</strong>
+                  <strong>{{ reservation.prix_total }} DT</strong>
                 </div>
               </article>
             </div>
@@ -305,7 +238,7 @@
                   </div>
                   <div class="history-card__meta-row">
                     <span class="history-card__meta-pill history-card__meta-pill--soft">Fin {{ subscription.date_fin | date: 'dd/MM/yyyy' }}</span>
-                    <span class="history-card__meta-pill history-card__meta-pill--soft">{{ subscription.tarif }} DA</span>
+                    <span class="history-card__meta-pill history-card__meta-pill--soft">{{ subscription.tarif }} DT</span>
                   </div>
                 </div>
               </article>
@@ -377,9 +310,7 @@
                 <h3>{{ vehicle.marque }} {{ vehicle.type }}</h3>
                 <p>{{ vehicle.matricule }}</p>
               </div>
-              <button class="default-toggle" type="button" [class.active]="vehicle.isDefault" (click)="setDefaultVehicle(vehicle.id)">
-                {{ vehicle.isDefault ? 'Voiture par defaut' : 'Definir par defaut' }}
-              </button>
+             
             </article>
           </div>
         </div>
@@ -392,7 +323,7 @@
               </div>
               <div>
                 <p class="eyebrow">Abonnements</p>
-                <h2>Gestion de vos abonnements</h2>
+                <h2>Vos abonnements</h2>
               </div>
             </div>
             <button class="primary-btn" type="button" (click)="openSubscriptionModal()">Nouvel abonnement</button>
@@ -421,7 +352,7 @@
 
               <div class="history-card__bottom">
                 <span>Tarif</span>
-                <strong>{{ subscription.tarif }} DA</strong>
+                <strong>{{ subscription.tarif }} DT</strong>
               </div>
 
               <div class="subscription-card__actions" *ngIf="subscription.canCancel">
@@ -443,6 +374,7 @@
               <p>Aucun abonnement actif ou en attente a gerer.</p>
             </div>
           </ng-template>
+
         </div>
       </section>
     </main>
@@ -563,7 +495,7 @@
     <div class="reservation-total-card">
       <div class="reservation-total-row">
         <span>Tarif horaire</span>
-        <strong>{{ selectedReservationParking?.prix_heure ?? 0 }} DA/h</strong>
+        <strong>{{ selectedReservationParking?.prix_heure ?? 0 }} DT/h</strong>
       </div>
       <div class="reservation-total-row">
         <span>Duree estimee</span>
@@ -574,7 +506,7 @@
       <div class="reservation-total-row reservation-total-row--total">
         <span>Total avant paiement</span>
         <strong>
-          {{ reservationEstimatedTotal !== null ? (reservationEstimatedTotal + ' DA') : '--' }}
+          {{ reservationEstimatedTotal !== null ? (reservationEstimatedTotal + ' DT') : '--' }}
         </strong>
       </div>
     </div>
@@ -604,7 +536,7 @@
           <h3>Continuer la procedure de paiement</h3>
         </div>
         <span class="payment-amount-pill">
-          {{ reservationEstimatedTotal !== null ? (reservationEstimatedTotal + ' DA') : '--' }}
+          {{ reservationEstimatedTotal !== null ? (reservationEstimatedTotal + ' DT') : '--' }}
         </span>
       </div>
 

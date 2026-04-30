@@ -325,6 +325,29 @@ def update_parking_validation_status(parking_id):
         for abonnement in subscriptions
     )
 
+    if (
+        parking.validation_status == StatutValidationParking.valide
+        and next_status != StatutValidationParking.valide
+        and has_active_or_pending_subscription
+    ):
+        return jsonify(
+            {
+                "msg": "Ce parking possede encore un abonnement actif ou en attente. Suspendez ou regularisez l abonnement avant de retirer la validation du parking."
+            }
+        ), 400
+
+    if next_status == StatutValidationParking.rejete and not reason:
+        return jsonify({"msg": "Un motif est obligatoire pour rejeter un parking"}), 400
+
+    parking.validation_status = next_status
+    parking.validation_reason = None if next_status == StatutValidationParking.valide else reason
+    if next_status != StatutValidationParking.valide:
+        parking.setup_status = StatutConfigurationParking.non_commencee
+        parking.ai_setup_status = StatutConfigurationIA.non_configuree
+
+    db.session.commit()
+    return jsonify(_parking_to_admin_dict(parking)), 200
+
 
 @admin_bp.route("/camera-health", methods=["GET"])
 @jwt_required()
@@ -352,29 +375,6 @@ def get_camera_health():
             "items": payload[:12],
         }
     )
-
-    if (
-        parking.validation_status == StatutValidationParking.valide
-        and next_status != StatutValidationParking.valide
-        and has_active_or_pending_subscription
-    ):
-        return jsonify(
-            {
-                "msg": "Ce parking possede encore un abonnement actif ou en attente. Suspendez ou regularisez l abonnement avant de retirer la validation du parking."
-            }
-        ), 400
-
-    if next_status == StatutValidationParking.rejete and not reason:
-        return jsonify({"msg": "Un motif est obligatoire pour rejeter un parking"}), 400
-
-    parking.validation_status = next_status
-    parking.validation_reason = None if next_status == StatutValidationParking.valide else reason
-    if next_status != StatutValidationParking.valide:
-        parking.setup_status = StatutConfigurationParking.non_commencee
-        parking.ai_setup_status = StatutConfigurationIA.non_configuree
-
-    db.session.commit()
-    return jsonify(_parking_to_admin_dict(parking)), 200
 
 
 

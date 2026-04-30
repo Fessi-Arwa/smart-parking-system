@@ -153,7 +153,7 @@ export class MapComponent implements AfterViewInit, OnChanges, OnDestroy {
           <div class="parking-popup">
             <strong>${parking.nom}</strong><br>
             ${parking.adresse}<br>
-            <span class="popup-price">${parking.price} DA/heure</span><br>
+            <span class="popup-price">${parking.price} DT/heure</span><br>
             <span class="popup-spaces">${parking.availableSpaces} places disponibles</span><br>
             <button class="popup-btn" data-id="${parking.id}">Reserver</button>
           </div>

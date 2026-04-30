@@ -43,3 +43,41 @@ Puis mets a jour le frontend avec :
 - `backendOrigin = https://...`
 
 Le service `payment.service.ts` utilise maintenant aussi `environment.apiBaseUrl`, donc toute l'application consommera la meme URL backend au lieu de `localhost`.
+
+## Cameras IP privees et Railway
+
+Si une camera expose un flux sur `localhost`, `192.168.x.x`, `10.x.x.x` ou `172.16-31.x.x`, Railway ne pourra pas y acceder depuis le cloud. Une API deployee sur Railway ne peut pas joindre un reseau local prive.
+
+Dans ce cas, il faut choisir un de ces modes :
+
+- utiliser une URL publique accessible depuis internet
+- exposer la camera via un tunnel ou un reverse proxy
+- relier le reseau camera via VPN
+- lancer un worker local proche de la camera qui capture les images et les envoie a l API Railway
+
+Le backend detecte deja ces flux prives et les marque en mode `edge_required`.
+
+### Worker local camera
+
+Le script `backend/scripts/camera_edge_worker.py` est prevu pour les cameras privees. Il tourne sur une machine qui voit la camera en local, capture une image, puis l envoie au backend public.
+
+Variables minimales :
+
+- `SMART_PARKING_API_BASE_URL=https://votre-backend.up.railway.app/api`
+- `SMART_PARKING_OWNER_TOKEN=...`
+- `SMART_PARKING_CAMERA_PARKING_IDS=1,2`
+
+Variables optionnelles :
+
+- `SMART_PARKING_CAMERA_SOURCE_IDS=12,15`
+- `SMART_PARKING_CAMERA_LOOP_SECONDS=30`
+- `SMART_PARKING_CAMERA_ONCE=true`
+
+Exemple :
+
+```bash
+cd backend
+python scripts/camera_edge_worker.py
+```
+
+Le worker recupere les sources camera actives pour les parkings indiques, lit le flux local avec OpenCV, puis poste chaque capture vers `POST /api/owner/ai-sources/:source_id/camera-frame-upload`.

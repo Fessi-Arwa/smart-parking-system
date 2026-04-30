@@ -100,8 +100,10 @@
 
       <div class="workflow-layout">
         <article class="workflow-panel">
-          <div class="progress-bar">
-            <span [style.width.%]="workflowCompletion"></span>
+          <div class="card-header">
+            <div class="progress-bar">
+              <span [style.width.%]="workflowCompletion"></span>
+            </div>
           </div>
 
           <div class="workflow-steps" *ngIf="workflowSteps.length; else emptyWorkflow">

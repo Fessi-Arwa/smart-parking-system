@@ -11,60 +11,12 @@
     <section class="overview-shell">
       <div class="overview-header">
         <div>
-          <p class="overview-kicker">Owner profile</p>
           <h1>Profil proprietaire</h1>
-          <p class="overview-subtitle">Un seul endroit pour avancer dans le workflow owner.</p>
         </div>
 
       </div>
 
-      <div class="hero-card">
-        <div class="hero-card__identity">
-          <div class="profile-avatar-text">{{ ownerInitials }}</div>
-          <div>
-            <p class="hero-card__eyebrow">Compte owner</p>
-            <h2>{{ owner.nom }}</h2>
-            <p>{{ owner.companyName || 'Parking principal' }}</p>
-          </div>
-        </div>
-
-        <div class="hero-card__metrics">
-          <article>
-            <span>Parkings</span>
-            <strong>{{ portfolioStats.totalParkings }}</strong>
-          </article>
-          <article>
-            <span>Places</span>
-            <strong>{{ portfolioStats.totalSpaces }}</strong>
-          </article>
-          <article>
-            <span>Occupation</span>
-            <strong>{{ portfolioStats.occupancyRate }}%</strong>
-          </article>
-          <article>
-            <span>Actifs</span>
-            <strong>{{ portfolioStats.activeParkings }}</strong>
-          </article>
-        </div>
-
-        <div class="hero-card__next-action">
-          <span>Prochaine priorite</span>
-          <strong>{{ portfolioNextActionTitle }}</strong>
-        </div>
-      </div>
-
-      <section class="wizard-focus">
-        <span>Action actuelle</span>
-        <strong>{{ portfolioNextActionTitle }}</strong>
-        <div class="wizard-focus__actions">
-          <button class="btn-primary wizard-focus__action" type="button" (click)="handleProfilePrimaryAction()">
-            {{ profilePrimaryActionLabel }}
-          </button>
-          <button class="btn-outline wizard-focus__action wizard-focus__action--secondary" type="button" (click)="goToOwnerHome()">
-            Retour a l accueil
-          </button>
-        </div>
-      </section>
+      
 
       <div class="workflow-banner workflow-banner--info" *ngIf="workflowState?.ownerStatus !== 'accepte' && parkings.length === 0">
         <ion-icon name="information-circle-outline"></ion-icon>
@@ -134,47 +86,17 @@
             <p>La creation de parking sera disponible apres validation du compte owner par l admin.</p>
           </div>
 
-          <div class="workflow-banner workflow-banner--info" *ngIf="canCreateParking && pendingReviewParking">
-            <ion-icon name="document-text-outline"></ion-icon>
-            <p>
-              Dossier en attente : <strong>{{ pendingReviewParking.nom }}</strong>.
-              {{ getParkingNextStep(pendingReviewParking) }}
-            </p>
-          </div>
-
-          <div class="workflow-banner workflow-banner--danger" *ngIf="canCreateParking && rejectedParking">
-            <ion-icon name="alert-circle-outline"></ion-icon>
-            <p>
-              Dossier a corriger : <strong>{{ rejectedParking.nom }}</strong>.
-              {{ getParkingNextStep(rejectedParking) }}
-            </p>
-          </div>
-
-          <div class="parking-toolbar" *ngIf="!selectedParking && !showAddParking">
-            <div class="parking-search">
-              <ion-icon name="search-outline"></ion-icon>
-              <input type="text" [(ngModel)]="parkingSearch" placeholder="Rechercher un parking ou une ville" />
-            </div>
-            <div class="parking-filters">
-              <button type="button" [class.is-active]="parkingStatusFilter === 'all'" (click)="setParkingStatusFilter('all')">Tous</button>
-              <button type="button" [class.is-active]="parkingStatusFilter === 'actif'" (click)="setParkingStatusFilter('actif')">Actifs</button>
-              <button type="button" [class.is-active]="parkingStatusFilter === 'inactif'" (click)="setParkingStatusFilter('inactif')">Maintenance</button>
-            </div>
-          </div>
-
-          <div *ngIf="!selectedParking && !showAddParking" class="parking-list">
-            <article *ngFor="let parking of filteredParkings; trackBy: trackByParking" class="parking-item" (click)="selectParking(parking)">
+          <div class="parking-list" *ngIf="!showAddParking">
+            <article *ngFor="let parking of parkings; trackBy: trackByParking" class="parking-item parking-item--simple">
               <div class="parking-item__top">
                 <div class="parking-item__identity">
                   <div class="parking-icon">
                     <ion-icon name="business-outline"></ion-icon>
                   </div>
                   <div class="parking-details">
-                    <div class="parking-topline">
-                      <h4>{{ parking.nom }}</h4>
-                      <span class="occupancy-pill">{{ getParkingOccupancy(parking) }}%</span>
-                    </div>
+                    <h4>{{ parking.nom }}</h4>
                     <p>{{ parking.adresse }}</p>
+                    <p class="parking-next-step">{{ getParkingNextStep(parking) }}</p>
                   </div>
                 </div>
 
@@ -187,308 +109,41 @@
                 Statut dossier : {{ getValidationStatusLabel(parking.validation_status) }}
               </p>
 
-              <p class="parking-next-step">
-                {{ getParkingNextStep(parking) }}
-              </p>
-
-              <div class="parking-meta">
-                <span>
-                  <ion-icon name="location-outline"></ion-icon>
-                  {{ parking.availableSpaces }}/{{ parking.totalSpaces }} places
-                </span>
-                <span>
-                  <ion-icon name="cash-outline"></ion-icon>
-                  {{ parking.prix_heure }} TND/h
-                </span>
-                <span>
-                  <ion-icon name="albums-outline"></ion-icon>
-                  {{ parking.activeSubscriptions }} abonnement(s)
-                </span>
-              </div>
-
-              <div class="parking-progress">
-                <span [style.width.%]="getParkingOccupancy(parking)"></span>
-              </div>
-
               <div class="parking-item__actions">
                 <button
                   class="btn-outline btn-outline--compact"
                   type="button"
-                  (click)="selectParking(parking); $event.stopPropagation()">
-                  Ouvrir
+                  (click)="startEditParking(parking)">
+                  Modifier
+                </button>
+                <button
+                  class="btn-outline btn-outline--compact"
+                  type="button"
+                  (click)="openParkingSetup(parking)">
+                  Config parking
+                </button>
+                <button
+                  class="btn-outline btn-outline--compact"
+                  type="button"
+                  (click)="openAiSetup(parking)"
+                  [disabled]="parking.validation_status !== 'valide' || parking.setup_status !== 'terminee'">
+                  Config IA
+                </button>
+                <button
+                  class="btn-danger btn-danger--compact"
+                  type="button"
+                  (click)="confirmDelete(parking)">
+                  Supprimer
                 </button>
               </div>
             </article>
 
-            <div *ngIf="filteredParkings.length === 0" class="empty-state">
+            <div *ngIf="parkings.length === 0" class="empty-state">
               <ion-icon name="business-outline"></ion-icon>
-              <p>Aucun parking ne correspond a ce filtre.</p>
+              <p>Aucun parking pour le moment.</p>
               <button class="btn-outline" type="button" (click)="openAddParking()" [disabled]="!canCreateParking">
                 Ajouter un parking
               </button>
-            </div>
-          </div>
-
-          <div *ngIf="selectedParking && !showAddParking" class="parking-detail">
-            <div class="detail-nav">
-              <button class="back-btn" type="button" (click)="backToList()">
-                <ion-icon name="arrow-back-outline"></ion-icon>
-                Retour
-              </button>
-              <div class="action-buttons">
-                <button class="icon-btn" type="button" (click)="startEditParking()">
-                  <ion-icon name="create-outline"></ion-icon>
-                </button>
-                <button class="icon-btn" type="button" (click)="openParkingSetup()" [disabled]="!canOpenParkingSetup">
-                  <ion-icon name="construct-outline"></ion-icon>
-                </button>
-                <button class="icon-btn danger" type="button" (click)="confirmDelete(selectedParking); $event.stopPropagation()">
-                  <ion-icon name="trash-outline"></ion-icon>
-                </button>
-              </div>
-            </div>
-
-            <div class="detail-hero">
-              <div class="detail-icon">
-                <ion-icon name="business-outline"></ion-icon>
-              </div>
-              <div>
-                <h3>{{ selectedParking.nom }}</h3>
-                <span class="status-pill" [class.status-pill--maintenance]="selectedParking.statut !== 'actif'">
-                  {{ getStatusLabel(selectedParking.statut) }}
-                </span>
-              </div>
-              <p class="parking-validation-status">
-                Statut dossier : {{ getValidationStatusLabel(selectedParking.validation_status) }}
-              </p>
-            </div>
-
-            <p class="parking-next-step parking-next-step--detail">
-              {{ getParkingNextStep(selectedParking) }}
-            </p>
-
-            <div class="workflow-banner workflow-banner--danger" *ngIf="selectedParking.validation_status === 'rejete' && selectedParking.validation_reason">
-              <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
-              <p>Motif admin : {{ selectedParking.validation_reason }}</p>
-            </div>
-
-            <div class="detail-stats">
-              <article>
-                <span>Disponibles</span>
-                <strong>{{ selectedParking.availableSpaces }}</strong>
-              </article>
-              <article>
-                <span>Total</span>
-                <strong>{{ selectedParking.totalSpaces }}</strong>
-              </article>
-              <article>
-                <span>Occupation</span>
-                <strong>{{ getParkingOccupancy(selectedParking) }}%</strong>
-              </article>
-            </div>
-
-            <div class="detail-info" *ngIf="!isEditingParking">
-              <div class="info-row">
-                <ion-icon name="location-outline"></ion-icon>
-                <span>{{ selectedParking.adresse }}, {{ selectedParking.ville }}</span>
-              </div>
-              <div class="info-row">
-                <ion-icon name="cash-outline"></ion-icon>
-                <span>{{ selectedParking.prix_heure }} TND / heure</span>
-              </div>
-              <div class="info-row">
-                <ion-icon name="car-outline"></ion-icon>
-                <span>{{ selectedParking.availableSpaces }} / {{ selectedParking.totalSpaces }} places disponibles</span>
-              </div>
-              <div class="info-row">
-                <ion-icon name="people-outline"></ion-icon>
-                <span>{{ selectedParking.activeSubscriptions }} abonnements actifs</span>
-              </div>
-            </div>
-
-            <div class="parking-setup-card">
-              <div>
-                <p class="section-kicker">Configuration parking</p>
-                <strong>Etape suivante pour ce parking</strong>
-                <p>{{ parkingSetupHint }}</p>
-              </div>
-              <button
-                class="btn-primary parking-setup-card__action"
-                type="button"
-                (click)="openParkingSetup()"
-                [disabled]="!canOpenParkingSetup">
-                Ouvrir la configuration parking
-              </button>
-            </div>
-
-            <div class="ai-shortcut-card">
-              <div>
-                <p class="section-kicker">Module IA</p>
-                <strong>Derniere etape du workflow</strong>
-                <p>{{ aiSetupHint }}</p>
-              </div>
-              <button class="btn-primary ai-shortcut-card__action" type="button" (click)="openAiSetup()" [disabled]="!canOpenAiSetup">
-                Ouvrir la configuration IA
-              </button>
-            </div>
-
-            <div class="detail-stats detail-stats--sources">
-              <article>
-                <span>Images IA</span>
-                <strong>{{ selectedParkingImages.length }}</strong>
-              </article>
-              <article>
-                <span>Videos IA</span>
-                <strong>{{ selectedParkingVideos.length }}</strong>
-              </article>
-              <article>
-                <span>Cameras IA</span>
-                <strong>{{ selectedParkingCameras.length }}</strong>
-              </article>
-            </div>
-
-            <div class="detail-media">
-              <div class="detail-media__header">
-                <p class="section-kicker">Sources image du parking</p>
-                <strong>{{ selectedParkingImages.length }}</strong>
-              </div>
-
-              <div class="video-grid" *ngIf="selectedParkingImages.length > 0; else emptyParkingImages">
-                <article class="video-card" *ngFor="let source of selectedParkingImages">
-                  <div class="video-card__preview" *ngIf="showPreview(source); else imageFallback">
-                    <img [src]="getSourceMediaUrl(source)" [alt]="source.label || source.original_name || 'Image du parking'" (error)="markPreviewError(source)" />
-                  </div>
-
-                  <ng-template #imageFallback>
-                    <div class="video-card__preview video-card__preview--fallback">
-                      <ion-icon name="image-outline"></ion-icon>
-                      <span>Apercu image indisponible</span>
-                    </div>
-                  </ng-template>
-
-                  <div class="video-card__body">
-                    <strong>{{ source.label || source.original_name || 'Image du parking' }}</strong>
-                    <p>{{ source.original_name || source.mime_type || 'Source image' }}</p>
-                    <div class="video-card__actions">
-                      <button class="btn-outline btn-outline--compact" type="button" (click)="openSourceExternal(source)">
-                        Voir
-                      </button>
-                      <button class="btn-outline btn-outline--compact" type="button" (click)="reanalyzeSelectedSource(source)" [disabled]="isReanalyzingSource(source.id_source)">
-                        {{ isReanalyzingSource(source.id_source) ? 'Traitement...' : 'Retraiter' }}
-                      </button>
-                      <button class="btn-danger btn-danger--compact" type="button" (click)="deleteSelectedSource(source)">
-                        Supprimer
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              </div>
-
-              <ng-template #emptyParkingImages>
-                <div class="empty-state empty-state--compact">
-                  <ion-icon name="image-outline"></ion-icon>
-                  <p>Aucune image n a encore ete ajoutee pour ce parking.</p>
-                </div>
-              </ng-template>
-            </div>
-
-            <div class="detail-media">
-              <div class="detail-media__header">
-                <p class="section-kicker">Sources video du parking</p>
-                <strong>{{ selectedParkingVideos.length }}</strong>
-              </div>
-
-              <div class="video-grid" *ngIf="selectedParkingVideos.length > 0; else emptyParkingVideos">
-                <article class="video-card" *ngFor="let source of selectedParkingVideos">
-                  <div class="video-card__preview" *ngIf="showPreview(source); else videoFallback">
-                    <video [src]="getSourceVideoUrl(source)" controls preload="metadata" (error)="markPreviewError(source)"></video>
-                  </div>
-
-                  <ng-template #videoFallback>
-                    <div class="video-card__preview video-card__preview--fallback">
-                      <ion-icon name="videocam-outline"></ion-icon>
-                      <span>Apercu video indisponible</span>
-                    </div>
-                  </ng-template>
-
-                  <div class="video-card__body">
-                    <strong>{{ source.label || source.original_name || 'Video du parking' }}</strong>
-                    <p>{{ source.original_name || source.mime_type || 'Source video' }}</p>
-                    <div class="video-card__actions">
-                      <button class="btn-outline btn-outline--compact" type="button" (click)="openSourceExternal(source)">
-                        Voir
-                      </button>
-                      <button class="btn-outline btn-outline--compact" type="button" (click)="reanalyzeSelectedSource(source)" [disabled]="isReanalyzingSource(source.id_source)">
-                        {{ isReanalyzingSource(source.id_source) ? 'Traitement...' : 'Traiter' }}
-                      </button>
-                      <button class="btn-danger btn-danger--compact" type="button" (click)="deleteSelectedSource(source)">
-                        Supprimer
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              </div>
-
-              <ng-template #emptyParkingVideos>
-                <div class="empty-state empty-state--compact">
-                  <ion-icon name="videocam-outline"></ion-icon>
-                  <p>Aucune video n a encore ete ajoutee pour ce parking.</p>
-                </div>
-              </ng-template>
-            </div>
-
-            <div class="detail-media">
-              <div class="detail-media__header">
-                <p class="section-kicker">Sources camera du parking</p>
-                <strong>{{ selectedParkingCameras.length }}</strong>
-              </div>
-
-              <div class="video-grid" *ngIf="selectedParkingCameras.length > 0; else emptyParkingCameras">
-                <article class="video-card" *ngFor="let source of selectedParkingCameras">
-                  <div class="video-card__preview video-card__preview--fallback">
-                    <ion-icon name="videocam-outline"></ion-icon>
-                    <span>Flux camera</span>
-                  </div>
-
-                  <div class="video-card__body">
-                    <strong>{{ source.label || 'Camera du parking' }}</strong>
-                    <p>{{ source.stream_url || 'Flux camera protege' }}</p>
-                    <p>Statut: {{ getCameraStatusLabel(source) }} | Suivi auto: {{ source.auto_processing_enabled ? 'ON' : 'OFF' }}</p>
-                    <p *ngIf="getCameraLastProcessedLabel(source)">{{ getCameraLastProcessedLabel(source) }}</p>
-                    <p *ngIf="source.last_error">{{ source.last_error }}</p>
-                    <p *ngIf="source.analysis?.status === 'done'">
-                      {{ source.analysis?.free ?? 0 }} libres | {{ source.analysis?.occupied ?? 0 }} occupees | {{ source.analysis?.total ?? 0 }} total
-                    </p>
-                    <div class="video-card__actions">
-                      <button class="btn-outline btn-outline--compact" type="button" (click)="openSourceExternal(source)">
-                        Ouvrir le flux
-                      </button>
-                      <button class="btn-outline btn-outline--compact" type="button" (click)="reanalyzeSelectedSource(source)" [disabled]="isReanalyzingSource(source.id_source)">
-                        {{ isReanalyzingSource(source.id_source) ? 'Traitement...' : 'Traiter le flux' }}
-                      </button>
-                      <button class="btn-outline btn-outline--compact" type="button" (click)="toggleCameraAutoProcessing(source)" [disabled]="isAutoUpdatingCamera(source.id_source)">
-                        {{
-                          isAutoUpdatingCamera(source.id_source)
-                            ? 'Mise a jour...'
-                            : source.auto_processing_enabled
-                              ? 'Couper auto'
-                              : 'Activer auto'
-                        }}
-                      </button>
-                      <button class="btn-danger btn-danger--compact" type="button" (click)="deleteSelectedSource(source)">
-                        Supprimer
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              </div>
-
-              <ng-template #emptyParkingCameras>
-                <div class="empty-state empty-state--compact">
-                  <ion-icon name="videocam-outline"></ion-icon>
-                  <p>Aucune camera n a encore ete ajoutee pour ce parking.</p>
-                </div>
-              </ng-template>
             </div>
           </div>
         </ion-card-content>
