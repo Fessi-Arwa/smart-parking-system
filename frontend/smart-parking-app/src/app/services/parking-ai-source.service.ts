@@ -83,6 +83,29 @@ export interface ParkingAISlotsResponse {
   auto_assigned_count?: number | null;
 }
 
+export interface PlateCheckDto {
+  id: number;
+  parking_id: number;
+  place_id?: number | null;
+  reservation_id?: number | null;
+  source_id?: number | null;
+  slot_index?: number | null;
+  detected_plate?: string | null;
+  expected_plate?: string | null;
+  normalized_detected_plate?: string | null;
+  normalized_expected_plate?: string | null;
+  match_status: 'match' | 'mismatch' | 'no_plate_detected' | 'no_active_reservation' | 'error' | string;
+  confidence?: number | null;
+  bbox?: {
+    x?: number;
+    y?: number;
+    w?: number;
+    h?: number;
+  } | null;
+  evidence_url?: string | null;
+  created_at?: string;
+}
+
 interface DirectUploadInitResponse {
   upload_url: string;
   object_key: string;
@@ -352,6 +375,45 @@ export class ParkingAiSourceService {
     );
   }
 
+  async getPlateChecks(
+    parkingId: number,
+    options?: { sourceId?: number; matchStatus?: string; limit?: number }
+  ): Promise<PlateCheckDto[]> {
+    const params = new URLSearchParams();
+    if (options?.sourceId) {
+      params.set('source_id', String(options.sourceId));
+    }
+    if (options?.matchStatus) {
+      params.set('match_status', options.matchStatus);
+    }
+    if (options?.limit) {
+      params.set('limit', String(options.limit));
+    }
+
+    const query = params.toString();
+    const url = `${environment.apiBaseUrl}/ai/parkings/${parkingId}/plate-checks${query ? `?${query}` : ''}`;
+    const checks = await firstValueFrom(
+      this.http.get<PlateCheckDto[]>(url, { headers: this.buildAuthHeaders() })
+    );
+
+    return (checks || []).map((check) => this.normalizePlateCheck(check));
+  }
+
+  async reanalyzePlateChecks(sourceId: number): Promise<{ plate_checks?: PlateCheckDto[] }> {
+    const payload = await firstValueFrom(
+      this.http.post<{ plate_checks?: PlateCheckDto[] }>(
+        `${environment.apiBaseUrl}/ai/ai-sources/${sourceId}/plate-checks/reanalyze`,
+        {},
+        { headers: this.buildAuthHeaders() }
+      )
+    );
+
+    return {
+      ...payload,
+      plate_checks: (payload.plate_checks || []).map((check) => this.normalizePlateCheck(check)),
+    };
+  }
+
   async saveParkingSlots(parkingId: number, slots: ParkingAISlot[]): Promise<ParkingAISlotsResponse> {
     return firstValueFrom(
       this.http.put<ParkingAISlotsResponse>(
@@ -494,6 +556,13 @@ export class ParkingAiSourceService {
       ...job,
       results: (job.results || []).map((item) => this.normalizeBatchResult(item)),
       errors: job.errors || [],
+    };
+  }
+
+  private normalizePlateCheck(check: PlateCheckDto): PlateCheckDto {
+    return {
+      ...check,
+      evidence_url: this.normalizePreviewUrl(check.evidence_url) || undefined,
     };
   }
 
