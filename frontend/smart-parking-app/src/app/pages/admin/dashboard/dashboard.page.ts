@@ -19,7 +19,7 @@ import { HeaderNotificationItem } from '../../../shared/components/header/header
   standalone: false,
 })
 export class AdminDashboardPage implements OnInit {
-  activeSection: 'users' | 'parkings' | 'subscriptions' = 'users';
+  activeSection: 'users' | 'parkings' | 'cameras' | 'subscriptions' = 'users';
   stats = {
     totalUsers: 0,
     totalDrivers: 0,
@@ -215,6 +215,16 @@ export class AdminDashboardPage implements OnInit {
     return this.cameraHealth.summary.total > 0;
   }
 
+  get cameraIssuesCount(): number {
+    return this.cameraHealth.summary.offline + this.cameraHealth.summary.error;
+  }
+
+  get prioritizedCameraItems(): AdminCameraHealthRecord[] {
+    return [...this.cameraHealth.items]
+      .sort((left, right) => this.getCameraPriority(right.camera_status) - this.getCameraPriority(left.camera_status))
+      .slice(0, 6);
+  }
+
   getCameraStatusLabel(status?: string | null): string {
     switch (status) {
       case 'active':
@@ -234,6 +244,56 @@ export class AdminDashboardPage implements OnInit {
     }
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 'Jamais traitee' : date.toLocaleString('fr-FR');
+  }
+
+  getCameraBadgeClass(status?: string | null): string {
+    switch (status) {
+      case 'active':
+        return 'badge-success';
+      case 'offline':
+        return 'badge-warning';
+      case 'error':
+        return 'badge-danger';
+      default:
+        return 'badge-secondary';
+    }
+  }
+
+  getCameraCardClass(status?: string | null): string {
+    switch (status) {
+      case 'active':
+        return 'camera-card--active';
+      case 'offline':
+        return 'camera-card--offline';
+      case 'error':
+        return 'camera-card--error';
+      default:
+        return 'camera-card--idle';
+    }
+  }
+
+  getCameraAutomationLabel(camera: AdminCameraHealthRecord): string {
+    if (camera.auto_processing_enabled) {
+      const interval = camera.auto_process_interval_seconds
+        ? `toutes les ${camera.auto_process_interval_seconds}s`
+        : 'active';
+      return `Auto ${interval}`;
+    }
+
+    return 'Suivi manuel';
+  }
+
+  getCameraInsight(camera: AdminCameraHealthRecord): string {
+    switch (camera.camera_status) {
+      case 'active':
+        return 'Flux stable et dernier traitement remonte correctement.';
+      case 'offline':
+        return 'Connexion a verifier ou source temporairement indisponible.';
+      case 'error':
+        return 'Une erreur de traitement a ete detectee sur cette camera.';
+      default:
+        return 'Camera en attente d un premier traitement automatique.';
+    }
   }
 
   async approveOwner(userId: number): Promise<void> {
@@ -584,7 +644,7 @@ export class AdminDashboardPage implements OnInit {
     await this.loadDashboardData();
   }
 
-  setActiveSection(section: 'users' | 'parkings' | 'subscriptions'): void {
+  setActiveSection(section: 'users' | 'parkings' | 'cameras' | 'subscriptions'): void {
     this.activeSection = section;
   }
 
@@ -605,7 +665,7 @@ export class AdminDashboardPage implements OnInit {
       return;
     }
 
-    const sections: Array<'users' | 'parkings' | 'subscriptions'> = ['users', 'parkings', 'subscriptions'];
+    const sections: Array<'users' | 'parkings' | 'cameras' | 'subscriptions'> = ['users', 'parkings', 'cameras', 'subscriptions'];
     const currentIndex = sections.indexOf(this.activeSection);
     const nextIndex = deltaX < 0 ? Math.min(currentIndex + 1, sections.length - 1) : Math.max(currentIndex - 1, 0);
     this.activeSection = sections[nextIndex];
@@ -717,5 +777,19 @@ export class AdminDashboardPage implements OnInit {
     this.decisionReason = '';
     this.pendingDecisionAction = action;
     this.decisionModalOpen = true;
+  }
+
+  private getCameraPriority(status?: string | null): number {
+    switch (status) {
+      case 'error':
+        return 3;
+      case 'offline':
+        return 2;
+      case 'idle':
+        return 1;
+      case 'active':
+      default:
+        return 0;
+    }
   }
 }

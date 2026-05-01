@@ -61,52 +61,6 @@
       </article>
     </section>
 
-    <section class="data-card" *ngIf="hasCameraHealth">
-      <div class="card-header">
-        <div class="header-left">
-          <div class="header-icon-wrapper">
-            <ion-icon name="videocam-outline" class="header-icon"></ion-icon>
-          </div>
-          <div>
-            <h2>Surveillance camera</h2>
-            <p>Etat global des flux automatiques</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="ai-summary-strip">
-        <article>
-          <span>Total</span>
-          <strong>{{ cameraHealth.summary.total }}</strong>
-        </article>
-        <article>
-          <span>Actives</span>
-          <strong>{{ cameraHealth.summary.active }}</strong>
-        </article>
-        <article>
-          <span>Hors ligne</span>
-          <strong>{{ cameraHealth.summary.offline }}</strong>
-        </article>
-        <article>
-          <span>Auto ON</span>
-          <strong>{{ cameraHealth.summary.auto_enabled }}</strong>
-        </article>
-      </div>
-
-      <div class="review-queue__list">
-        <article class="review-queue__item" *ngFor="let camera of cameraHealth.items | slice:0:4">
-          <div>
-            <strong>{{ camera.label || 'Camera' }} - {{ camera.parking_name }}</strong>
-            <p>{{ camera.owner_name || 'Owner' }} | {{ formatCameraTimestamp(camera.last_processed_at) }}</p>
-            <p *ngIf="camera.last_error">{{ camera.last_error }}</p>
-          </div>
-          <span class="validation-badge" [class]="getValidationBadgeClass(camera.camera_status === 'active' ? 'valide' : camera.camera_status === 'offline' ? 'en_attente_validation' : 'rejete')">
-            {{ getCameraStatusLabel(camera.camera_status) }}
-          </span>
-        </article>
-      </div>
-    </section>
-
     <section class="section-switcher">
       <button
         type="button"
@@ -125,6 +79,13 @@
       <button
         type="button"
         class="section-switcher__tab"
+        [class.is-active]="activeSection === 'cameras'"
+        (click)="setActiveSection('cameras')">
+        Cameras
+      </button>
+      <button
+        type="button"
+        class="section-switcher__tab"
         [class.is-active]="activeSection === 'subscriptions'"
         (click)="setActiveSection('subscriptions')">
         Abonnements
@@ -136,7 +97,8 @@
       (touchstart)="onSectionTouchStart($event)"
       (touchend)="onSectionTouchEnd($event)">
       <span *ngIf="activeSection === 'users'">Glissez vers la gauche ou cliquez sur Parkings</span>
-      <span *ngIf="activeSection === 'parkings'">Glissez pour naviguer entre parkings et abonnements</span>
+      <span *ngIf="activeSection === 'parkings'">Glissez pour naviguer entre parkings et cameras</span>
+      <span *ngIf="activeSection === 'cameras'">Glissez pour naviguer entre cameras et abonnements</span>
       <span *ngIf="activeSection === 'subscriptions'">Glissez vers la droite ou cliquez sur une autre section</span>
     </div>
 
@@ -406,6 +368,123 @@
         <div class="empty-state">
           <ion-icon name="business-outline"></ion-icon>
           <p>Aucun parking trouve</p>
+        </div>
+      </ng-template>
+    </section>
+
+    <section
+      class="data-card"
+      *ngIf="activeSection === 'cameras'"
+      (touchstart)="onSectionTouchStart($event)"
+      (touchend)="onSectionTouchEnd($event)">
+      <div class="card-header">
+        <div class="header-left">
+          <div class="header-icon-wrapper">
+            <ion-icon name="videocam-outline" class="header-icon"></ion-icon>
+          </div>
+          <div>
+            <h2>Surveillance camera</h2>
+            <p>Etat global des flux automatiques</p>
+          </div>
+        </div>
+        <button class="ghost-btn" type="button" (click)="reloadData()">
+          <ion-icon name="refresh-outline"></ion-icon>
+          Actualiser
+        </button>
+      </div>
+
+      <div class="camera-overview" *ngIf="hasCameraHealth; else emptyCamerasState">
+        <div class="camera-overview__hero">
+          <p class="camera-overview__eyebrow">Monitoring temps reel</p>
+          <strong>{{ cameraHealth.summary.active }}/{{ cameraHealth.summary.total }} flux operationnels</strong>
+          <p class="camera-overview__text">
+            {{ cameraIssuesCount }} camera(s) necessitent une attention admin. Le suivi automatique est actif sur
+            {{ cameraHealth.summary.auto_enabled }} flux.
+          </p>
+          <div class="camera-overview__chips">
+            <span class="camera-pill camera-pill--ok">Actives {{ cameraHealth.summary.active }}</span>
+            <span class="camera-pill camera-pill--warning">Hors ligne {{ cameraHealth.summary.offline }}</span>
+            <span class="camera-pill camera-pill--danger">Erreurs {{ cameraHealth.summary.error }}</span>
+          </div>
+        </div>
+
+        <div class="camera-overview__stats">
+          <article class="camera-metric">
+            <span>Total</span>
+            <strong>{{ cameraHealth.summary.total }}</strong>
+            <p>Sources camera configurees</p>
+          </article>
+          <article class="camera-metric">
+            <span>Auto ON</span>
+            <strong>{{ cameraHealth.summary.auto_enabled }}</strong>
+            <p>Traitements automatiques actifs</p>
+          </article>
+          <article class="camera-metric">
+            <span>A surveiller</span>
+            <strong>{{ cameraIssuesCount }}</strong>
+            <p>Flux offline ou en erreur</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="camera-section-header" *ngIf="hasCameraHealth">
+        <div>
+          <p class="review-queue__kicker">Vue organisee</p>
+          <strong>Cameras prioritaires</strong>
+        </div>
+        <span class="camera-section-header__meta">
+          {{ prioritizedCameraItems.length }} flux affiches
+        </span>
+      </div>
+
+      <div class="camera-grid" *ngIf="hasCameraHealth">
+        <article class="camera-card" *ngFor="let camera of prioritizedCameraItems" [class]="getCameraCardClass(camera.camera_status)">
+          <div class="camera-card__top">
+            <div class="camera-card__identity">
+              <div class="camera-card__icon">
+                <ion-icon name="videocam-outline"></ion-icon>
+              </div>
+              <div>
+                <strong>{{ camera.label || 'Camera' }}</strong>
+                <p>{{ camera.parking_name }}</p>
+              </div>
+            </div>
+            <span class="validation-badge" [class]="getCameraBadgeClass(camera.camera_status)">
+              {{ getCameraStatusLabel(camera.camera_status) }}
+            </span>
+          </div>
+
+          <div class="camera-card__meta">
+            <span>
+              <ion-icon name="person-outline"></ion-icon>
+              {{ camera.owner_name || 'Owner non renseigne' }}
+            </span>
+            <span>
+              <ion-icon name="sync-outline"></ion-icon>
+              {{ getCameraAutomationLabel(camera) }}
+            </span>
+            <span>
+              <ion-icon name="time-outline"></ion-icon>
+              {{ formatCameraTimestamp(camera.last_processed_at) }}
+            </span>
+          </div>
+
+          <p class="camera-card__message" *ngIf="camera.last_error; else cameraHealthyHint">
+            {{ camera.last_error }}
+          </p>
+
+          <ng-template #cameraHealthyHint>
+            <p class="camera-card__message camera-card__message--muted">
+              {{ getCameraInsight(camera) }}
+            </p>
+          </ng-template>
+        </article>
+      </div>
+
+      <ng-template #emptyCamerasState>
+        <div class="empty-state">
+          <ion-icon name="videocam-outline"></ion-icon>
+          <p>Aucune camera de surveillance configuree</p>
         </div>
       </ng-template>
     </section>
