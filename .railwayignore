@@ -1,5 +1,8 @@
 .git
 .sixth
+.venv
+.tmp-pip
+.paddlex
 frontend
 backend/venv
 backend/uploads

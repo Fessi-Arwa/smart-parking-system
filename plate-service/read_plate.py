@@ -15,11 +15,40 @@ DEFAULT_MODEL = Path("best.pt")
 DEFAULT_OCR_DIR = Path(".easyocr")
 DEFAULT_PADDLE_CACHE_DIR = Path(".paddlex")
 ARABIC_TUNIS = "\u062a\u0648\u0646\u0633"
-DEFAULT_DETECTION_PADDING = 0.12
+DEFAULT_DETECTION_PADDING = 0.22
+
+
+def ensure_color_image(image):
+    if image is None:
+        return image
+    if len(image.shape) == 2:
+        return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    return image
+
+
+def enhance_plate_crop(image, min_width=720, min_height=220):
+    color = ensure_color_image(image)
+    if color is None or color.size == 0:
+        return color
+
+    height, width = color.shape[:2]
+    upscale_ratio = max(min_width / max(1, width), min_height / max(1, height), 1.0)
+    if upscale_ratio > 1.0:
+        color = cv2.resize(color, None, fx=upscale_ratio, fy=upscale_ratio, interpolation=cv2.INTER_CUBIC)
+
+    lab = cv2.cvtColor(color, cv2.COLOR_BGR2LAB)
+    l_channel, a_channel, b_channel = cv2.split(lab)
+    l_channel = cv2.createCLAHE(clipLimit=2.8, tileGridSize=(8, 8)).apply(l_channel)
+    balanced = cv2.cvtColor(cv2.merge((l_channel, a_channel, b_channel)), cv2.COLOR_LAB2BGR)
+
+    denoised = cv2.bilateralFilter(balanced, 9, 45, 45)
+    sharpened = cv2.addWeighted(denoised, 1.45, cv2.GaussianBlur(denoised, (0, 0), 1.6), -0.45, 0)
+    return sharpened
 
 
 def preprocess_plate_variants(image):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    enhanced = enhance_plate_crop(image)
+    gray = cv2.cvtColor(enhanced, cv2.COLOR_BGR2GRAY)
     enlarged = cv2.resize(gray, None, fx=3.0, fy=3.0, interpolation=cv2.INTER_CUBIC)
     denoised = cv2.bilateralFilter(enlarged, 9, 35, 35)
     clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8)).apply(denoised)
@@ -153,8 +182,8 @@ def score_plate_candidate(text):
 def expand_bbox(x1, y1, x2, y2, image_width, image_height, padding_ratio=DEFAULT_DETECTION_PADDING):
     width = max(1, x2 - x1)
     height = max(1, y2 - y1)
-    pad_x = int(width * padding_ratio)
-    pad_y = int(height * padding_ratio)
+    pad_x = int(width * max(padding_ratio * 1.45, 0.16))
+    pad_y = int(height * max(padding_ratio * 1.8, 0.22))
 
     nx1 = max(0, x1 - pad_x)
     ny1 = max(0, y1 - pad_y)
@@ -544,8 +573,9 @@ def recognize_plate_in_image(image, model_path, conf, languages, ocr_dir, ocr_en
     best_text = ""
     best_total_score = -10**9
     for detection in detections[:5]:
+        enhanced_crop = enhance_plate_crop(detection["crop"])
         candidate_text, text_score = read_best_plate_text(
-            detection["crop"],
+            enhanced_crop,
             languages,
             ocr_dir,
             ocr_engine=ocr_engine,
@@ -557,7 +587,7 @@ def recognize_plate_in_image(image, model_path, conf, languages, ocr_dir, ocr_en
             best_detection = detection
             best_text = candidate_text
 
-    crop = best_detection["crop"]
+    crop = enhance_plate_crop(best_detection["crop"])
     score = best_detection["confidence"]
     bbox = best_detection["bbox"]
     text = best_text

@@ -1,4 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from flask import current_app
 from sqlalchemy.exc import IntegrityError
 
 from .. import db
@@ -6,6 +9,21 @@ from ..models.parking import Parking
 from ..models.place import Place
 from ..models.reservation import Reservation
 from ..models.vehicule import Vehicule
+
+
+def _resolve_app_timezone() -> ZoneInfo:
+    timezone_name = current_app.config.get("APP_TIMEZONE", "Africa/Tunis")
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
+
+
+def _parse_reservation_datetime(raw_value: str) -> datetime:
+    parsed = datetime.fromisoformat(raw_value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=_resolve_app_timezone())
+    return parsed.astimezone(timezone.utc)
 
 
 def create_reservation(data, user_id):
@@ -19,8 +37,8 @@ def create_reservation(data, user_id):
         return {"error": "place_id, date_debut and date_fin are required"}, 400
 
     try:
-        date_debut = datetime.fromisoformat(date_debut_raw)
-        date_fin = datetime.fromisoformat(date_fin_raw)
+        date_debut = _parse_reservation_datetime(date_debut_raw)
+        date_fin = _parse_reservation_datetime(date_fin_raw)
     except (TypeError, ValueError):
         return {"error": "Invalid date format"}, 400
 

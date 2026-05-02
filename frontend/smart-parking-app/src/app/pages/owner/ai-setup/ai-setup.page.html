@@ -306,14 +306,26 @@
 
             <div [class]="getPlateCheckPanelClass(source)" *ngIf="hasPlateCheck(source)">
               <div class="plate-check__header">
-                <span class="source-analysis__badge" [ngClass]="getPlateCheckBadgeClass(source)">
-                  {{ getPlateCheckBadgeLabel(source) }}
-                </span>
-                <strong>Controle plaque</strong>
+                <div class="plate-check__header-copy">
+                  <span class="source-analysis__badge" [ngClass]="getPlateCheckBadgeClass(source)">
+                    {{ getPlateCheckBadgeLabel(source) }}
+                  </span>
+                  <strong>Controle plaque</strong>
+                </div>
+                <p class="plate-check__headline">{{ getPlateCheckHeadline(source) }}</p>
               </div>
 
               <p *ngIf="getPlateCheckSummary(source)">{{ getPlateCheckSummary(source) }}</p>
               <p class="plate-check__meta" *ngIf="getPlateCheckMeta(source)">{{ getPlateCheckMeta(source) }}</p>
+              <div class="plate-check__technical" *ngIf="getPlateCheckTechnicalReason(source)">
+                <span>{{ getPlateCheckTechnicalLabel(source) }}</span>
+                <code>{{ getPlateCheckTechnicalReason(source) }}</code>
+              </div>
+
+              <div class="plate-check__decision" *ngIf="getPlateCheckOwnerDecision(source)">
+                <span>Ce que l owner doit comprendre</span>
+                <strong>{{ getPlateCheckOwnerDecision(source) }}</strong>
+              </div>
 
               <div class="plate-check__grid" *ngIf="getLatestPlateCheck(source) as plateCheck">
                 <article>
@@ -327,7 +339,8 @@
               </div>
 
               <p class="plate-check__alert" *ngIf="getPlateCheckAlertMessage(source)">
-                {{ getPlateCheckAlertMessage(source) }}
+                <span *ngIf="getPlateCheckAlertTitle(source)">{{ getPlateCheckAlertTitle(source) }}</span>
+                <strong>{{ getPlateCheckAlertMessage(source) }}</strong>
               </p>
 
               <div class="plate-check__evidence" *ngIf="getPlateCheckEvidenceUrl(source)">
@@ -337,10 +350,35 @@
 
             <div class="plate-check plate-check--warning" *ngIf="shouldShowMissingPlateCheckNotice(source)">
               <div class="plate-check__header">
-                <span class="source-analysis__badge source-analysis__badge--warning">Controle absent</span>
-                <strong>Controle plaque non disponible</strong>
+                <div class="plate-check__header-copy">
+                  <span class="source-analysis__badge source-analysis__badge--warning">Controle absent</span>
+                  <strong>Controle plaque non disponible</strong>
+                </div>
+                <p class="plate-check__headline">{{ getMissingPlateCheckTitle(source) }}</p>
               </div>
-              <p>L analyse de la source est terminee, mais aucun resultat de comparaison plaque/reservation n a ete trouve pour cette source.</p>
+              <div class="plate-check__status-grid">
+                <article *ngFor="let row of getMissingPlateCheckStatusRows(source)" [ngClass]="'plate-check__status-card--' + row.tone">
+                  <span>{{ row.label }}</span>
+                  <strong>{{ row.value }}</strong>
+                </article>
+              </div>
+              <p>{{ getMissingPlateCheckGuidance(source) }}</p>
+              <div class="plate-check__alert plate-check__alert--warning">
+                <span>Cause probable</span>
+                <strong>{{ getMissingPlateCheckProbableCause(source) }}</strong>
+              </div>
+              <div class="plate-check__timing" *ngIf="getReservationTimingRows(source).length">
+                <article *ngFor="let row of getReservationTimingRows(source)">
+                  <span>{{ row.label }}</span>
+                  <strong>{{ row.value }}</strong>
+                </article>
+              </div>
+              <div class="plate-check__decision plate-check__decision--warning">
+                <span>Ce que l owner doit verifier</span>
+                <ul>
+                  <li *ngFor="let item of getMissingPlateCheckChecklist()">{{ item }}</li>
+                </ul>
+              </div>
             </div>
 
             <div class="source-analysis source-analysis--pending" *ngIf="hasPendingVideoProcessing(source)">

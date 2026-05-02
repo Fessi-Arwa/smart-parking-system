@@ -7,6 +7,7 @@ from typing import Any
 from urllib import error, request
 
 import cv2
+import numpy as np
 
 
 def normalize_plate(value: str | None) -> str | None:
@@ -55,7 +56,8 @@ class PlateRecognitionService:
         if not self.is_configured:
             return PlateRecognitionResponse(status="disabled", error="Plate recognition API is not configured.")
 
-        ok, buffer = cv2.imencode(".jpg", image)
+        prepared_image = self._prepare_image_for_ocr(image)
+        ok, buffer = cv2.imencode(".png", prepared_image)
         if not ok:
             return PlateRecognitionResponse(status="error", error="Unable to encode the vehicle crop.")
 
@@ -94,6 +96,34 @@ class PlateRecognitionService:
             service_response=raw_response,
         )
 
+    def _prepare_image_for_ocr(self, image: Any) -> Any:
+        if image is None or getattr(image, "size", 0) == 0:
+            return image
+
+        prepared = image.copy()
+        height, width = prepared.shape[:2]
+
+        min_width = 960
+        min_height = 540
+        upscale_ratio = max(min_width / max(1, width), min_height / max(1, height), 1.0)
+        if upscale_ratio > 1.0:
+            prepared = cv2.resize(
+                prepared,
+                None,
+                fx=upscale_ratio,
+                fy=upscale_ratio,
+                interpolation=cv2.INTER_CUBIC,
+            )
+
+        lab = cv2.cvtColor(prepared, cv2.COLOR_BGR2LAB)
+        l_channel, a_channel, b_channel = cv2.split(lab)
+        l_channel = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8)).apply(l_channel)
+        prepared = cv2.cvtColor(cv2.merge((l_channel, a_channel, b_channel)), cv2.COLOR_LAB2BGR)
+
+        denoised = cv2.bilateralFilter(prepared, 7, 40, 40)
+        sharpened = cv2.addWeighted(denoised, 1.3, cv2.GaussianBlur(denoised, (0, 0), 1.2), -0.3, 0)
+        return np.ascontiguousarray(sharpened)
+
     def _post_json(self, payload: dict[str, Any]) -> dict[str, Any]:
         body = json.dumps(payload).encode("utf-8")
         http_request = request.Request(self.api_url, data=body, method="POST")
@@ -107,9 +137,20 @@ class PlateRecognitionService:
                 response_body = response.read().decode("utf-8")
         except error.HTTPError as exc:
             response_body = exc.read().decode("utf-8", errors="replace")
+            parsed_body = self._parse_json_body(response_body)
+            service_error = None
+            if isinstance(parsed_body, dict):
+                service_error = parsed_body.get("error") or parsed_body.get("message") or parsed_body.get("detail")
             return {
                 "status": "error",
-                "error": f"Plate recognition service returned HTTP {exc.code}.",
+                "error": (
+                    f"Plate recognition service returned HTTP {exc.code}: {service_error}"
+                    if service_error
+                    else f"Plate recognition service returned HTTP {exc.code}."
+                ),
+                "http_status": exc.code,
+                "service_error": service_error,
+                "response_json": parsed_body,
                 "response_body": response_body[:500],
             }
         except error.URLError as exc:
@@ -133,3 +174,11 @@ class PlateRecognitionService:
             }
 
         return parsed if isinstance(parsed, dict) else {"status": "error", "error": "Invalid JSON payload."}
+
+    @staticmethod
+    def _parse_json_body(response_body: str) -> dict[str, Any] | None:
+        try:
+            parsed = json.loads(response_body or "{}")
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None

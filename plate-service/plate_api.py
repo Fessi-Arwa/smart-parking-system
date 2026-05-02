@@ -85,7 +85,13 @@ def create_app():
                 paddle_cache_dir=app.config["PLATE_PADDLE_CACHE_DIR"],
             )
         except Exception as exc:
-            return jsonify({"status": "error", "error": str(exc)}), 500
+            return jsonify(
+                {
+                    "status": "error",
+                    "error": str(exc),
+                    "error_type": exc.__class__.__name__,
+                }
+            ), 500
 
         result["parking_id"] = payload.get("parking_id")
         result["place_id"] = payload.get("place_id")

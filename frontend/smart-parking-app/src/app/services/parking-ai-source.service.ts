@@ -62,7 +62,36 @@ export interface ParkingAISourceAnalysis {
   sync_warning?: string | null;
   output_url?: string | null;
   output_preview_url?: string | null;
+  plate_summary?: PlateCheckSummary | null;
+  plate_checks?: PlateCheckDto[] | null;
   error?: string | null;
+}
+
+export interface PlateCheckReservationDiagnostic {
+  slot_index: number;
+  place_id?: number | null;
+  place_number?: number | null;
+  slot_state?: string | null;
+  checked_at?: string | null;
+  reason?: string | null;
+  reservation_id?: number | null;
+  reservation_status?: string | null;
+  reservation_start?: string | null;
+  reservation_end?: string | null;
+}
+
+export interface PlateCheckSummary {
+  status?: string | null;
+  message?: string | null;
+  checked_at?: string | null;
+  eligible_slots?: number | null;
+  checked?: number | null;
+  match?: number | null;
+  mismatch?: number | null;
+  no_plate_detected?: number | null;
+  error?: number | null;
+  blocking_reason?: string | null;
+  reservation_diagnostics?: PlateCheckReservationDiagnostic[] | null;
 }
 
 export interface ParkingAISlot {
@@ -101,6 +130,24 @@ export interface PlateCheckDto {
     y?: number;
     w?: number;
     h?: number;
+  } | null;
+  service_response_json?: {
+    status?: string | null;
+    error?: string | null;
+    error_type?: string | null;
+    service_error?: string | null;
+    http_status?: number | null;
+    response_body?: string | null;
+    response_json?: Record<string, unknown> | null;
+    service_response?: {
+      status?: string | null;
+      error?: string | null;
+      error_type?: string | null;
+      service_error?: string | null;
+      http_status?: number | null;
+      response_body?: string | null;
+      response_json?: Record<string, unknown> | null;
+    } | null;
   } | null;
   evidence_url?: string | null;
   created_at?: string;

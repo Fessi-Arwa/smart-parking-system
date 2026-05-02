@@ -25,6 +25,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "smart-parking-jwt-dev-secret-key-2026")
+    APP_TIMEZONE = os.getenv("APP_TIMEZONE", "Africa/Tunis").strip() or "Africa/Tunis"
     PLATE_RECOGNITION_API_URL = os.getenv("PLATE_RECOGNITION_API_URL", "").strip()
     PLATE_RECOGNITION_API_TOKEN = os.getenv("PLATE_RECOGNITION_API_TOKEN", "").strip()
     PLATE_RECOGNITION_API_TIMEOUT = max(3, int(os.getenv("PLATE_RECOGNITION_API_TIMEOUT", "15")))

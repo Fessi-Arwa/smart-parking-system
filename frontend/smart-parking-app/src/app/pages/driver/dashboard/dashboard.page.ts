@@ -975,8 +975,8 @@ export class DashboardPage implements OnInit, OnDestroy {
         this.reservationService.createReservation({
           vehicule_id: vehicle.id,
           place_id: Number(values.place_id),
-          date_debut: values.date_debut,
-          date_fin: values.date_fin,
+          date_debut: start.toISOString(),
+          date_fin: end.toISOString(),
         })
       );
 

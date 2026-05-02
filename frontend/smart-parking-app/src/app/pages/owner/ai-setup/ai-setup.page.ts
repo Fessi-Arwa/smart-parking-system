@@ -12,6 +12,8 @@ import {
   ParkingAISlot,
   ParkingAiUploadProgress,
   PlateCheckDto,
+  PlateCheckReservationDiagnostic,
+  PlateCheckSummary,
   ParkingAiSourceService,
 } from '../../../services/parking-ai-source.service';
 import { ParkingDto, ParkingService } from '../../../services/parking.service';
@@ -833,6 +835,84 @@ export class AiSetupPage implements OnInit, OnDestroy {
     return this.hasProcessedAnalysis(source) && !this.hasPlateCheck(source);
   }
 
+  getPlateSummary(source: ParkingAISource): PlateCheckSummary | null {
+    return source.analysis?.plate_summary || null;
+  }
+
+  getMissingPlateCheckStatusRows(source: ParkingAISource): Array<{ label: string; value: string; tone: 'success' | 'warning' | 'muted' }> {
+    const rows: Array<{ label: string; value: string; tone: 'success' | 'warning' | 'muted' }> = [];
+    const occupiedSlots = this.getOccupiedSlotLabels(source);
+    const plateSummary = this.getPlateSummary(source);
+
+    if (this.hasProcessedAnalysis(source)) {
+      rows.push({
+        label: 'Modele de place',
+        value: 'Analyse terminee',
+        tone: 'success',
+      });
+    }
+
+    if (occupiedSlots.length > 0) {
+      rows.push({
+        label: 'Place detectee occupee',
+        value: occupiedSlots.join(', '),
+        tone: 'success',
+      });
+    } else {
+      rows.push({
+        label: 'Place detectee occupee',
+        value: 'Aucune place occupee clairement identifiee',
+        tone: 'muted',
+      });
+    }
+
+    rows.push({
+      label: 'Modele de plaque',
+      value: 'Aucun resultat enregistre',
+      tone: 'warning',
+    });
+
+    if (plateSummary?.checked_at) {
+      rows.push({
+        label: 'Heure backend',
+        value: new Date(plateSummary.checked_at).toLocaleString('fr-FR'),
+        tone: 'muted',
+      });
+    }
+
+    return rows;
+  }
+
+  getMissingPlateCheckProbableCause(source: ParkingAISource): string {
+    const summary = this.getPlateSummary(source);
+    const diagnostic = this.getPrimaryReservationDiagnostic(source);
+    const occupiedSlots = this.getOccupiedSlotLabels(source);
+    if (!occupiedSlots.length) {
+      return 'Le systeme n a pas trouve de place occupee exploitable pour lancer la comparaison de plaque.';
+    }
+
+    switch (diagnostic?.reason) {
+      case 'reservation_not_started':
+        return 'La reservation existe, mais elle n avait pas encore commence au moment ou le backend a analyse l image.';
+      case 'reservation_expired':
+        return 'La reservation de cette place etait deja expiree quand le backend a analyse l image.';
+      case 'reservation_cancelled':
+        return 'La reservation trouvee pour cette place est annulee.';
+      case 'reservation_completed':
+        return 'La reservation trouvee pour cette place etait deja terminee.';
+      case 'no_reservation_found':
+        return 'Aucune reservation n a ete trouvee pour la place occupee detectee.';
+      case 'no_place_mapping':
+        return 'Le slot occupe detecte n est pas correctement relie a une place du parking.';
+    }
+
+    if (summary?.blocking_reason) {
+      return `Le backend a bloque le controle pour la raison: ${summary.blocking_reason}.`;
+    }
+
+    return 'La comparaison plaque/reservation ne s est pas lancee pour la place detectee. La reservation active ou le lien slot/place doit etre verifie.';
+  }
+
   getPlateCheckBadgeLabel(source: ParkingAISource): string {
     const check = this.getLatestPlateCheck(source);
     switch (check?.match_status) {
@@ -848,6 +928,24 @@ export class AiSetupPage implements OnInit, OnDestroy {
         return 'Sans reservation';
       default:
         return 'Controle plaque';
+    }
+  }
+
+  getPlateCheckHeadline(source: ParkingAISource): string {
+    const check = this.getLatestPlateCheck(source);
+    switch (check?.match_status) {
+      case 'match':
+        return 'La voiture garée correspond à la réservation';
+      case 'mismatch':
+        return 'La voiture garée ne correspond pas à la réservation';
+      case 'no_plate_detected':
+        return 'La place est occupée, mais la plaque n a pas pu être lue';
+      case 'error':
+        return 'Le contrôle de plaque a échoué';
+      case 'no_active_reservation':
+        return 'Aucune réservation active n a été trouvée';
+      default:
+        return 'Résultat du contrôle de plaque';
     }
   }
 
@@ -897,11 +995,33 @@ export class AiSetupPage implements OnInit, OnDestroy {
       case 'no_plate_detected':
         return 'La place semble occupee, mais la plaque n a pas pu etre lue correctement.';
       case 'error':
-        return 'Le traitement plaque a rencontre une erreur technique.';
+        return this.getPlateCheckTechnicalReason(source) || 'Le traitement plaque a rencontre une erreur technique.';
       case 'no_active_reservation':
         return 'Aucune reservation active n etait associee a cette place au moment du controle.';
       default:
         return 'Controle plaque disponible.';
+    }
+  }
+
+  getPlateCheckOwnerDecision(source: ParkingAISource): string | null {
+    const check = this.getLatestPlateCheck(source);
+    if (!check) {
+      return null;
+    }
+
+    switch (check.match_status) {
+      case 'match':
+        return 'Aucune action urgente. La voiture détectée semble bien être celle du conducteur qui a réservé.';
+      case 'mismatch':
+        return 'À vérifier rapidement. La voiture présente ne semble pas être celle attendue pour cette place réservée.';
+      case 'no_plate_detected':
+        return 'À vérifier visuellement. Le système a vu une voiture, mais il n a pas réussi à confirmer la plaque.';
+      case 'error':
+        return 'À relancer ou contrôler. Le traitement automatique n a pas pu terminer correctement.';
+      case 'no_active_reservation':
+        return 'Aucune comparaison possible. Le système n a trouvé aucune réservation active liée à cette place.';
+      default:
+        return null;
     }
   }
 
@@ -918,7 +1038,29 @@ export class AiSetupPage implements OnInit, OnDestroy {
       return 'Alerte owner: la place est occupee mais la plaque n a pas ete reconnue.';
     }
     if (check.match_status === 'error') {
-      return 'Alerte owner: le controle de plaque a echoue, verifier l image et la source IA.';
+      const technicalReason = this.getPlateCheckTechnicalReason(source);
+      return technicalReason
+        ? `Alerte owner: le controle de plaque a echoue. Motif OCR: ${technicalReason}`
+        : 'Alerte owner: le controle de plaque a echoue, verifier l image et la source IA.';
+    }
+
+    return null;
+  }
+
+  getPlateCheckAlertTitle(source: ParkingAISource): string | null {
+    const check = this.getLatestPlateCheck(source);
+    if (!check) {
+      return null;
+    }
+
+    if (check.match_status === 'mismatch') {
+      return 'Alerte owner';
+    }
+    if (check.match_status === 'no_plate_detected') {
+      return 'Lecture incomplète';
+    }
+    if (check.match_status === 'error') {
+      return 'Erreur technique';
     }
 
     return null;
@@ -940,6 +1082,60 @@ export class AiSetupPage implements OnInit, OnDestroy {
     return parts.length ? parts.join(' | ') : null;
   }
 
+  getPlateCheckTechnicalReason(source: ParkingAISource): string | null {
+    const check = this.getLatestPlateCheck(source);
+    if (!check || check.match_status !== 'error') {
+      return null;
+    }
+
+    const response = check.service_response_json;
+    const nestedResponse = response?.service_response;
+    const parsedResponseJson = this.stringifyTechnicalPayload(response?.response_json);
+    const parsedNestedResponseJson = this.stringifyTechnicalPayload(nestedResponse?.response_json);
+
+    return (
+      this.cleanTechnicalMessage(nestedResponse?.service_error) ||
+      this.cleanTechnicalMessage(nestedResponse?.error) ||
+      this.cleanTechnicalMessage(response?.service_error) ||
+      this.cleanTechnicalMessage(response?.error) ||
+      this.cleanTechnicalMessage(parsedNestedResponseJson) ||
+      this.cleanTechnicalMessage(parsedResponseJson) ||
+      this.cleanTechnicalMessage(nestedResponse?.response_body) ||
+      this.cleanTechnicalMessage(response?.response_body)
+    );
+  }
+
+  getPlateCheckTechnicalLabel(source: ParkingAISource): string | null {
+    const check = this.getLatestPlateCheck(source);
+    const reason = this.getPlateCheckTechnicalReason(source);
+    if (!check || !reason) {
+      return null;
+    }
+
+    return check.match_status === 'error' ? 'Raison technique OCR' : null;
+  }
+
+  private cleanTechnicalMessage(value: unknown): string | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    return normalized || null;
+  }
+
+  private stringifyTechnicalPayload(value: unknown): string | null {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return null;
+    }
+  }
+
   getPlateCheckEvidenceUrl(source: ParkingAISource): string | null {
     const check = this.getLatestPlateCheck(source);
     if (!check) {
@@ -949,8 +1145,55 @@ export class AiSetupPage implements OnInit, OnDestroy {
     return this.plateCheckEvidenceBlobs.get(check.id) || check.evidence_url || null;
   }
 
+  getMissingPlateCheckTitle(source: ParkingAISource): string {
+    if (this.hasProcessedAnalysis(source)) {
+      return 'Le contrôle de plaque n a pas été produit';
+    }
+    return 'Contrôle plaque indisponible';
+  }
+
+  getMissingPlateCheckGuidance(source: ParkingAISource): string {
+    if (this.hasProcessedAnalysis(source)) {
+      return 'La place a bien été analysée, mais aucune comparaison plaque/réservation n a été enregistrée pour cette source.';
+    }
+    return 'Le système n a pas encore assez d informations pour produire un contrôle de plaque.';
+  }
+
+  getMissingPlateCheckChecklist(): string[] {
+    return [
+      'Vérifier que le slot occupé est bien lié à la bonne place.',
+      'Vérifier que la réservation est active au moment de l analyse.',
+      'Relancer l analyse si l image montre bien la voiture réservée.',
+    ];
+  }
+
   get videoSourcesCount(): number {
     return this.aiSources.filter((source) => this.isVideoSource(source)).length;
+  }
+
+  getReservationTimingRows(source: ParkingAISource): Array<{ label: string; value: string }> {
+    const diagnostic = this.getPrimaryReservationDiagnostic(source);
+    if (!diagnostic) {
+      return [];
+    }
+
+    const rows: Array<{ label: string; value: string }> = [];
+    if (diagnostic.checked_at) {
+      rows.push({ label: 'Heure vue par le backend', value: new Date(diagnostic.checked_at).toLocaleString('fr-FR') });
+    }
+    if (diagnostic.reservation_start) {
+      rows.push({ label: 'Reservation debut', value: new Date(diagnostic.reservation_start).toLocaleString('fr-FR') });
+    }
+    if (diagnostic.reservation_end) {
+      rows.push({ label: 'Reservation fin', value: new Date(diagnostic.reservation_end).toLocaleString('fr-FR') });
+    }
+    if (diagnostic.reservation_status) {
+      rows.push({ label: 'Statut reservation', value: diagnostic.reservation_status });
+    }
+    if (diagnostic.reason) {
+      rows.push({ label: 'Diagnostic', value: this.getReservationReasonLabel(diagnostic.reason) });
+    }
+    return rows;
   }
 
   trackSource(_: number, source: ParkingAISource): number {
@@ -959,6 +1202,56 @@ export class AiSetupPage implements OnInit, OnDestroy {
 
   isReanalyzingSource(sourceId: number): boolean {
     return this.reanalyzingSourceIds.has(sourceId);
+  }
+
+  private getOccupiedSlotLabels(source: ParkingAISource): string[] {
+    const occupiedSlots = (source.analysis?.slot_debug || []).filter((item) => item.label === 'busy');
+    return occupiedSlots.map((item) => item.place_number ? `Place ${item.place_number}` : item.place_id ? `Place #${item.place_id}` : `Slot ${item.slot_index}`);
+  }
+
+  private getPrimaryReservationDiagnostic(source: ParkingAISource): PlateCheckReservationDiagnostic | null {
+    const diagnostics = this.getPlateSummary(source)?.reservation_diagnostics || [];
+    if (!diagnostics.length) {
+      return null;
+    }
+
+    const orderedReasons = [
+      'reservation_not_started',
+      'reservation_expired',
+      'reservation_cancelled',
+      'reservation_completed',
+      'no_reservation_found',
+      'no_place_mapping',
+      'active_reservation_found',
+    ];
+    for (const reason of orderedReasons) {
+      const match = diagnostics.find((item) => item.reason === reason);
+      if (match) {
+        return match;
+      }
+    }
+    return diagnostics[0];
+  }
+
+  private getReservationReasonLabel(reason: string): string {
+    switch (reason) {
+      case 'reservation_not_started':
+        return 'Reservation pas encore commencee';
+      case 'reservation_expired':
+        return 'Reservation expiree';
+      case 'reservation_cancelled':
+        return 'Reservation annulee';
+      case 'reservation_completed':
+        return 'Reservation terminee';
+      case 'no_reservation_found':
+        return 'Aucune reservation trouvee';
+      case 'no_place_mapping':
+        return 'Slot non relie a une place';
+      case 'active_reservation_found':
+        return 'Reservation active trouvee';
+      default:
+        return reason;
+    }
   }
 
   private async loadSources(): Promise<void> {

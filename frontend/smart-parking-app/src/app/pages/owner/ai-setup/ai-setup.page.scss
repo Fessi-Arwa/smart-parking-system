@@ -711,10 +711,23 @@
 }
 
 .plate-check__header {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.plate-check__header-copy {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
   align-items: center;
+}
+
+.plate-check__headline {
+  margin: 0;
+  color: #102a43;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .plate-check__meta {
@@ -722,10 +735,144 @@
   font-size: 0.85rem;
 }
 
+.plate-check__technical {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 0.9rem;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.plate-check__technical span {
+  color: #7b8794;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.plate-check__technical code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #7f1d1d;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  font-family: 'IBM Plex Mono', 'Fira Code', monospace;
+}
+
+.plate-check__decision {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.plate-check__decision span {
+  color: #52606d;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.plate-check__decision strong {
+  color: #102a43;
+  font-size: 0.96rem;
+  line-height: 1.45;
+}
+
+.plate-check__decision--warning ul {
+  margin: 0;
+  padding-left: 1rem;
+  color: #7c2d12;
+}
+
+.plate-check__decision--warning li + li {
+  margin-top: 0.35rem;
+}
+
 .plate-check__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.8rem;
+}
+
+.plate-check__status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.plate-check__status-grid article {
+  padding: 0.85rem 0.9rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.plate-check__status-grid span {
+  display: block;
+  color: #52606d;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.plate-check__status-grid strong {
+  display: block;
+  margin-top: 0.35rem;
+  color: #102a43;
+  font-size: 0.96rem;
+  line-height: 1.4;
+}
+
+.plate-check__timing {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.plate-check__timing article {
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.plate-check__timing span {
+  display: block;
+  color: #52606d;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.plate-check__timing strong {
+  display: block;
+  margin-top: 0.35rem;
+  color: #102a43;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.plate-check__status-card--success {
+  background: rgba(240, 253, 244, 0.9);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.plate-check__status-card--warning {
+  background: rgba(255, 247, 237, 0.95);
+  border-color: rgba(245, 158, 11, 0.22);
+}
+
+.plate-check__status-card--muted {
+  background: rgba(248, 250, 252, 0.92);
+  border-color: rgba(148, 163, 184, 0.18);
 }
 
 .plate-check__grid article {
@@ -753,13 +900,47 @@
 }
 
 .plate-check__alert {
+  display: grid;
+  gap: 0.25rem;
   margin: 0;
   padding: 0.8rem 0.9rem;
   border-radius: 0.9rem;
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(225, 29, 72, 0.16);
+}
+
+.plate-check__alert span {
+  color: #9f1239;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.plate-check__alert strong {
   color: #b91c1c;
-  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.plate-check__alert--warning {
+  border-color: rgba(245, 158, 11, 0.22);
+}
+
+.plate-check__alert--warning span {
+  color: #9a3412;
+}
+
+.plate-check__alert--warning strong {
+  color: #9a3412;
+}
+
+@media (max-width: 680px) {
+  .plate-check__timing,
+  .plate-check__status-grid,
+  .plate-check__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .plate-check__evidence {

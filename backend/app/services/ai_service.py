@@ -898,9 +898,12 @@ class ParkingSourceAIService:
                 "error": 0,
             }
 
+        checked_at = datetime.now(timezone.utc)
+        checked_at_local = checked_at.astimezone().isoformat(timespec="seconds")
         slot_places = self._resolve_slot_places(source.parking_id, slots)
         place_ids = [place.id_place for place in slot_places if place]
         active_reservations = self._get_active_reservations_by_place(place_ids)
+        latest_reservations = self._get_latest_reservations_by_place(place_ids)
 
         eligible_slots = 0
         counts = {
@@ -910,19 +913,65 @@ class ParkingSourceAIService:
             PlateMatchStatus.error.value: 0,
         }
         persisted_checks: list[PlateCheck] = []
+        reservation_diagnostics: list[dict[str, Any]] = []
 
         for index, (slot, slot_state, place) in enumerate(zip(slots, slot_states, slot_places), start=1):
             if slot_state != BUSY_LABEL or place is None:
+                if slot_state == BUSY_LABEL and place is None:
+                    reservation_diagnostics.append(
+                        {
+                            "slot_index": int(slot.get("slot_index") or index),
+                            "place_id": None,
+                            "place_number": slot.get("place_number"),
+                            "slot_state": slot_state,
+                            "reason": "no_place_mapping",
+                            "checked_at": checked_at_local,
+                        }
+                    )
                 continue
 
             reservation = active_reservations.get(place.id_place)
             if not reservation:
+                latest_reservation = latest_reservations.get(place.id_place)
+                diagnostic = self._build_reservation_diagnostic(
+                    checked_at=checked_at,
+                    checked_at_local=checked_at_local,
+                    slot=slot,
+                    slot_index=int(slot.get("slot_index") or index),
+                    place=place,
+                    reservation=latest_reservation,
+                )
+                reservation_diagnostics.append(diagnostic)
+                self.flask_app.logger.info(
+                    "plate-check-blocked parking_id=%s source_id=%s slot_index=%s place_id=%s now=%s reservation_id=%s start=%s end=%s status=%s reason=%s",
+                    source.parking_id,
+                    source.id_source,
+                    diagnostic.get("slot_index"),
+                    diagnostic.get("place_id"),
+                    diagnostic.get("checked_at"),
+                    diagnostic.get("reservation_id"),
+                    diagnostic.get("reservation_start"),
+                    diagnostic.get("reservation_end"),
+                    diagnostic.get("reservation_status"),
+                    diagnostic.get("reason"),
+                )
                 continue
 
             eligible_slots += 1
             vehicle = Vehicule.query.get(reservation.vehicule_id) if reservation.vehicule_id else None
             expected_plate = vehicle.matricule if vehicle else None
             normalized_expected_plate = normalize_plate(expected_plate)
+            reservation_diagnostics.append(
+                self._build_reservation_diagnostic(
+                    checked_at=checked_at,
+                    checked_at_local=checked_at_local,
+                    slot=slot,
+                    slot_index=int(slot.get("slot_index") or index),
+                    place=place,
+                    reservation=reservation,
+                    reason="active_reservation_found",
+                )
+            )
 
             crop = self._extract_slot_crop(frame, slot)
             if crop is None:
@@ -1004,16 +1053,34 @@ class ParkingSourceAIService:
         summary_message = None
         if summary_status == "no_active_reservations":
             summary_message = "Aucune reservation active occupee n'a necessite de verification plaque."
+        blocking_reason = None
+        if not serialized_checks:
+            reasons = {item.get("reason") for item in reservation_diagnostics}
+            if "reservation_not_started" in reasons:
+                blocking_reason = "reservation_not_started"
+            elif "reservation_expired" in reasons:
+                blocking_reason = "reservation_expired"
+            elif "reservation_cancelled" in reasons:
+                blocking_reason = "reservation_cancelled"
+            elif "reservation_completed" in reasons:
+                blocking_reason = "reservation_completed"
+            elif "no_reservation_found" in reasons:
+                blocking_reason = "no_reservation_found"
+            elif "no_place_mapping" in reasons:
+                blocking_reason = "no_place_mapping"
 
         return serialized_checks, {
             "status": summary_status,
             "message": summary_message,
+            "checked_at": checked_at_local,
             "eligible_slots": eligible_slots,
             "checked": len(serialized_checks),
             "match": counts[PlateMatchStatus.match.value],
             "mismatch": counts[PlateMatchStatus.mismatch.value],
             "no_plate_detected": counts[PlateMatchStatus.no_plate_detected.value],
             "error": counts[PlateMatchStatus.error.value],
+            "blocking_reason": blocking_reason,
+            "reservation_diagnostics": reservation_diagnostics,
         }
 
     def _resolve_plate_frame_path(self, source: ParkingAISource) -> Path:
@@ -1084,6 +1151,69 @@ class ParkingSourceAIService:
         for reservation in reservations:
             active_by_place.setdefault(reservation.place_id, reservation)
         return active_by_place
+
+    @staticmethod
+    def _get_latest_reservations_by_place(place_ids: list[int]) -> dict[int, Reservation]:
+        if not place_ids:
+            return {}
+
+        reservations = (
+            Reservation.query.filter(Reservation.place_id.in_(place_ids))
+            .order_by(Reservation.date_debut.desc(), Reservation.id_res.desc())
+            .all()
+        )
+        latest_by_place: dict[int, Reservation] = {}
+        for reservation in reservations:
+            latest_by_place.setdefault(reservation.place_id, reservation)
+        return latest_by_place
+
+    @staticmethod
+    def _build_reservation_diagnostic(
+        *,
+        checked_at: datetime,
+        checked_at_local: str,
+        slot: dict[str, Any],
+        slot_index: int,
+        place: Place,
+        reservation: Reservation | None,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        if reservation is None:
+            resolved_reason = reason or "no_reservation_found"
+            reservation_start = None
+            reservation_end = None
+            reservation_status = None
+            reservation_id = None
+        else:
+            reservation_start = reservation.date_debut.astimezone().isoformat(timespec="seconds") if reservation.date_debut else None
+            reservation_end = reservation.date_fin.astimezone().isoformat(timespec="seconds") if reservation.date_fin else None
+            reservation_status = reservation.statut.value if hasattr(reservation.statut, "value") else str(reservation.statut)
+            reservation_id = reservation.id_res
+            if reason:
+                resolved_reason = reason
+            elif reservation.statut == StatutReservation.annulee:
+                resolved_reason = "reservation_cancelled"
+            elif reservation.statut == StatutReservation.terminee:
+                resolved_reason = "reservation_completed"
+            elif reservation.date_debut and reservation.date_debut > checked_at:
+                resolved_reason = "reservation_not_started"
+            elif reservation.date_fin and reservation.date_fin < checked_at:
+                resolved_reason = "reservation_expired"
+            else:
+                resolved_reason = "reservation_inactive"
+
+        return {
+            "slot_index": slot_index,
+            "place_id": place.id_place,
+            "place_number": slot.get("place_number"),
+            "slot_state": slot.get("label") or BUSY_LABEL,
+            "checked_at": checked_at_local,
+            "reason": resolved_reason,
+            "reservation_id": reservation_id,
+            "reservation_status": reservation_status,
+            "reservation_start": reservation_start,
+            "reservation_end": reservation_end,
+        }
 
     def _extract_slot_crop(self, frame: Any, slot: dict[str, Any]) -> Any | None:
         x, y, w, h = int(slot["x"]), int(slot["y"]), int(slot["w"]), int(slot["h"])
